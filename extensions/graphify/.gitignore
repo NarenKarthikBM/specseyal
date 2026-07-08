@@ -1,0 +1,18 @@
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+
+# Python (in case contributors run the merge scripts locally)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Consumers of this template generate these in THEIR repos, not here.
+# Listed for reference if you test the installer against a checkout in-tree:
+# graphify-out/
+# specs/*/graphify-context.md
