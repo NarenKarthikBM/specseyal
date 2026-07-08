@@ -22,12 +22,12 @@
 ## Phase 2 — Foundational (blocks all commands)
 
 - [X] T005 **Token-capture spike (S1 / R1 — timeboxed, ≤1 investigation session).** Determine whether the Claude Code transcript JSONL yields per-subagent token usage. Outcome sets the `capture_method` policy (`transcript` vs `unavailable`). **Spike failure = a D-row + `capture_method: unavailable`, never a blocker** (carried constraint R1-S01). Produces `extensions/council/docs/token-capture-spike.md`.
-- [ ] T006 [P] `extension/templates/trace-fragment.md` — the per-session trace fragment format (`trace-schema.md` **1.2**: `skills:[]`, `elevated_grants:[]`, `capture_method`, `cost_usd:null`) + the **orchestrator-serialized append** rule (never a parallel append). Consumes T005's policy.
-- [ ] T007 [P] `extension/templates/deck-technical.md` — D15 deck: problem, chosen approach + rejected alternatives, dependency/graph impact, risk register, cost/complexity, testability.
-- [ ] T008 [P] `extension/templates/deck-overview.md` — one page: what/why, what could go wrong, cost, "done".
-- [ ] T009 [P] `extension/templates/member-prompt.md` — base reviewer + `{{lens}}` slot (FR-003); graphify query-tool instructions (D10); **status-only return** (S2); **lens recorded in opinion metadata** (S4); reduced-grounding note (FR-019).
-- [ ] T010 [P] `extension/templates/chairman-prompt.md` — synthesis; classify `blocking`/`strong`/`consider`; stable IDs `R<n>-S<nn>`; delta-check; **reduced-grounding banner** (FR-019).
-- [ ] T011 [P] `extension/templates/suggestions.md` — chairman output structure (verdict, classified/ID'd table, reduced-grounding banner slot).
+- [X] T006 [P] `extension/templates/trace-fragment.md` — the per-session trace fragment format (`trace-schema.md` **1.2**: `skills:[]`, `elevated_grants:[]`, `capture_method`, `cost_usd:null`) + the **orchestrator-serialized append** rule (never a parallel append). Consumes T005's policy.
+- [X] T007 [P] `extension/templates/deck-technical.md` — D15 deck: problem, chosen approach + rejected alternatives, dependency/graph impact, risk register, cost/complexity, testability.
+- [X] T008 [P] `extension/templates/deck-overview.md` — one page: what/why, what could go wrong, cost, "done".
+- [X] T009 [P] `extension/templates/member-prompt.md` — base reviewer + `{{lens}}` slot (FR-003); graphify query-tool instructions (D10); **status-only return** (S2); **lens recorded in opinion metadata** (S4); reduced-grounding note (FR-019).
+- [X] T010 [P] `extension/templates/chairman-prompt.md` — synthesis; classify `blocking`/`strong`/`consider`; stable IDs `R<n>-S<nn>`; delta-check; **reduced-grounding banner** (FR-019).
+- [X] T011 [P] `extension/templates/suggestions.md` — chairman output structure (verdict, classified/ID'd table, reduced-grounding banner slot).
 
 ## Phase 3 — User Story 1: `/speckit-council` (Priority: P1) 🎯 MVP  *(also US5, FR-019, FR-017)*
 
