@@ -1,74 +1,108 @@
-# Contract — Agent Library Entry
+# Contract — Agent Library
 
-> **Status:** 1.0 (M0). Normative.
-> **Implements:** D2 (hybrid creator), D16 (taxonomy keys), D17 (per-repo now, central library later), D18 (model policy), D24/I-1 (flywheel), D34.
-> **Location:** `.claude/agents/<name>.md` — one file per specialist.
-> **Consumed by:** the agent creator (M3), Claude Code's own subagent loader, the central-library MCP (I-10, later).
+> **Status:** 2.0 (M0, amended 2026-07-09). Normative.
+> **Implements:** D2 (hybrid creator), D16 (taxonomy keys), D17 (per-repo now, central library later), D18 (model policy), D24/I-1 (flywheel), D34, **D40** (composability), **D41** (tool grants), **D43** (stats rekeyed on skill `id@version`), **D44** (curated-static bases; core-vs-elevated terms).
+> **Amended by:** `docs/reviews/2026-07-09-taxonomy-v0-review.md` §3 (A-1) and §4 (A-2); flag adjudications D43–D44.
+> **Consumed by:** the categorizer and skill builder (M3), Claude Code's own subagent and skill loaders, the central skill registry (I-10, later).
 
-An entry is **a Claude Code agent file that happens to carry SpecSeyal metadata** — not a SpecSeyal file that happens to be loadable. That ordering is the whole design (D34): the same file must dispatch as a subagent today and sync to a central library tomorrow, with no conversion step.
+**The library's unit of storage is the skill, not the agent (D40).** An agent is not a file; it is an *assembly* performed at dispatch time:
+
+```
+agent = base model (Sonnet, per D18)
+      + base specialist config   selected by (type, specialization)   ← fixed core
+      + injected skill modules   selected by tags                     ← free tags
+      + tool grants              aggregated from those skills         ← D41
+```
+
+Two things are stored, and only one of them evolves:
+
+| Stored | Path | Selected by | Evolves? |
+|---|---|---|---|
+| **Base specialist** | `.claude/agents/<name>.md` | `(type, specialization)` — exactly one lane | No. A thin config; hand-curated; 8 × 11 possible lanes, most empty. |
+| **Skill module** | `.claude/skills/<name>/SKILL.md` | `tags`, ranked | **Yes.** Authored by the skill builder, persisted by the flywheel (D24), synced to the registry (I-10). Format: `skill-module.md`. |
+
+Both remain **native Claude Code files that happen to carry SpecSeyal metadata** — not SpecSeyal files that happen to be loadable (D34). That ordering is the whole design: the same file must dispatch today and sync to a central registry tomorrow, with no conversion step.
+
+> **Two-kind storage — confirmed (Flag 3, adjudicated D44).** The memo states the unit of storage is the skill (§3) *and* that matching yields a base selected by `(type, specialization)` (§5.2). Both are honored by storing two entry kinds with **different evolutionary status**:
+> - **Base specialists are curated-static.** They are created and changed by a human, and only under a D-row — never by the flywheel, never by the skill builder. A base is a thin, stable lane definition; it does not learn.
+> - **Skills alone evolve.** The flywheel (D24) authors, versions, promotes, and persists *skills*. This is the single self-evolving component of year one, and it lives entirely on one side of this split.
+>
+> Base specialists do **not** disappear into assembly-from-bare-Sonnet. The `(type, specialization)` lane needs a stored home, and that home is the base.
 
 ---
 
-## 1. Format
+## 1. The two entry formats
 
-Claude Code owns the top-level frontmatter keys `name`, `description`, `tools`, `model`. Everything of ours nests under a single `specseyal:` key, so the two vocabularies can never collide.
+### 1.1 Base specialist — `.claude/agents/<name>.md`
+
+Claude Code owns `name`, `description`, `tools`, `model`. Everything of ours nests under `specseyal:`.
 
 ```markdown
 ---
-name: backend-service-python
-description: Implements service-layer business logic in Python. Use for tasks typed
-  service or endpoint in a FastAPI/SQLAlchemy codebase.
-tools: Read, Write, Edit, Bash, Glob, Grep
+name: backend-service
+description: Implements service-layer business logic. Base specialist for the
+  (service|endpoint) × backend-service lane.
+tools: Read, Write, Edit, Bash, Glob, Grep     # the immutable core — see §4.1
 model: sonnet
 
 specseyal:
-  schema_version: "1.0"
-  id: agt_backend_service_python          # stable, immutable, globally unique
-  version: 1.2.0                          # semver
-  origin: library                         # library | generated | promoted
+  schema_version: "2.0"
+  kind: base                                   # base | (skills use skill-module.md)
+  id: agt_backend_service                      # stable, immutable, globally unique
+  version: 1.0.0
 
-  taxonomy:                               # D16 fixed core + free tags
-    type: [service, endpoint]             # list — the task types this agent accepts
-    specialization: backend-service       # exactly one — its lane
-    tags: [python, fastapi, sqlalchemy, pytest]
+  taxonomy:
+    type: [service, endpoint]                  # list — the task types this lane accepts
+    specialization: backend-service            # exactly one — its lane
 
   provenance:
-    created: 2026-07-08
-    created_by: human                     # human | agent-creator
-    source_feature: null                  # specs/NNN-… for origin=generated|promoted
-    promoted_at: null                     # ISO date; set when generated → promoted
+    created: 2026-07-09
+    created_by: human
 
-  stats:                                  # DERIVED from traces.jsonl. Cache, not truth.
-    assignments: 0
-    success_rate: null
-    last_used: null
-
-  central:                                # D17 — central-sync-ready from day one
+  central:
     synced: false
     remote_id: null
-    body_sha256: null                     # hash of the prompt body below
+    body_sha256: null                          # hash of the prompt body below
 ---
 
-<system prompt body — everything below the frontmatter>
+<system prompt body — lane-level discipline only; no framework or protocol knowledge>
+```
+
+A base specialist carries **no `tags`**. Tags select skills, never bases. A base that encodes `fastapi` knowledge is a skill wearing a base's clothes, and it will be wrong the first time the lane meets Django.
+
+### 1.2 Skill module — `.claude/skills/<name>/SKILL.md`
+
+Full format in **`skill-module.md`**. Its metadata surface, for reference here:
+
+```yaml
+specseyal:
+  kind: skill
+  id: skl_refactor_discipline
+  version: 1.0.0
+  origin: seed | generated | promoted
+  taxonomy:
+    tags: [refactor, blast-radius]     # what it matches on
+  grants: []                           # declared tool grants (D41) — union'd at assembly
+  stats: { assignments: 0, success_rate: null, last_used: null }
 ```
 
 ## 2. Identity, versioning, and why `id` is not `name`
 
 | Field | Mutable? | Purpose |
 |---|---|---|
-| `id` | **never** | The join key. Central library, traces, and assignment records all reference `id`. |
+| `id` | **never** | The join key. Registry, traces, and assignment records all reference `id`. |
 | `name` | yes | Claude Code's dispatch handle and the filename. Humans rename things. |
 | `version` | monotonic | Attributes stats to a prompt. |
 
-`id` format: `agt_` + `snake_case`, stable for the life of the specialist. Renaming `backend-service-python` → `python-backend` changes the filename and `name`; `id` and accumulated `stats` survive. Had the library joined on `name`, one rename would orphan a specialist's entire performance history — and the flywheel (D24) is exactly that history.
+`id` format: `agt_` (bases) or `skl_` (skills) + `snake_case`, stable for the life of the entry. Renaming changes the filename and `name`; `id` and accumulated `stats` survive. Had the library joined on `name`, one rename would orphan a skill's entire performance history — and the flywheel (D24) *is* that history.
 
-**Version bump rule.** Bump when any of `{prompt body, tools, model}` changes:
+**Version bump rule.** Bump when any of `{prompt body, tools/grants, model}` changes:
 - prompt body → **minor** (behavior change)
-- `tools` or `model` → **minor**
+- `tools`, `grants`, or `model` → **minor**
 - typo/comment-only edit → **patch**
-- taxonomy `type` or `specialization` change → **major** (it now matches different tasks; old stats no longer transfer)
+- `taxonomy.type` / `taxonomy.specialization` (bases) or `taxonomy.tags` (skills) → **major** — it now matches different tasks, and old stats no longer transfer
 
-`body_sha256` is recomputed on every write. It is how the central library (I-10) detects that a repo edited a shared specialist locally without bumping `version` — the one desync that silently corrupts cross-repo stats.
+`body_sha256` is recomputed on every write. It is how the registry (I-10) detects that a repo edited a shared entry locally without bumping `version` — the one desync that silently corrupts cross-repo stats.
 
 **Body, defined exactly:** everything after the frontmatter's closing `---` line and its newline, taken verbatim as UTF-8 bytes — no trimming, no normalization. Reference implementation:
 
@@ -76,73 +110,110 @@ specseyal:
 sed '1,/^---$/d; 1,/^---$/d' agent.md | shasum -a 256
 ```
 
-## 3. Taxonomy keys and the matching algorithm (D16)
+## 3. Matching and assembly (D16, D40)
 
-Keys are drawn from `taxonomy-v0.md`. `type` is a **list** (a specialist accepts several kinds of work); `specialization` is **exactly one** (a specialist has one lane). This asymmetry is the matching algorithm's whole basis.
-
-Given a categorized task `t` with `t.type`, `t.specialization`, `t.tags`:
+Given a categorized task `t` with `t.type`, `t.specialization`, `t.tags`, `t.preserves_behavior`:
 
 ```
-candidates = { a ∈ library :
-                 t.type ∈ a.taxonomy.type
-               ∧ t.specialization == a.taxonomy.specialization }
+# ---- 1. Base: the fixed core selects exactly one lane ----
+base = the b ∈ bases with  t.type ∈ b.taxonomy.type
+                         ∧ t.specialization == b.taxonomy.specialization
+       (lanes are unique; ∅ → generic base, and the lane is reported at the workforce gate)
 
-if candidates = ∅         → gap generator (D2): create a bespoke agent
-if |candidates| = 1       → assign it
-else rank by, in order:
-    1. |t.tags ∩ a.taxonomy.tags| / |t.tags ∪ a.taxonomy.tags|   (Jaccard, descending)
-    2. a.stats.success_rate                                       (descending, nulls last)
-    3. a.version                                                  (descending)
-    4. a.id                                                       (ascending — total order, no ties)
+# ---- 2. Skills: free tags rank the candidates ----
+candidates = { s ∈ skills : s.taxonomy.tags ∩ t.tags ≠ ∅ }
+
+if t.preserves_behavior:
+    force-inject skl_refactor_discipline          # taxonomy-v0.md §2.3 — counts against the cap
+
+rank candidates by, in order:
+    1. |t.tags ∩ s.taxonomy.tags| / |t.tags ∪ s.taxonomy.tags|   (Jaccard, descending)
+    2. s.stats.success_rate                                       (descending, nulls last)
+    3. s.version                                                  (descending)
+    4. s.id                                                       (ascending — total order, no ties)
+
+injected = first 3 of (forced ++ ranked)          # ASSEMBLY CAP = 3 (D40)
+dropped  = the remainder — MUST be logged, never silently discarded
+
+# ---- 3. Grants: the union, nothing more (D41) ----
+grants = ⋃ { s.grants : s ∈ injected }
+
+# ---- 4. Gap ----
+if candidates = ∅ and t.tags ≠ ∅ → skill builder authors a new SKILL.md (D2, D40.2)
 ```
 
-Step 4 exists so assignment is **deterministic**: the same `categorization.md` against the same library yields the same roster, every run. That is what makes the workforce gate reviewable and the implement phase resumable.
+Step 4 of the ranking exists so assignment is **deterministic**: the same `categorization.md` against the same library yields the same roster, every run. That is what makes the workforce gate reviewable and the implement phase resumable.
 
-The fixed core does the matching; free `tags` do the ranking and feed the gap generator's prompt when matching fails. That is the division of labour D16 asked for.
+**Guardrails (D40.4), all normative:**
+
+- **Assembly cap: base + 3 injected skills, maximum.** The assignment step trims by tag-rank; it never exceeds. What it trims, it logs.
+- **Additive only.** Skills extend the base. A skill MUST NOT override or contradict base-agent behavior. `skill-module.md` encodes this as a hard constraint on the module format, not as advice.
+
+The fixed core selects the base; free tags select, rank, and brief the skills. That is the division of labour D16 asked for, with D40's third job (`taxonomy-v0.md` §6) added.
 
 ## 4. Model policy is validated, not suggested (D18)
 
-`model ∈ {opus, sonnet, haiku, inherit}`.
+`model ∈ {opus, sonnet, haiku, inherit}`. Only **base specialists** declare a model — skills never do, because a skill is not a dispatch target.
 
 | Role | Model | Rule |
 |---|---|---|
-| Implementation agents (every library specialist) | `sonnet` | **Enforced.** An entry whose `taxonomy.type` contains any implementation type (`taxonomy-v0.md` §3) and whose `model ≠ sonnet` is invalid. |
+| Implementation work (every base specialist accepting an implementation type) | `sonnet` | **Enforced.** A base whose `taxonomy.type` contains any of the 7 implementation types (`taxonomy-v0.md` §3) and whose `model ≠ sonnet` is invalid. |
 | Judgment roles — council chairman, analyze/triage | `opus` | Not library entries; see `trace-schema.md` `role`. |
-| Mechanical roles — deck prep, categorizer, council members | `sonnet` | as above |
+| Mechanical roles — deck prep, categorizer, skill builder, council members | `sonnet` | as above |
 | `haiku` | — | Unused in v1 (D18). A validator **warns**; it does not fail. |
+
+`preserves_behavior: true` does not change the model. It injects a skill (`taxonomy-v0.md` §2.3), and skills have no model to change.
 
 A specialist wanting Opus is not a config edit. It is an argument that D18's two-plane policy is wrong for this role, made in docs/90, decided, then applied. The validator's job is to make sure that argument actually happens.
 
+### 4.1 Tool grants (D41) — two defined terms (Flag 4, adjudicated D44)
+
+Tool access splits into two named tiers. These are **defined terms**, used with these exact meanings everywhere in the contracts:
+
+> **Core toolset** — the fixed set `{Read, Write, Edit, Bash, Glob, Grep}`. Every base specialist carries it, unmodified. Bases do not differ in tools; they differ in prompt. The core is never listed in a grant set or a trace — it is assumed, so only elevation is auditable.
+>
+> **Elevated grant** — any tool access *beyond* the core. **Web search is the first of them.** An elevated grant is never an agent-level default: it is *declared by a skill* (`skill-module.md` §4), and it reaches a dispatch only by that skill being injected.
+
+- The assembled agent's **elevated-grant set** is the **union** of its injected skills' declarations (§3 step 3). A skill may not declare a core tool as a grant (validation rule 9) — that would make the audit trail lie about where access came from.
+- **The workforce-gate roster MUST display each assembled agent's elevated-grant set.** Approving the roster is approving network access. This binds M3 (the roster artifact) and M5 (the gate view), and the approved set is recorded on every dispatch's trace as `elevated_grants` (D43).
+
+**A-2's "not an agent-level default" — clarified (D44):** it governs *elevated* access only. It never meant a base cannot `Read` a file; a base without the core toolset could do nothing at all. It means elevation — the network, and whatever follows it — is skill-declared and gate-visible, which is the audit property A-2 exists to secure.
+
 ## 5. `stats` is a cache, `traces.jsonl` is the truth
 
-`stats` is **derived** by aggregating `traces.jsonl` across features over records where `agent_id == a.id`:
+`stats` lives on **skills** (bases do not evolve, so they do not accumulate). It is derived by aggregating `traces.jsonl` across features over the records in which **this exact skill version** was injected — read straight off each record's `skills` array (`trace-schema.md` §1, added by D43):
 
-- `assignments` — count of records
-- `success_rate` — `count(outcome == success) / assignments`, `null` when `assignments == 0`
-- `last_used` — `max(started_at)`
+- `assignments` — `count(r : {id: a.id, version: a.version} ∈ r.skills)`
+- `success_rate` — `count(those with outcome == success) / assignments`, `null` when `assignments == 0`
+- `last_used` — `max(r.started_at)` over those records
 
-It is written into the entry as a cache so that matching (§3, rank step 2) needs one glob of `.claude/agents/`, not a scan of every feature's traces. A stale `stats` block degrades ranking quality; it can never corrupt correctness, because step 4 still totally orders the candidates. Never hand-edit `stats`; recompute it.
+The aggregation keys on `id@version`, matching `trace-schema.md` §5's `skill_success`, and for the reason given there: crediting the base (`agent_id`) would smear each skill's record across every other skill it was co-injected with, and ignoring `version` would let a regressed prompt coast on an older one's numbers (D17/D24). A skill is credited only in *combination* with its assembly-mates — honest, and sufficient for a promotion bar (see the isolation note in `trace-schema.md` §5).
 
-**The flywheel (D24, I-1)** is exactly this loop: a `generated` agent accumulates `stats` → clears a promotion bar → `origin: promoted`, `promoted_at` set, `source_feature` retained. Promotion is the only self-evolving behavior in year one, and it is gated on data this schema requires from day one. The promotion bar itself is M3's decision, not M0's.
+`stats` is cached into the entry so that ranking (§3, step 2) needs one glob of `.claude/skills/`, not a scan of every feature's traces. A stale `stats` block degrades ranking quality; it can never corrupt correctness, because ranking step 4 still totally orders the candidates. Never hand-edit `stats`; recompute it.
+
+**The flywheel (D24, I-1)** is this loop, running on skills: a `generated` skill accumulates `stats` → clears a promotion bar → `origin: promoted`. Promotion is the only self-evolving behavior in year one. The promotion bar is M3's decision, not M0's.
+
+> **Attribution resolved (D43).** An earlier draft of this section flagged the flywheel as BLOCKED: under D40 the dispatched agent is an assembly, and the pre-D43 trace record carried no field naming which skills were injected, so `stats` could not be computed. D43 added `skills: [{id, version}]` (and `elevated_grants`) to the trace record, and the aggregation above now reads it directly. The flywheel turns.
 
 ## 6. Validation
 
 An entry conforms iff:
 
-1. Frontmatter parses as YAML; `name`, `description`, `model` present; `specseyal` present.
-2. `id` matches `^agt_[a-z0-9]+(_[a-z0-9]+)*$` and is unique across `.claude/agents/`.
+1. Frontmatter parses as YAML; `name`, `description` present; `specseyal` present; `model` present iff `kind: base`.
+2. `id` matches `^agt_[a-z0-9]+(_[a-z0-9]+)*$` (bases) or `^skl_[a-z0-9]+(_[a-z0-9]+)*$` (skills), and is unique across the library.
 3. `version` is valid semver.
-4. `origin ∈ {library, generated, promoted}`; `origin ∈ {generated, promoted}` ⟹ `source_feature` non-null; `origin == promoted` ⟹ `promoted_at` non-null.
-5. `taxonomy.type` is a non-empty subset of `taxonomy-v0.md` types; `taxonomy.specialization` is exactly one of its specializations.
-6. §4's model rule holds.
+4. Skills: `origin ∈ {seed, generated, promoted}`; `origin ∈ {generated, promoted}` ⟹ `source_feature` non-null; `origin == promoted` ⟹ `promoted_at` non-null. Bases have no `origin`.
+5. **Bases:** `taxonomy.type` is a non-empty subset of `taxonomy-v0.md`'s **8** types; `taxonomy.specialization` is exactly one of its **11** specializations; the `(type, specialization)` lane is unique across bases. **Skills:** `taxonomy.tags` is non-empty; bases carry no `tags`.
+6. §4's model rule holds (bases only). §4.1's core toolset is present and unmodified.
 7. `body_sha256` equals the SHA-256 of the prompt body.
 8. The prompt body is non-empty.
+9. Skills: `grants` is a (possibly empty) list; no skill grants a tool the base's core already provides.
 
-Rule 5 is why `taxonomy-v0.md` must be blessed before M3: it is a closed enum, and closed enums are load-bearing for rules 5 and §3.
+Rule 5 is why `taxonomy-v0.md` had to be blessed before M3: it is a closed enum, and closed enums are load-bearing for rules 5 and §3. It now is (2026-07-09).
 
 ## 7. Non-goals (v1)
 
-- **No index file.** Matching globs `.claude/agents/*.md` and parses frontmatter. An index is a cache with a staleness problem, and the library is a handful of files. Revisit when the central library (I-10) makes the glob a network call.
-- **No inheritance or composition** between entries. A specialist is one file.
-- **No per-entry tool allowlists beyond Claude Code's `tools`.** We do not invent a second permission system.
-- **No central library.** D17 is explicit: per-repo now. The `central:` block exists so the migration is a field-population, not a schema change.
+- **No index file.** Matching globs `.claude/agents/*.md` and `.claude/skills/*/SKILL.md` and parses frontmatter. An index is a cache with a staleness problem. Revisit when the registry (I-10) makes the glob a network call.
+- **No skill-to-skill composition.** Skills compose onto a base, never onto each other. The assembly cap of 3 is the only depth there is.
+- **No second permission system.** Grants (§4.1) name Claude Code's own tools. We do not invent our own.
+- **No central registry.** D17 is explicit: per-repo now. The `central:` block exists so the migration is a field-population, not a schema change.

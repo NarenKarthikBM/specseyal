@@ -1,9 +1,9 @@
 # Contract — `traces.jsonl` (observability)
 
-> **Status:** 1.0 (M0). Normative.
-> **Implements:** principle 4 (observability), D6 (cost is a metric, not a principle), D18, D19 (sync model), D28 (subscription-only), D35.
+> **Status:** 1.1 (M0, amended 2026-07-09 by **D43**). Normative.
+> **Implements:** principle 4 (observability), D6 (cost is a metric, not a principle), D18, D19 (sync model), D28 (subscription-only), D35, **D40** (assembly), **D41** (tool grants), **D43** (skill/grant attribution).
 > **Location:** `specs/NNN-feature/traces.jsonl` — one append-only file per feature.
-> **Consumed by:** agent-library `stats` (M3), the M1 exit criterion, the central manager (M5).
+> **Consumed by:** agent-library skill `stats` (M3 flywheel), the M1 exit criterion, the central manager (M5).
 
 Every session in every phase appends exactly one record when it ends. No exceptions, no opt-out (`profile-schema.md` §6). The file is JSON Lines: one object per line, append-only, never rewritten.
 
@@ -20,6 +20,8 @@ Every session in every phase appends exactly one record when it ends. No excepti
   "phase": "council",
   "role": "chairman",
   "agent_id": null,
+  "skills": [],
+  "elevated_grants": [],
   "model": "claude-opus-4-8",
   "effort": "xhigh",
   "started_at": "2026-07-08T14:00:03.120Z",
@@ -32,6 +34,34 @@ Every session in every phase appends exactly one record when it ends. No excepti
 }
 ```
 
+An `implementer` record, showing a populated assembly (D40/D43) — a `service` base with two injected skills, one of which declared a `web_search` grant:
+
+```json
+{
+  "schema_version": "1.0",
+  "trace_id": "trc_01J8Z4M2RS9P",
+  "parent_trace_id": "trc_01J8Z4K0IMPL",
+  "feature": "021-rate-limits",
+  "phase": "implement",
+  "role": "implementer",
+  "agent_id": "agt_backend_service",
+  "skills": [
+    { "id": "skl_rate_limiting", "version": "1.2.0" },
+    { "id": "skl_refactor_discipline", "version": "1.0.0" }
+  ],
+  "elevated_grants": ["web_search"],
+  "model": "claude-sonnet-5",
+  "effort": "medium",
+  "started_at": "2026-07-09T10:15:00.000Z",
+  "ended_at": "2026-07-09T10:19:40.000Z",
+  "duration_ms": 280000,
+  "tokens": { "input": 12000, "output": 3100, "cache_read": 8000, "cache_creation": 0 },
+  "outcome": "success",
+  "artifact": "src/services/rate_limit.ts",
+  "cost_usd": null
+}
+```
+
 | Field | Type | Notes |
 |---|---|---|
 | `schema_version` | string | `"1.0"`. |
@@ -40,7 +70,9 @@ Every session in every phase appends exactly one record when it ends. No excepti
 | `feature` | string | Spec ID. Redundant with the path — carried so records survive being concatenated across features. |
 | `phase` | enum | One of the phases in `artifact-layout.md` §2. |
 | `role` | enum | §2. |
-| `agent_id` | string \| null | The `specseyal.id` of the library entry that ran (`agent-library-schema.md`). Non-null iff `role == implementer`. |
+| `agent_id` | string \| null | The `specseyal.id` of the **base specialist** the assembly dispatched (`agent-library-schema.md` §1.1). Non-null iff `role == implementer`. Before D40 this named "the library entry that ran"; under D40 the thing that runs is an assembly, and this is its base. |
+| `skills` | array | The skill modules injected into this assembly (D40, D43). Each element is `{ "id": "skl_…", "version": "x.y.z" }`. **Empty array `[]` when none were injected** — never `null`. Non-implementer roles always carry `[]`. Order is the assignment step's injection order; consumers must not depend on it. |
+| `elevated_grants` | array | The union of elevated tool grants active for this dispatch (D41, D43) — the exact set the workforce gate displayed and a human approved. Strings, e.g. `["web_search"]`. `[]` when the assembly ran on the base's core toolset alone. The base's immutable core (`Read, Write, Edit, Bash, Glob, Grep`) is **never** listed — only elevation is auditable. |
 | `model` | string | **Exact model ID**, e.g. `claude-opus-4-8`, `claude-sonnet-5`. Never an alias like `sonnet`. Aliases move; a trace is a historical claim. |
 | `effort` | enum \| null | `low` \| `medium` \| `high` \| `xhigh` \| `max` \| null. D18 names it (`Opus, xhigh`), so it is recorded. |
 | `started_at`, `ended_at` | ISO-8601 UTC, ms precision | |
@@ -72,7 +104,7 @@ A record whose `(role, model)` contradicts this table is **valid but flagged**. 
 
 ## 3. No message bodies
 
-A trace record carries **no prompts, no transcripts, no artifact bodies, no tool inputs or outputs**. Only the fields in §1.
+A trace record carries **no prompts, no transcripts, no artifact bodies, no tool inputs or outputs**. Only the fields in §1. `skills` and `elevated_grants` (D43) are *identity and capability metadata* — an id, a version, a tool name — not bodies; they carry no skill prompt text. The no-bodies rule is intact.
 
 Two reasons, and both are load-bearing. Context hygiene (principle 1): a trace that carries bodies re-imports the context the session boundary exists to keep out. Multi-tenancy (D7, D20): traces sync to a central manager shared by work teams and OSS users; a trace file must be safe to ship without redaction review.
 
@@ -97,12 +129,20 @@ tokens_billable(r)      = r.tokens.input + r.tokens.output + r.tokens.cache_crea
 phase_spend(f, p)       = Σ tokens_billable(r) for r in f.traces where r.phase == p
 feature_spend(f)        = Σ tokens_billable(r) for r in f.traces
 council_spend(f)        = phase_spend(f, "council") + phase_spend(f, "deck-prep")
-agent_success(a)        = count(r.outcome == "success") / count(r) where r.agent_id == a
+
+# Flywheel attribution (D43). A skill is credited for a dispatch iff it was injected into
+# that dispatch's assembly — read straight off r.skills. Segmented per VERSION (D17/D24):
+# skl_x@1.0 and skl_x@1.1 are different rows, because a prompt edit is a behavior change.
+skill_success(k, v)     = count(r.outcome == "success" for r in ALL.traces
+                                where {id:k, version:v} ∈ r.skills)
+                          / count(r for r in ALL.traces where {id:k, version:v} ∈ r.skills)
 ```
 
 `council_spend` includes deck prep because the deck exists only to be reviewed. **This is the M1 exit criterion** — "council token spend per feature is measured" (docs/05) — and M1's risk note ("if heavy, trim member count before trimming member tooling") is answerable only against this exact number, computed this exact way.
 
-`agent_success` is the flywheel's promotion input (`agent-library-schema.md` §5).
+`skill_success` is the flywheel's promotion input (`agent-library-schema.md` §5). It keys on the **skill**, not the dispatched agent, because under D40 the agent is an assembly and crediting `agent_id` (the base) would smear every skill's performance across every other skill it was ever co-injected with. It segments on `version` because promotion rewards a *specific prompt* (D17/D24); a skill that regressed at 1.1 must not coast on 1.0's record. A dispatch with `skills: []` credits no skill — correctly, since a bare base is not a flywheel candidate.
+
+> **Note on isolation.** `skill_success` measures a skill only in *combination* with whatever else shared its assembly (up to the cap of 3) — traces cannot isolate one skill's marginal contribution. That is honest, and it is enough for a promotion bar; a true ablation would need controlled dispatches, which are out of scope. Recorded so no one reads `skill_success` as a clean per-skill causal number.
 
 ## 6. D19-readiness: the phase event envelope
 
@@ -147,9 +187,11 @@ The file conforms iff:
 2. Every record has all §1 fields; unknown fields are rejected.
 3. `duration_ms == ended_at − started_at`, within 1 ms.
 4. `agent_id != null` ⟺ `role == "implementer"`.
-5. `trace_id` is unique within the file; every non-null `parent_trace_id` refers to a `trace_id` in this file or a parent feature's.
-6. No value in any record contains a newline (JSONL invariant) — which §3 already guarantees, since only bodies would.
-7. Every completed phase in `artifact-layout.md` §2 that runs a session has ≥1 record. `branch`, `council-gate` and `workforce-gate` run no session — a git ref and a human, respectively — and correctly have none.
+5. `skills` is always present and always an array; each element is `{id, version}` with `id` matching `^skl_[a-z0-9]+(_[a-z0-9]+)*$` and `version` valid semver. `skills != []` ⟹ `role == "implementer"` (only an assembly injects skills). `|skills| ≤ 3` (the assembly cap, `agent-library-schema.md` §3).
+6. `elevated_grants` is always present and always an array of strings; none of them is a member of the base core `{Read, Write, Edit, Bash, Glob, Grep}` (only elevation is recorded, D41/D43). `elevated_grants != []` ⟹ `role == "implementer"`.
+7. `trace_id` is unique within the file; every non-null `parent_trace_id` refers to a `trace_id` in this file or a parent feature's.
+8. No value in any record contains a newline (JSONL invariant) — which §3 already guarantees, since only bodies would.
+9. Every completed phase in `artifact-layout.md` §2 that runs a session has ≥1 record. `branch`, `council-gate` and `workforce-gate` run no session — a git ref and a human, respectively — and correctly have none.
 
 ## 8. Non-goals (v1)
 

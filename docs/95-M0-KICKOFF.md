@@ -64,14 +64,14 @@ main thread model policy per CLAUDE.md.
 ## Part 3 — M0 exit criteria (from docs/05)
 
 - [x] graphify migrated and verified working in `extensions/graphify/` — `git subtree`, history preserved (D31)
-- [x] Six contract docs exist and are internally consistent with docs/00 and docs/10
-- [x] `specs/000-sample/` committed and valid against the contracts — 240 checks, all passing
-- [ ] **Taxonomy v0 reviewed and blessed by Babu** — the one open item. `docs/contracts/taxonomy-v0.md` §7 has 6 questions.
-- [x] docs/90 updated (decisions D31–D39 + I-11 + session log)
+- [x] Contract docs exist and are internally consistent with docs/00 and docs/10 — **seven** now (the original six + `skill-module.md`, added by the taxonomy blessing, D40)
+- [x] `specs/000-sample/` committed and valid against the contracts — **385 checks, all passing**
+- [x] **Taxonomy v0 reviewed and blessed by Babu** — `docs/reviews/2026-07-09-taxonomy-v0-review.md`; blessed with amendments D40–D44; status **v0 BLESSED (normative)**
+- [x] docs/90 updated (decisions D31–D44 + I-11 + session log)
 - [x] Old repo archival **scheduled for checkpoint α** (when the new repo goes public) — archiving during the private phase would remove graphify's only public home
 
-**M0 done → M1 begins, and from there the pipeline builds itself.**
+**✅ M0 CLOSED — 2026-07-09.** All six exit criteria met on green verify + commit. M1 begins next, and from there the pipeline builds itself.
 
-> **Status 2026-07-09:** five of six criteria met. M1 is blocked on the taxonomy blessing, because
-> `agent-library-schema.md` §6.5 treats the taxonomy as a closed enum. M1 itself does not consume it —
-> M3 does — so a conditional start is possible if Babu prefers. That is his call, not the session's.
+> **Status 2026-07-09 (final):** all six criteria met. The taxonomy blessing (D40–D42) and its
+> flag adjudications (D43–D44) are applied; the flywheel block D40 had created is lifted by D43.
+> `95-M0-KICKOFF.md` has served its purpose and is ready to archive per docs/00 §7. M1 not started.

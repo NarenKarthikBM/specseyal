@@ -122,11 +122,24 @@ Because the Agent SDK can load the same skills and slash commands from `.claude/
 
 ### 4.3 Agent layer
 
-- **Taxonomy (D16):** hybrid — a fixed core (type × specialization enums) keeps library matching deterministic; free tags carry nuance the gap generator can read.
-- **Specialist library (D17):** per-repo in `.claude/agents/` for v1; **central library later, exposed via a central-library MCP** (I-10). Entries carry stable IDs + version metadata from day one so central sync is lift-and-shift.
-- **Gap generator:** creates bespoke agent definitions (prompt + toolset + model) for task clusters with no library match.
-- **Flywheel:** good generated agents get persisted back into the library.
-- **Model policy (D18):** two-plane — **Sonnet default for implementation agents; Opus (xhigh effort) for the main thread.** Judgment roles (chairman, analyze/triage) take Opus; mechanical/generative roles (deck prep, categorizer, members) take Sonnet; Haiku unused in v1. Graph-scored assignment deferred until observability (principle 7) produces real data — Q6 revisits then.
+**Agents are assembled, not stored (D40).** The library's unit of storage is the *skill*; an agent is what the assignment step composes at dispatch time:
+
+```
+agent = base model (Sonnet, per D18)
+      + base specialist config   selected by (type, specialization)   ← fixed core
+      + injected skill modules   selected by tags                     ← free tags
+      + tool grants              aggregated from those skills         ← D41
+```
+
+- **Taxonomy (D16, D42):** hybrid — a fixed core (**8 types × 11 specializations**, `general` capped at 20% of a feature's tasks) keeps base selection deterministic; free tags carry the nuance, and do three jobs: rank skills, brief the skill builder, and **select the skills injected at assembly**. A boolean `preserves_behavior` modifier replaces what was almost a `refactor` type, auto-injecting the `refactor-discipline` skill.
+- **Skill library (D17, D40):** per-repo — base specialists in `.claude/agents/`, skill modules in `.claude/skills/`. **Central *skill registry* later, exposed via MCP** (I-10). Entries carry stable IDs + version metadata from day one so central sync is lift-and-shift.
+- **Skill builder (was: gap generator) (D2, D40):** on a tag with no covering skill, it authors one `SKILL.md` module — not a whole bespoke agent. The library grows in composable parts rather than in near-empty lanes.
+- **Guardrails (D40):** **assembly cap of 3** injected skills per dispatch (trim by tag-rank, log what was dropped); **additive-only** — a skill may forbid more, never permit more, so injecting three sight-unseen can never make an agent less safe than its base.
+- **Tool grants (D41):** every base carries the same immutable core toolset; everything beyond it — **web search first among them** — is a per-skill declared grant, and the assembled agent's grants are their union. **The workforce-gate roster displays every agent's grant set**: approving the roster is approving network access. Binds M3 (roster artifact) and M5 (gate view).
+- **Flywheel (D24):** good generated **skills** get persisted back into the library with their stats. Still the only self-evolving component in year one.
+- **Model policy (D18):** two-plane — **Sonnet default for implementation agents; Opus (xhigh effort) for the main thread.** Judgment roles (chairman, analyze/triage) take Opus; mechanical/generative roles (deck prep, categorizer, skill builder, members) take Sonnet; Haiku unused in v1. Only base specialists declare a model — a skill is not a dispatch target. Graph-scored assignment deferred until observability (principle 7) produces real data — Q6 revisits then.
+
+Contracts: `docs/contracts/agent-library-schema.md`, `docs/contracts/skill-module.md`, `docs/contracts/taxonomy-v0.md`.
 
 ---
 
@@ -157,7 +170,8 @@ Because the Agent SDK can load the same skills and slash commands from `.claude/
 | `00-VISION-AND-ARCHITECTURE.md` | North star (this doc) | Rare |
 | `05-IMPLEMENTATION-PLAN.md` | Grounded build sequence, milestones M0–M7 | Per milestone |
 | `10-COUNCIL-EXTENSION-SPEC.md` | Deep dive: priority #1 (at 0.2 — buildable) | Active |
-| `contracts/` | The six M0 schemas: artifact layout, decision record, profile, agent library, trace, taxonomy | Rare (each change needs a D-row) |
+| `contracts/` | The M0 schemas: artifact layout, decision record, profile, agent library, **skill module**, trace, taxonomy | Rare (each change needs a D-row) |
+| `reviews/` | Normative review memos (e.g. the 2026-07-09 taxonomy blessing) | Per review |
 | `90-DECISIONS-AND-IDEAS.md` | Decision log, open questions, idea parking lot | Every session |
 | `95-M0-KICKOFF.md` | Claude Code handoff: pre-flight + M0 prompt | One-shot (archive after M0) |
 

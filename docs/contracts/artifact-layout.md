@@ -99,7 +99,7 @@ The `branch` phase has no artifact-out. Its completion check is the git ref itse
 
 | Path | Holds | Audience |
 |---|---|---|
-| `docs/contracts/` | SpecSeyal's own schemas (this file, and its five siblings) | The pipeline itself |
+| `docs/contracts/` | SpecSeyal's own schemas (this file, and its six siblings) | The pipeline itself |
 | `specs/NNN-feature/contracts/` | That feature's API contracts (OpenAPI, proto, …) | Stock spec-kit |
 
 The collision is inherited from spec-kit. It is documented rather than renamed (D39): renaming either one breaks a convention someone else owns. Always qualify the path when referring to one.

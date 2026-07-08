@@ -29,5 +29,6 @@ that no dashboard built at M5 quietly charts it as the pipeline's first datapoin
 observability number is M1's `council_spend` (`trace-schema.md` §5).
 
 ### Next steps
-- Taxonomy v0 awaits review (`docs/contracts/taxonomy-v0.md` §7) before M3 can treat it as a closed enum.
-- I-11 (conformance checker) revisits this fixture at M1.
+- Taxonomy v0 is **BLESSED (normative)** as of 2026-07-09 (`docs/reviews/2026-07-09-taxonomy-v0-review.md`); M3 may treat it as a closed enum. The M0 exit gate is closed.
+- **Flywheel unblocked (D43):** `trace-schema.md` now carries `skills: [{id, version}]` + `elevated_grants`, so skill-level stats attribution keys on `id@version` (`agent-library-schema.md` §5). M3's flywheel can turn.
+- I-11 (conformance checker) revisits this fixture at M1 — and now must also validate the base/skill split, grant display, and the additive-only rule.

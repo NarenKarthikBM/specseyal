@@ -1,11 +1,11 @@
-# Contract — Task Taxonomy v0 · **DRAFT, AWAITING REVIEW**
+# Contract — Task Taxonomy · **v0 — BLESSED (normative), 2026-07-09**
 
-> **Status:** 0.1 — **DRAFT. Not normative until Babu blesses it** (docs/95, M0 exit criteria).
-> **Implements:** D16 (hybrid: fixed core + free tags), D36.
-> **Blocks:** M3 (categorize + agent creator). `agent-library-schema.md` §6 rule 5 treats these as closed enums.
+> **Status:** v0 — **BLESSED (normative), 2026-07-09.** Reviewed and amended per `docs/reviews/2026-07-09-taxonomy-v0-review.md`. The M0 exit criterion "taxonomy v0 reviewed and blessed by Babu" (docs/95 Part 3) is satisfied.
+> **Implements:** D16 (hybrid: fixed core + free tags), D36, **D40** (composability), **D41** (tool grants), **D42** (OQ verdicts, 8×11 cardinality, `general` cap).
+> **Blocks:** M3 (categorize + skill builder). `agent-library-schema.md` §6 rule 5 treats these as closed enums.
 > **Grounded in:** graphify's `speckit-tasks-graph` skill and its `examples/tasks-with-waves.example.md`, both now at `extensions/graphify/`.
 
-Every task carries exactly one `type`, exactly one `specialization`, and any number of free `tags`. The pair `(type, specialization)` is the deterministic matching key against the agent library; `tags` rank the candidates and brief the gap generator (D16, `agent-library-schema.md` §3).
+Every task carries exactly one `type`, exactly one `specialization`, the boolean modifier `preserves_behavior` (§2.3), and any number of free `tags`. The pair `(type, specialization)` deterministically selects the **base specialist**; `tags` rank and select the **skill modules** injected on top of it (D40, `agent-library-schema.md` §3).
 
 ---
 
@@ -34,7 +34,7 @@ So the two axes are not a tidy 2×2 imposed on the problem. They are the two *so
 
 That is also why a Sonnet categorizer suffices (D18): one axis is a lookup, the other is a shallow inference over a document that already states the answer.
 
-## 2. Type — 9 values
+## 2. Type — 8 values
 
 | `type` | The task's deliverable | Derivation rule (graphify signals) |
 |---|---|---|
@@ -46,7 +46,6 @@ That is also why a Sonnet categorizer suffices (D18): one axis is a lookup, the 
 | `test` | Any verification artifact | `files=` under `tests/` or matching `*.test.*`/`*_test.*`; lands in an **earlier wave** than the task it covers |
 | `docs` | Documentation | `files=` under `docs/`, or `*.md` outside `specs/` |
 | `infra` | CI, containers, deployment manifests | `files=` under `.github/`, `Dockerfile`, IaC paths |
-| `refactor` | Behavior-preserving change to existing code | **every** file in `files=` already exists in the graph (`mutates=` has no `(new)`) **and** the task adds no new public surface |
 
 **Every rule keys off something graphify actually emits.** That is the acceptance test for a type: if you cannot write its derivation rule against `files=` / `deps=` / `mutates=` / phase / TDD position, it is not a type.
 
@@ -64,15 +63,33 @@ The near miss is instructive. In graphify's own example, `T011 POST /searches en
 
 `[P]`, wave membership, and `mutates=` are **scheduling**, not classification. They never enter the matching key. They do constrain the roster in one way — a task whose `mutates=` hits the shared/mutable list can only be assigned an agent, never inlined as orchestrator glue, and vice versa — but that is an assignment guard (M3), not a taxonomy key.
 
+### 2.3 The `preserves_behavior` modifier (OQ1 — OVERRULED, D42)
+
+`refactor` was drafted as a ninth type. **It is not a type; it is a modifier**, orthogonal to type. "Refactor the search service" already has a type — `service` — and burying that under `(refactor, backend-service)` destroys the information that it *is* service work.
+
+Every task therefore carries a boolean `preserves_behavior`, whose derivation rule is the one `refactor` used to own, verbatim:
+
+> **`preserves_behavior` is true when every file in `files=` already exists in the graph (`mutates=` has no `(new)`) and the task adds no new public surface.**
+
+Like `type`, it is derivable from what graphify emits — so it belongs to the mechanical axis and costs the categorizer nothing.
+
+**Consequence (D40).** The requirement that motivated `refactor` — that this work needs a *differently disciplined* agent, one careful about blast radius and adding no public surface — is met by composition rather than by a type. `preserves_behavior: true` **auto-injects the `refactor-discipline` skill module** at assembly (`skill-module.md`; `agent-library-schema.md` §3). The discipline arrives as a skill on top of the right base specialist, instead of replacing that base specialist with a generic one.
+
+The auto-injection counts against the assembly cap of 3 injected skills (D40).
+
+`preserves_behavior: true` tasks remain **implementation tasks** (§3): they run the base specialist for their `type`, which is never `docs`.
+
 ## 3. Implementation types
 
-`agent-library-schema.md` §4 enforces `model: sonnet` for library specialists that accept **implementation types**. Those are:
+`agent-library-schema.md` §4 enforces `model: sonnet` for base specialists that accept **implementation types**. Those are the 7:
 
 ```
-scaffold · data-model · service · endpoint · ui · test · infra · refactor
+scaffold · data-model · service · endpoint · ui · test · infra
 ```
 
 i.e. everything but `docs`. A `docs`-only specialist may take any model D18 permits.
+
+`preserves_behavior: true` does not change this. A behavior-preserving `service` task is still an implementation task on the `service` base specialist — it merely arrives with the `refactor-discipline` skill injected (§2.3).
 
 ## 4. Specialization — 10 values (+ 1 escape hatch)
 
@@ -90,7 +107,19 @@ Exactly one per task: *the expertise that dominates*. Not the only expertise inv
 | `ai-agents` | LLMs, prompts, agent orchestration, MCP |
 | `devtools-cli` | CLIs, build tooling, codegen, editor/agent extensions |
 | `qa-automation` | Test harnesses, fixtures, e2e drivers |
-| `general` | **Escape hatch.** No lane dominates. Guarantees no library match → routes to the gap generator. |
+| `general` | **Escape hatch.** No lane dominates. Guarantees no base-specialist match → routes to the skill builder. **Capped — see below.** |
+
+### The `general` cap (OQ3 — upheld with a cap, D42)
+
+`general` is the honest answer when no lane dominates, and it stays. But it is also the answer a lazy categorizer gives to everything, so it is bounded:
+
+> **At most 20% of a feature's tasks may be specialized `general`. A categorization that exceeds the cap FAILS and must be redone with better evidence.**
+>
+> Formally: `count(general) ≤ 0.20 × count(tasks)`.
+
+Failure is not a warning. `categorization.md` is not written, the phase does not complete, and — by the resumability rule (`artifact-layout.md` §3) — the pipeline stops at categorize until a run produces a conforming artifact. The cap is a floor on evidence, not a style preference: a feature whose tasks genuinely resist classification is telling you the plan is underspecified, and that is worth stopping for.
+
+**Edge case, adjudicated (D44).** For a feature with fewer than 5 tasks, `0.20 × n < 1`, so the cap permits **zero** `general` tasks. This was flagged during application and ruled on: **the literal 20% cap stands for v0.** A one-task floor — `count(general) ≤ max(1, ⌊0.2·n⌋)` — is recorded as an *unadopted* v1 candidate in §8, to be decided against real small-feature data rather than invented now.
 
 Deliberately **not** specializations, because they duplicate a type: `api-contract` (that is `type: endpoint`), `technical-writing` (that is `type: docs`), `testing` (that is `type: test`). A specialization that names the same thing as a type collapses the two axes and makes the matching key a single axis wearing two hats.
 
@@ -113,36 +142,43 @@ Every task from `extensions/graphify/examples/tasks-with-waves.example.md`, tagg
 | T022 | Saved-search dropdown | `ui` | `frontend-web` | `react`, `tsx` |
 | T030 | Integration test, save → list | `test` | `qa-automation` | `integration`, `e2e` |
 
-Observations worth the reviewer's attention:
+Every task above has `preserves_behavior: false` — all ten create new surface. The modifier is unexercised here; see the risk note below.
 
-- **Every task tagged unambiguously**, with one exception argued in OQ4 below (T030).
-- The example exercises **5 of 9 types** and **4 of 11 specializations**. `scaffold`, `docs`, `infra`, `refactor` and six specializations are unexercised by it. They are argued from the derivation rules, not demonstrated. **That is the draft's chief risk** — an unexercised enum value is a guess.
-- The `(type, specialization)` pairs cluster hard: 4 of 10 tasks are `× backend-service`. A seed library of 5–6 specialists (docs/05, M3) therefore covers a typical feature — which is the assumption M3's whole cost model rests on, and this table is the first evidence for it.
-- `T011`/`T021` share a type *and* a specialization *and* a file. They get the same specialist and are still serialized. Taxonomy and scheduling stayed orthogonal, as §2.1 claimed.
+Observations worth keeping:
+
+- **Every task tagged unambiguously**, with one exception (T030), settled by OQ4 and re-opened at v0→v1.
+- The example exercises **5 of 8 types** and **4 of 11 specializations**. `scaffold`, `docs`, `infra`, seven specializations, and the `preserves_behavior: true` branch are unexercised by it. They are argued from the derivation rules, not demonstrated. **That remains the taxonomy's chief risk** — an unexercised enum value is a guess, and blessing does not make it evidence.
+- The `(type, specialization)` pairs cluster hard: 4 of 10 tasks are `× backend-service`. Under D40 this matters more, not less: a base specialist covers a lane, and skills cover the variation *within* it. This table is the first evidence that a small set of lanes plus composable skills covers a typical feature.
+- `T011`/`T021` share a type *and* a specialization *and* a file. They assemble to the same base specialist and are still serialized. Taxonomy and scheduling stayed orthogonal, as §2.1 claimed.
 
 ## 6. Free tags (D16)
 
-Lowercase kebab-case, unbounded, unvalidated. They carry the nuance the fixed core deliberately drops: language, framework, protocol, sub-domain. They do two jobs and no others:
+Lowercase kebab-case, unbounded, unvalidated. They carry the nuance the fixed core deliberately drops: language, framework, protocol, sub-domain. Under D40 they do **three** jobs and no others:
 
-1. **Rank** tied library candidates (Jaccard overlap — `agent-library-schema.md` §3).
-2. **Brief** the gap generator when matching returns ∅ — a task tagged `python, fastapi, rate-limiting` tells the generator far more than `(endpoint, backend-service)` ever could.
+1. **Rank** candidate skill modules (Jaccard overlap — `agent-library-schema.md` §3).
+2. **Brief** the skill builder when matching returns ∅ — a task tagged `python, fastapi, rate-limiting` tells the builder far more than `(endpoint, backend-service)` ever could.
+3. **Select** the skill modules injected onto the base specialist at assembly time (D40, `skill-module.md`). *This is the third job, added by the review memo (§3.1).*
 
-Tags **never** widen or narrow a match. If a tag ever needs to, it has earned promotion to the fixed core, and that is a schema change with a D-row.
+Job 3 is what recovers the cross-cutting signal OQ2 gave up. "Add rate limiting to `POST /searches`" is still `(endpoint, backend-service)` — one specialization, matching stays deterministic — but its `rate-limiting` and `security` tags inject the skills that carry the security knowledge. **The signal was never lost; it moved from the matching key to the assembly.**
 
-## 7. Open questions for review
+Tags **never** widen or narrow the *base* match. If a tag ever needs to, it has earned promotion to the fixed core, and that is a schema change with a D-row.
 
-The six places I made a call that could reasonably go the other way. **OQ1 and OQ2 are the ones I would most like overruled if you disagree** — they are the hardest to change after M3 ships, because `agent-library-schema.md` §3 hard-codes their shape.
+## 7. Open questions — **all six resolved**
 
-| # | Question | My call | The case against |
+Resolved by Babu, 2026-07-09. The normative record is `docs/reviews/2026-07-09-taxonomy-v0-review.md` §2; the verdicts are logged as **D42**.
+
+| # | Question | Verdict | Where it landed |
 |---|---|---|---|
-| **OQ1** | Is `refactor` a **type**, or a **modifier** orthogonal to type? | Type. Its derivation rule is crisp (`mutates=` all non-new, no new surface) and it needs a genuinely different agent — one disciplined about blast radius and adding no public surface. | "Refactor the search service" has an obvious type already: `service`. Making it a type means the pair `(refactor, backend-service)` loses the information that it *is* service work. The alternative: drop `refactor`, add a boolean `preserves_behavior`. **8 types instead of 9.** |
-| **OQ2** | One specialization per task, or `primary` + `secondary[]`? | Exactly one. Determinism is the reason the fixed core exists at all. | "Add rate limiting to `POST /searches`" is honestly `security` *and* `backend-service`. Forcing one loses real signal — though `tags: [rate-limiting]` recovers most of it, and set-overlap matching is a strictly bigger change than it looks. |
-| **OQ3** | Does `general` defeat the point? | Keep it. Every task must be taggable, and `general` is an *honest* "no lane dominates" that routes straight to the gap generator (D2) rather than forcing a bad match. | It is an invitation to a lazy categorizer. Mitigation if you want one: cap `general` at, say, 20% of a feature's tasks and fail categorization above that. |
-| **OQ4** | `T030` — is a cross-cutting integration test `qa-automation` or `backend-service`? | `qa-automation`. Unit tests need domain knowledge; e2e tests need harness knowledge. | The boundary is the softest in the table, and it is decided by test *scope*, not by anything graphify emits — so it violates §1's "type is mechanical" spirit, one axis over. |
-| **OQ5** | Merge `scaffold` and `infra`? | Keep separate. Adding a `tsconfig` path and authoring a GitHub Actions matrix are different jobs for different agents. | Both are "config files nobody wants to write." Merging gives **8 types** and one fewer near-empty library lane. |
-| **OQ6** | Do `ai-agents` and `devtools-cli` belong in a *general* taxonomy? | Keep. SpecSeyal dogfoods on itself from M1 (CLAUDE.md), so **its own tasks** are overwhelmingly `(service|docs|test) × (ai-agents|devtools-cli)`. Without these two, the very first real run tags everything `general`. | They are here because of *this* repo, not because of a survey of repos. That is a legitimate charge of overfitting — mitigated only by the fact that the library is per-repo (D17) and the taxonomy is v0. |
+| **OQ1** | Is `refactor` a type, or a modifier? | **OVERRULED** — modifier | `refactor` deleted from the type enum (9 → **8 types**); `preserves_behavior` added as a boolean carrying the old derivation rule verbatim, auto-injecting the `refactor-discipline` skill (§2.3, D40) |
+| **OQ2** | One specialization, or `primary` + `secondary[]`? | **Upheld** — exactly one | Cross-cutting signal recovered by tag→skill injection (§6 job 3), not by `secondary[]`. Matching stays deterministic (D40) |
+| **OQ3** | Does `general` defeat the point? | **Upheld, cap adopted** | `general` stays; capped at 20% of a feature's tasks, over-cap categorization **fails** (§4) |
+| **OQ4** | Is `T030` `qa-automation` or `backend-service`? | **Upheld** — `qa-automation` | Scope-based boundary accepted for v0; **explicitly re-examined at the v0→v1 three-feature review** (§8) |
+| **OQ5** | Merge `scaffold` and `infra`? | **Upheld** — separate | Composability removed the cost that motivated merging: near-empty *skill* lanes are cheap; near-empty *agent* lanes were not (D40) |
+| **OQ6** | Do `ai-agents` / `devtools-cli` belong in a general taxonomy? | **Upheld** — both stay | Dogfooding is decisive; the per-repo library (D17) contains the overfit; v0→v1 re-tests it (§8) |
 
-Cardinality if you take every "against": **8 types × 10 specializations**. Cardinality as drafted: **9 × 11**.
+**Resulting cardinality: 8 types × 11 specializations**, `general` capped.
+
+The draft argued OQ1 and OQ2 were the hardest to change after M3 because `agent-library-schema.md` §3 hard-coded their shape. OQ1 was overruled *before* M3, at zero cost. OQ2 was upheld — but D40 changed the reason it holds: determinism survives not because one specialization is enough to describe a task, but because the parts it cannot describe now live in the skills, where they compose.
 
 ## 8. Change process
 
@@ -153,3 +189,13 @@ This file is a closed enum with two hard consumers (`agent-library-schema.md` §
 3. Promoting a free tag to the fixed core → §6's rule. A D-row.
 
 v0 → v1 happens when the first three real dogfood features are categorized and the enum has been tested against work that isn't graphify's own example. Until then, every value not exercised in §5 is a hypothesis.
+
+**Carried to the v0→v1 review** (each booked by the 2026-07-09 memo or by applying it):
+
+| # | Item |
+|---|---|
+| 1 | **OQ4** — the `test × qa-automation` vs `test × backend-service` boundary, decided by test *scope* rather than by anything graphify emits (memo §2) |
+| 2 | **OQ6** — whether `ai-agents` and `devtools-cli` survive contact with a repo that is not SpecSeyal (memo §2) |
+| 3 | **Small-feature edge (Flag 2, adjudicated D44).** The literal 20% cap admits **zero** `general` tasks when a feature has fewer than 5 (`0.20 × n < 1`, §4). The literal cap **stands for v0.** Candidate for v1, noted but **unadopted**: `count(general) ≤ max(1, ⌊0.2·n⌋)` — a one-task floor. Decide against real small-feature data, not in the abstract. |
+| 4 | `preserves_behavior: true` is unexercised by §5's worked example, so the `refactor-discipline` auto-injection has never fired against real output |
+| 5 | Whether the assembly cap of 3 injected skills (D40) binds in practice, and what the assignment step drops when it does |
