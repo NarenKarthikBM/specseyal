@@ -21,7 +21,7 @@
 
 ## Phase 2 — Foundational (blocks all commands)
 
-- [ ] T005 **Token-capture spike (S1 / R1 — timeboxed, ≤1 investigation session).** Determine whether the Claude Code transcript JSONL yields per-subagent token usage. Outcome sets the `capture_method` policy (`transcript` vs `unavailable`). **Spike failure = a D-row + `capture_method: unavailable`, never a blocker** (carried constraint R1-S01). Produces `extensions/council/docs/token-capture-spike.md`.
+- [X] T005 **Token-capture spike (S1 / R1 — timeboxed, ≤1 investigation session).** Determine whether the Claude Code transcript JSONL yields per-subagent token usage. Outcome sets the `capture_method` policy (`transcript` vs `unavailable`). **Spike failure = a D-row + `capture_method: unavailable`, never a blocker** (carried constraint R1-S01). Produces `extensions/council/docs/token-capture-spike.md`.
 - [ ] T006 [P] `extension/templates/trace-fragment.md` — the per-session trace fragment format (`trace-schema.md` **1.2**: `skills:[]`, `elevated_grants:[]`, `capture_method`, `cost_usd:null`) + the **orchestrator-serialized append** rule (never a parallel append). Consumes T005's policy.
 - [ ] T007 [P] `extension/templates/deck-technical.md` — D15 deck: problem, chosen approach + rejected alternatives, dependency/graph impact, risk register, cost/complexity, testability.
 - [ ] T008 [P] `extension/templates/deck-overview.md` — one page: what/why, what could go wrong, cost, "done".
