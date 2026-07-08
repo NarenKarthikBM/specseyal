@@ -1,0 +1,30 @@
+schema_version: "1.0"
+
+extension:
+  id: council
+  name: "Plan Defense Council"
+  version: "0.1.0"
+  description: "Forces every plan through an adversarial council before task breakdown: deck prep distills plan.md and spec.md into a technical and one-page defense deck, a Claude-only member bench (5 Sonnet members across two stages) plus an Opus chairman run one llm-council review round into a classified suggestions list, a triage step applies the accepted suggestions and writes the decision record, and a human gate signs off before /speckit-tasks unlocks."
+  author: narenkarthikbm
+  license: MIT
+
+requires:
+  speckit_version: ">=0.2.0"
+
+provides:
+  commands:
+    - name: speckit.council
+      file: commands/speckit.council.md
+      description: "Deck prep plus one two-stage, five-member council round with chairman synthesis, producing a suggestions summary"
+    - name: speckit.council.triage
+      file: commands/speckit.council.triage.md
+      description: "Apply accepted suggestions to plan.md and write the council decision record"
+    - name: speckit.council.approve
+      file: commands/speckit.council.approve.md
+      description: "Record the human-gate decision on the decision record and unlock /speckit-tasks"
+
+tags:
+  - "council"
+  - "plan-review"
+  - "governance"
+  - "llm-council"

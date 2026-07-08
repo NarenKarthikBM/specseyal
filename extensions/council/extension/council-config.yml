@@ -1,0 +1,30 @@
+# Council extension configuration
+# Governs the plan-defense council convened by /speckit-council.
+# Also read by /speckit-council-triage (model map) and /speckit-council-approve
+# (no keys of its own, but shares this file for consistency).
+member_count: 5
+# Number of independent council members in stage 1 + stage 2 (peer review).
+# This is the M1 cost lever (risk R2, plan.md): one council round is
+# ~2 * member_count + 3 sessions (deck-prep + members x2 stages + chairman + triage).
+# If council_spend (SC-002) runs hot, trim this number first — it's a
+# one-line config edit, no code change. Peer review itself is not cut
+# (see plan.md "Rejected Alternatives").
+member_lenses: [correctness, risk, simplicity, testability, sequencing]
+# Soft analytical-lens nudge, assigned one-per-member (A-E) on top of the
+# same base reviewer prompt (member-prompt.md). v1 members are
+# general-purpose reviewers with varied prompts (D18) — this is NOT the
+# v2 role-critic roster (formal specialized critics), just an emphasis
+# layered on a shared base prompt. Must have exactly member_count entries.
+# Each member records its assigned lens in its opinion's metadata header.
+models:
+  # D18 role -> model policy. This is global policy for the council
+  # extension, not a per-feature setting — do not override per spec.
+  chairman: opus
+  member: sonnet
+  deck_prep: sonnet
+max_rounds: 1
+# v1 runs exactly one full council round (deck-prep -> members stage 1 ->
+# members stage 2 -> chairman synthesis) per /speckit-council invocation.
+# Any residual `blocking` item surviving the chairman's delta-check
+# escalates to the human gate (D13) rather than triggering another round.
+# Raising this above 1 is a later autonomy-profile option, not v1 behavior.

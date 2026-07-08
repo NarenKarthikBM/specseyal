@@ -15,9 +15,9 @@
 ## Phase 1 — Setup (shared scaffold)
 
 - [X] T001 Scaffold `extensions/council/` (dir tree) + `install.sh` + `uninstall.sh`, mirroring `extensions/graphify/` — **simpler**: council registers no `before_*` hooks, so drop the PyYAML hook-merge; the installer only copies `extension/` and `skills/*` and (optionally) adds `council` to `.specify/extensions.yml` `installed:`.
-- [ ] T002 [P] `extension/extension.yml` (id: council; provides the 3 commands; `hooks: none`) + `extension/README.md`.
-- [ ] T003 [P] `extension/council-config.yml` — `member_count: 5`, `member_lenses: [correctness, risk, simplicity, testability, sequencing]`, `models: {chairman: opus, member: sonnet, deck_prep: sonnet}`, `max_rounds: 1` (the member-count trim lever, R2/S3).
-- [ ] T004 [P] `extensions/council/README.md` (top-level: what it installs, the flow, requirements).
+- [X] T002 [P] `extension/extension.yml` (id: council; provides the 3 commands; `hooks: none`) + `extension/README.md`.
+- [X] T003 [P] `extension/council-config.yml` — `member_count: 5`, `member_lenses: [correctness, risk, simplicity, testability, sequencing]`, `models: {chairman: opus, member: sonnet, deck_prep: sonnet}`, `max_rounds: 1` (the member-count trim lever, R2/S3).
+- [X] T004 [P] `extensions/council/README.md` (top-level: what it installs, the flow, requirements).
 
 ## Phase 2 — Foundational (blocks all commands)
 
