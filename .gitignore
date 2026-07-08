@@ -8,3 +8,8 @@ graphify-out/
 __pycache__/
 *.pyc
 node_modules/
+
+# spec-kit working state: active-feature pointer, transient/per-session (D45).
+# The active feature is resolved from this at runtime; durable phase state lives
+# only under specs/NNN/ (D32), so this is never committed.
+.specify/feature.json
