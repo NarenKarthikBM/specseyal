@@ -97,7 +97,7 @@ extensions/council/
 ├── install.sh                     # idempotent; mirrors graphify (no before_* hook merge)
 ├── uninstall.sh
 ├── README.md
-└── extension/
+├── extension/
     ├── extension.yml              # id: council; provides 3 commands; hooks: none
     ├── README.md
     ├── council-config.yml         # member_count, lenses, model map, max_rounds
@@ -111,14 +111,15 @@ extensions/council/
         ├── member-prompt.md       # base reviewer prompt + {{lens}} slot (thin interface, FR-003)
         ├── chairman-prompt.md     # synthesis + classification + delta-check
         └── suggestions.md         # chairman output structure (classified, ID'd, reduced-grounding flag)
+└── skills/                        # SOURCE of the 3 command skills (each its own dir)
+    ├── speckit-council/SKILL.md
+    ├── speckit-council-triage/SKILL.md
+    └── speckit-council-approve/SKILL.md
 
-.claude/skills/                    # install destination (each command = one skill dir)
-├── speckit-council/SKILL.md
-├── speckit-council-triage/SKILL.md
-└── speckit-council-approve/SKILL.md
+# install.sh copies extensions/council/skills/* → .claude/skills/  (the graphify pattern; not authored there)
 ```
 
-**Structure Decision**: sibling-of-graphify layout. Command skills live in `.claude/skills/` (not edits to stock spec-kit skills) so a Spec Kit re-init never clobbers them — the same compatibility guarantee graphify documents.
+**Structure Decision**: sibling-of-graphify layout. Command skills are **authored in `extensions/council/skills/`** and **installed to `.claude/skills/`** by `install.sh` (not edits to stock spec-kit skills), so a Spec Kit re-init never clobbers them — the same compatibility guarantee graphify documents.
 
 ## Dependency / graph impact
 
