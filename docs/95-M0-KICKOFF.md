@@ -63,11 +63,15 @@ main thread model policy per CLAUDE.md.
 
 ## Part 3 — M0 exit criteria (from docs/05)
 
-- [ ] graphify migrated and verified working in `extensions/graphify/`
-- [ ] Six contract docs exist and are internally consistent with docs/00 and docs/10
-- [ ] `specs/000-sample/` committed and valid against the contracts
-- [ ] Taxonomy v0 reviewed and blessed by Babu
-- [ ] docs/90 updated (decisions + session log)
-- [ ] Old repo archival **scheduled for checkpoint α** (when the new repo goes public) — archiving during the private phase would remove graphify's only public home
+- [x] graphify migrated and verified working in `extensions/graphify/` — `git subtree`, history preserved (D31)
+- [x] Six contract docs exist and are internally consistent with docs/00 and docs/10
+- [x] `specs/000-sample/` committed and valid against the contracts — 240 checks, all passing
+- [ ] **Taxonomy v0 reviewed and blessed by Babu** — the one open item. `docs/contracts/taxonomy-v0.md` §7 has 6 questions.
+- [x] docs/90 updated (decisions D31–D39 + I-11 + session log)
+- [x] Old repo archival **scheduled for checkpoint α** (when the new repo goes public) — archiving during the private phase would remove graphify's only public home
 
 **M0 done → M1 begins, and from there the pipeline builds itself.**
+
+> **Status 2026-07-09:** five of six criteria met. M1 is blocked on the taxonomy blessing, because
+> `agent-library-schema.md` §6.5 treats the taxonomy as a closed enum. M1 itself does not consume it —
+> M3 does — so a conditional start is possible if Babu prefers. That is his call, not the session's.

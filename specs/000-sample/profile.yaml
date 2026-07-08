@@ -1,0 +1,14 @@
+# Autonomy profile — 000-sample
+# Both gates human: the default posture (D9). See docs/contracts/profile-schema.md.
+schema_version: "1.0"
+feature: "000-sample"
+
+full_auto: false
+
+gates:
+  council:
+    mode: human
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: human

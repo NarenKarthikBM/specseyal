@@ -157,6 +157,7 @@ Because the Agent SDK can load the same skills and slash commands from `.claude/
 | `00-VISION-AND-ARCHITECTURE.md` | North star (this doc) | Rare |
 | `05-IMPLEMENTATION-PLAN.md` | Grounded build sequence, milestones M0–M7 | Per milestone |
 | `10-COUNCIL-EXTENSION-SPEC.md` | Deep dive: priority #1 (at 0.2 — buildable) | Active |
+| `contracts/` | The six M0 schemas: artifact layout, decision record, profile, agent library, trace, taxonomy | Rare (each change needs a D-row) |
 | `90-DECISIONS-AND-IDEAS.md` | Decision log, open questions, idea parking lot | Every session |
 | `95-M0-KICKOFF.md` | Claude Code handoff: pre-flight + M0 prompt | One-shot (archive after M0) |
 
