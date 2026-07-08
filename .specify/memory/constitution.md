@@ -1,50 +1,39 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# SpecSeyal Constitution
+
+> The non-negotiable principles governing every feature built through this pipeline.
+> Derived from `docs/00-VISION-AND-ARCHITECTURE.md` §2 and the decision log `docs/90`.
+> This file is the operative gate that `/speckit-plan` and `/speckit-analyze` check each feature against.
+> Amending it is a decision (a D-row in docs/90) plus a version bump here.
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Artifacts Are the Contract
+Every pipeline phase reads artifacts in and writes **exactly one** artifact out (principle 1, D4). The CLI layer and the platform layer share this single interface — files in the repo. A phase that writes two artifacts, or mutates another phase's artifact, violates this. `tasks.md` has two writers only because graphify appends a disjoint `## Execution Waves` section (artifact-layout §6); that is the sole exception, and it is why categorization got its own artifact (D37).
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Context Hygiene
+The main thread stays a lean orchestration spine (principle 2). Heavy work — council review, categorization, agent assembly — runs in **separate sessions** that receive only their declared context-in and return one compact artifact. The main thread never inherits an offloaded session's context. The council's `opinions/` never cross to the main thread; `suggestions.md` is the sole compression boundary (docs/10 §6).
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Resumability (NON-NEGOTIABLE)
+Phase state is **inferred from artifacts**. There is no state file, and adding one is forbidden (D32). A phase is complete iff its artifact-out exists **and** validates against its contract. Gate decisions are artifacts — a section appended to a record — never events in a database or a transcript. Kill the process anywhere; the artifact tree alone says where to restart.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Observability
+Every session in every phase appends **exactly one** trace record to `traces.jsonl` (principle 4, D35). No opt-out — a feature cannot disable tracing. Traces carry **no message bodies** (identity and metrics only), so they are safe to sync to a multi-tenant manager without redaction review. Tokens are the unit of account; `cost_usd` is `null` under subscription billing (D6, D28).
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Subscription-Only Billing (NON-NEGOTIABLE)
+All work runs on Claude subscription auth. `ANTHROPIC_API_KEY` is **never** set or relied upon (D28). M0–M5 run in interactive sessions; M6+ programmatic sessions use the plan's Agent SDK monthly credit. A build machine with the key set routes billing to the API silently — so it stays unset.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Additional Constraints
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### Model Policy (D18)
+Two-plane: **Opus (xhigh)** on the main thread and for judgment roles (council chairman, analyze/triage); **Sonnet** for implementation agents and mechanical/generative roles (deck prep, categorizer, skill builder, council members). Haiku unused in v1. Only base specialists declare a model; a `(role, model)` contradiction in a trace is *flagged*, never silently rewritten (the trace is evidence, not an enforcer).
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
-
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### Autonomy & Gates (D9)
+Exactly two gate-capable checkpoints: the **council gate** (post-plan) and the **workforce gate** (post-tasks + agent assignment). The council gate is default-on in every profile; skipping it requires an explicit `full_auto: true` handshake (profile-schema §2). Autonomy is about **who signs**, never about **what runs** — an `auto` gate still convenes the council and writes every artifact.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution supersedes convenience. Every `/speckit-plan` runs a **Constitution Check** gate against these principles before Phase 0 and re-checks after design; an unjustified violation is an ERROR. A justified violation is recorded in the plan's **Complexity Tracking** with the simpler alternative that was rejected and why.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Log discipline (non-negotiable):** any decision made in a session gets a D-row in `docs/90` in that same session; ideas get I-rows immediately. Amendments to this constitution are themselves decisions — a D-row, plus a version bump below.
+
+**Version**: 1.0.0 | **Ratified**: 2026-07-09 | **Last Amended**: 2026-07-09
