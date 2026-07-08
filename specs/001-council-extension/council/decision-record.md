@@ -63,3 +63,26 @@
 - `R1-S02` — the orchestrator/member design MUST enforce **status-only returns** (all opinion content file-mediated); a task verifies SC-005's two-part check.
 - `R1-S03` — `member_count: 5` + faithful two-stage peer review are **fixed for the first live run** (config); no tuning task exists until SC-002 does.
 - `R1-S04` — member opinions **record their lens** in metadata.
+
+---
+
+## Workforce Gate — 2026-07-09  ⚠ bootstrap placement (contract gap, I-12)
+
+> **Flagged gap (I-12).** No contract defines a workforce-gate record *format*. `artifact-layout.md` §2 puts
+> the workforce-gate record in `agents/assignment.md` — but that is M3's agent-assignment artifact, and M3 has
+> not shipped (categorization for `001` was a manual pass, so there is no roster artifact). Per the gate's own
+> directive, this approval is recorded here instead. Doing so **exceeds the `decision-record.md` contract's
+> section set** (which ends at `## Carried Constraints`, cardinality "1, last") — recorded that way *deliberately*,
+> to surface the gap rather than paper over it. Resolve at M3 / the v0→v1 contracts review.
+
+| Field | Value |
+|---|---|
+| reviewer | Babu |
+| decision | `approved` |
+| roster | Sonnet implementation agents (D18); **max 3 parallel** |
+| elevated grants | **none** (core toolset only; no `web_search`) |
+| reviewed | `tasks.md` (20 tasks / 8 waves), `categorization.md` (0 `general`, cap 4 → pass) |
+
+**Notes:** Bootstrap workforce gate — no `agents/assignment.md` roster exists (M3 not shipped); the human approved the tasks + waves + the manual categorization directly. Directives: **Call 1** upheld (`endpoint × ai-agents`, `orchestration` tag on the 3 command skills); **Call 2** accepted for v0 (D48 guard on `prompt`-tagged tasks; type resolution deferred to §8); shared-file registration stays orchestrator glue (taxonomy §2.1), never a parallel subagent.
+
+**Overrides:** none.
