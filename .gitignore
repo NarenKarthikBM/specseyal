@@ -1,0 +1,10 @@
+# macOS
+.DS_Store
+
+# graphify output (regenerated per repo; never committed)
+graphify-out/
+
+# Python / node debris from extension tooling
+__pycache__/
+*.pyc
+node_modules/
