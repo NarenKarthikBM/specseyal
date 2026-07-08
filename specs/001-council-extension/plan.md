@@ -62,6 +62,8 @@ The technical spine is **the compression boundary**: the main thread coordinates
 4. **Stage 3 — chairman synthesis** — one Opus subagent reads **all** opinions + peer reviews (chairman-only), classifies each suggestion `blocking`/`strong`/`consider`, assigns IDs `R<n>-S<nn>`, and writes `round-N/suggestions.md` (+ a reduced-grounding flag if the graph was absent, FR-019). Returns the suggestions summary.
 5. The orchestrator reads **only** `suggestions.md` and returns it to the main thread. It never reads `opinions/` — preserving SC-005.
 
+**Invariant (status-only returns, S2):** every subagent returns **status only** — a path, a one-line outcome, and its trace fragment. **All review content is file-mediated**: members write `opinions/`, the chairman reads them from disk; no opinion body ever appears in a subagent's return value or in the orchestrator's context. This is what makes SC-005's grep a sufficient check — there is no opinion text in the main thread to leak in the first place.
+
 **Reopen interface (FR-017, D46):** `/speckit-council --reopen delta|full`. `delta` packages `(plan diff, triggering finding)` as the sole context and runs stages 1–3 against that; `full` reruns the whole round. A `## Reopen` section is written to the decision record. Manually invoked in v1; the automated `/speckit-analyze` trigger is out of scope.
 
 ### D. Member differentiation — "varied prompts" (resolves the spec's deferred decision)
@@ -127,7 +129,7 @@ All-new code under `extensions/council/`; nothing existing is modified except th
 | # | Risk | Likelihood | Mitigation |
 |---|---|---|---|
 | **R1** | **Per-session token capture in interactive CLI.** SC-002 needs real `tokens` per session; if the Agent-tool return doesn't expose usage, exact `council_spend` isn't computable until the SDK (M6). | Med | Design the trace-writer to read usage from the subagent return metadata; if unavailable, M2 emits structurally-valid traces with best-effort tokens and the exact measurement lands with the SDK. **Flagged for the council** — it touches the M1 exit. |
-| **R2** | **Council cost heavier than expected** (13 sessions/round). | Med | The member-count lever is one config line (risk note: trim members before tooling). SC-002 makes the number visible on the first run. |
+| **R2** | **Council cost heavier than expected** (13 sessions/round). | Med | The member-count lever is one config line (risk note: trim members before tooling). SC-002 makes the number visible on the first run. **The 5-member + faithful two-stage bench is fixed for the first live run; tuning (member count, peer-review shape) is deferred until the first SC-002 measurement (S3).** |
 | **R3** | **Context-hygiene leak** — orchestrator or a tool reads `opinions/`. | Low | SC-005 grep invariant in the conformance check; the orchestrator is coded to read only `suggestions.md`; members return statuses, not bodies. |
 | **R4** | **Parallel trace-append corruption.** | Low (mitigated) | Orchestrator-serialized assembly after each barrier (design F). |
 | **R5** | **Deck/opinion quality from Sonnet members varies.** | Med | Peer-review stage + Opus chairman synthesis filter noise; the human gate is the backstop (D9). |

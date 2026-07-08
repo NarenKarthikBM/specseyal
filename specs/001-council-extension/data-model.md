@@ -34,8 +34,13 @@ Round-scoped artifacts live under `round-N/` and are never overwritten; `defense
 Overview (one page): what & why · what could go wrong · what it costs · what "done" looks like.
 
 ### Opinion (`round-N/opinions/<A–E>.md`, `.../peer/<A–E>.md`)
-A member's review. Free-form markdown but MUST end with a **machine-liftable suggestion list** the chairman consolidates:
+A member's review. It opens with a metadata line recording the member's **lens** (`correctness` / `risk` / `simplicity` / `testability` / `sequencing`, S4) — kept as future v2 evidence of which lens raised which suggestion; the lens is a review angle, not the member's identity, so it does not de-anonymize (FR-006). Then free-form markdown that MUST end with a **machine-liftable suggestion list** the chairman consolidates:
 ```markdown
+---
+lens: correctness
+---
+<review prose>
+
 ## Suggestions
 - [correctness] The migration and schema edit are bundled; split them. (confidence: high)
 - [risk] No rollback path for the partial-write case. (confidence: med)

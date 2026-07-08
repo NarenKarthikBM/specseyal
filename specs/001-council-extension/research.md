@@ -6,7 +6,7 @@ Design decisions resolved before Phase 1. Format: **Decision / Rationale / Alter
 
 **Decision**: 5 **general-purpose** members share one base reviewer prompt, differentiated by a soft **lens nudge** each: A correctness/logic · B risk & failure modes · C simplicity & rejected alternatives · D testability · E dependencies & sequencing.
 
-**Rationale**: Satisfies D18 ("varied prompts") and docs/10's "faithful llm-council v1" simultaneously — the lenses induce opinion diversity without making members formal role critics. The base prompt lives in `member-prompt.md` with a `{{lens}}` slot, so v1→v2 (role critics) is a template swap, not an architecture change (FR-003).
+**Rationale**: Satisfies D18 ("varied prompts") and docs/10's "faithful llm-council v1" simultaneously — the lenses induce opinion diversity without making members formal role critics. The base prompt lives in `member-prompt.md` with a `{{lens}}` slot, so v1→v2 (role critics) is a template swap, not an architecture change (FR-003). Each member records its assigned lens in its opinion metadata (S4), so the first live run yields evidence of which lens surfaced which suggestion — direct input to the v2 role-critic design.
 
 **Alternatives**: (a) identical prompts, rely on sampling diversity — weaker signal, wastes the chance to spread coverage; (b) formal v2 role critics now — pre-empts a v2 decision and overfits before cost data exists.
 

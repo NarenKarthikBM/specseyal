@@ -1,7 +1,7 @@
 # Contract — `traces.jsonl` (observability)
 
-> **Status:** 1.1 (M0, amended 2026-07-09 by **D43**). Normative.
-> **Implements:** principle 4 (observability), D6 (cost is a metric, not a principle), D18, D19 (sync model), D28 (subscription-only), D35, **D40** (assembly), **D41** (tool grants), **D43** (skill/grant attribution).
+> **Status:** 1.2 (M0, amended 2026-07-09 by **D43**, **D47**). Normative.
+> **Implements:** principle 4 (observability), D6 (cost is a metric, not a principle), D18, D19 (sync model), D28 (subscription-only), D35, **D40** (assembly), **D41** (tool grants), **D43** (skill/grant attribution), **D47** (token capture method).
 > **Location:** `specs/NNN-feature/traces.jsonl` — one append-only file per feature.
 > **Consumed by:** agent-library skill `stats` (M3 flywheel), the M1 exit criterion, the central manager (M5).
 
@@ -28,6 +28,7 @@ Every session in every phase appends exactly one record when it ends. No excepti
   "ended_at": "2026-07-08T14:02:11.902Z",
   "duration_ms": 128782,
   "tokens": { "input": 41203, "output": 3877, "cache_read": 118400, "cache_creation": 12010 },
+  "capture_method": "transcript",
   "outcome": "success",
   "artifact": "specs/000-sample/council/round-1/suggestions.md",
   "cost_usd": null
@@ -56,6 +57,7 @@ An `implementer` record, showing a populated assembly (D40/D43) — a `service` 
   "ended_at": "2026-07-09T10:19:40.000Z",
   "duration_ms": 280000,
   "tokens": { "input": 12000, "output": 3100, "cache_read": 8000, "cache_creation": 0 },
+  "capture_method": "sdk",
   "outcome": "success",
   "artifact": "src/services/rate_limit.ts",
   "cost_usd": null
@@ -77,7 +79,8 @@ An `implementer` record, showing a populated assembly (D40/D43) — a `service` 
 | `effort` | enum \| null | `low` \| `medium` \| `high` \| `xhigh` \| `max` \| null. D18 names it (`Opus, xhigh`), so it is recorded. |
 | `started_at`, `ended_at` | ISO-8601 UTC, ms precision | |
 | `duration_ms` | int | `ended_at − started_at`. Denormalized; it is what every query wants. |
-| `tokens` | object | Four non-negative ints: `input`, `output`, `cache_read`, `cache_creation`. All four required. |
+| `tokens` | object \| null | Four non-negative ints: `input`, `output`, `cache_read`, `cache_creation`. All four required **when `capture_method ≠ unavailable`**; the whole object is **`null`** when `capture_method == unavailable` (D47 — exact-or-null, never estimated). |
+| `capture_method` | enum | `sdk` \| `transcript` \| `unavailable` (D47). How `tokens` were obtained: `sdk` = Agent SDK / API usage metadata (exact; the M6 path); `transcript` = parsed from the Claude Code transcript JSONL (exact; the interactive path); `unavailable` = not capturable, `tokens` is `null`. Never a fabricated estimate — the `cost_usd`-null ethos (§4) applied to tokens. |
 | `outcome` | enum | `success` \| `partial` \| `failed` \| `aborted`. Matches implement-parallel's wave-review vocabulary. |
 | `artifact` | string \| null | Repo-relative path of the **one** artifact this session produced (principle 1). `null` for sessions that produce none (a council member's opinion is chairman-only, not an artifact-out). |
 | `cost_usd` | number \| null | §4. |
@@ -123,8 +126,12 @@ Do not synthesize `cost_usd` from public API rates. A number that looks like mon
 Defined here so every consumer computes them identically.
 
 ```
-tokens_billable(r)      = r.tokens.input + r.tokens.output + r.tokens.cache_creation
-                          # cache_read excluded: it is the saving, not the spend
+tokens_billable(r)      = 0 if r.tokens == null else (r.tokens.input + r.tokens.output + r.tokens.cache_creation)
+                          # cache_read excluded: it is the saving, not the spend.
+                          # tokens == null ⟺ capture_method == unavailable (D47): the record contributes 0,
+                          # and every consumer MUST report the COUNT of such records alongside the sum —
+                          # a spend computed over partly-unavailable traces is a lower bound, and saying so
+                          # is the difference between an honest datapoint and a misleading one.
 
 phase_spend(f, p)       = Σ tokens_billable(r) for r in f.traces where r.phase == p
 feature_spend(f)        = Σ tokens_billable(r) for r in f.traces
@@ -138,7 +145,7 @@ skill_success(k, v)     = count(r.outcome == "success" for r in ALL.traces
                           / count(r for r in ALL.traces where {id:k, version:v} ∈ r.skills)
 ```
 
-`council_spend` includes deck prep because the deck exists only to be reviewed. **This is the M1 exit criterion** — "council token spend per feature is measured" (docs/05) — and M1's risk note ("if heavy, trim member count before trimming member tooling") is answerable only against this exact number, computed this exact way.
+`council_spend` includes deck prep because the deck exists only to be reviewed. **This is the M1 exit criterion** — "council token spend per feature is measured" (docs/05) — and M1's risk note ("if heavy, trim member count before trimming member tooling") is answerable only against this exact number, computed this exact way. Per D47 it is reported **with the count of `capture_method: unavailable` records**: interactive runs may not capture every session exactly, and an honest exit datapoint states its own completeness rather than presenting a lower bound as the whole.
 
 `skill_success` is the flywheel's promotion input (`agent-library-schema.md` §5). It keys on the **skill**, not the dispatched agent, because under D40 the agent is an assembly and crediting `agent_id` (the base) would smear every skill's performance across every other skill it was ever co-injected with. It segments on `version` because promotion rewards a *specific prompt* (D17/D24); a skill that regressed at 1.1 must not coast on 1.0's record. A dispatch with `skills: []` credits no skill — correctly, since a bare base is not a flywheel candidate.
 
@@ -192,6 +199,7 @@ The file conforms iff:
 7. `trace_id` is unique within the file; every non-null `parent_trace_id` refers to a `trace_id` in this file or a parent feature's.
 8. No value in any record contains a newline (JSONL invariant) — which §3 already guarantees, since only bodies would.
 9. Every completed phase in `artifact-layout.md` §2 that runs a session has ≥1 record. `branch`, `council-gate` and `workforce-gate` run no session — a git ref and a human, respectively — and correctly have none.
+10. `capture_method ∈ {sdk, transcript, unavailable}` (D47). `tokens == null ⟺ capture_method == unavailable`; when `tokens != null`, all four sub-fields are present non-negative ints.
 
 ## 8. Non-goals (v1)
 
