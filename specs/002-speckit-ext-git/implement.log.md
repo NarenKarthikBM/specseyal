@@ -22,6 +22,19 @@ Gate-freshness baseline: council `plan.md@bec819e` · workforce `tasks.md@30167a
 | 2026-07-10T00:10Z | 11/14 | T020 | 0 (orchestrator — shares graphify-context.md with T019, serial) | success | ✅ intact; before_specify assertions fixed (speckit-specify NOTE + graphify-context:13) → after_specify (D-R1) |
 | 2026-07-10T00:30Z | 12/14 | T021 | 0 (orchestrator glue — test/run.sh on the shared list) | success | ✅ intact; harness 11/11 PASS. **S17 test earned its keep**: caught T010's per-wave edit was only in the INSTALLED copy → wiped by a graphify reinstall (graphify SHIPS speckit-implement-parallel). Fixed by moving the edit into graphify's SOURCE; regression now confirms it survives. T015 targets are stock (safe). |
 | 2026-07-10T00:45Z | 13/14 | T022 | 0 (orchestrator glue — extends test/run.sh) | success | ✅ intact; before_specify drift lint added (section 4). Full harness 15/15 PASS; negative control confirms it catches reintroduced drift. Homed in test/run.sh until the D50 checker ships (D50/S29). |
+| 2026-07-10T01:00Z | 14/14 | T023 | 0 (orchestrator — quickstart validation run) | success | ✅ intact; quickstart SC existence-proofs 15/15 PASS (summary below). ALL 23 TASKS [X]. |
+
+## Quickstart SC validation — outcome (T023 · R1-S18/S29 · existence proofs, not "100%")
+
+Ran the `quickstart.md` scenarios against the built extension in throwaway repos (this repo untouched). **15/15 checks PASS:**
+- **SC-001/002/003** (Scenario 1): `commit.sh` self-heals the branch → branch name = spec ID, checked out; `spec.md` on the feature branch and **`git show main:…spec.md` fails** (base-clean); phase-tagged grammar `spec(<id>): …`/`plan(<id>): …`/`impl(<id>) wave K/N: …`; no empty commit on a clean tree (FR-004).
+- **SC-004** (Scenario 2): fresh binding verifies (exit 0); an **uncommitted** edit → stale hard-block (S05 working-tree-aware); a **committed** edit → stale hard-block (SHA mismatch). Both cases caught.
+- **SC-005** (Scenario 3): `cleanup.sh` → `complete/<spec-id>` tag exists; **every** phase/wave commit reachable from base tip via per-SHA `git merge-base --is-ancestor` (not a count); feature branch ref removed.
+- **SC-006** (Scenario 3b): the per-wave commit lands in HEAD **before** `[X]` — an interrupt leaves a recoverable "committed-but-unmarked" state.
+- **SC-007** (Scenario 4): **by construction** — no `extensions/git/**` code path invokes a model/API or writes `traces.jsonl` (verified precisely, stripping doc-comments and the `.claude/` path — not a vacuous grep).
+- **SC-008** (Scenario 5): no v1 payload references `worktree` — deleting the spike leaves US1–US4 intact (firewall held).
+
+*(One self-caught false positive along the way: the first SC-007 grep matched the scripts' own "no model / no traces.jsonl" doc-comments and the `.claude/skills` path; corrected to a comment-stripped, path-excluded invocation check — the property holds.)*
 
 ## Wave-worktree spike — outcome (T018 · FR-015 · D54 · timebox ≤2h: ran ~18:20–18:25Z, well within cap)
 
