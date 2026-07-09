@@ -20,6 +20,7 @@ Gate-freshness baseline: council `plan.md@bec819e` · workforce `tasks.md@30167a
 | 2026-07-09T18:15Z | 9/14 | T010 | 1 (Sonnet) | success | ✅ intact; implement-parallel now carries per-wave verify-gate (S23) + commit-before-[X] (S06), surgical. US2 complete. (Orchestrator still does both BY HAND this run — note 3.) |
 | 2026-07-09T18:20Z | 10/14 | T018, T019 | 0 (orchestrator — spike experiment + disposable-doc regen) | success | ✅ intact; spike concluded ABANDON (below); graphify-context manifest corrected |
 | 2026-07-10T00:10Z | 11/14 | T020 | 0 (orchestrator — shares graphify-context.md with T019, serial) | success | ✅ intact; before_specify assertions fixed (speckit-specify NOTE + graphify-context:13) → after_specify (D-R1) |
+| 2026-07-10T00:30Z | 12/14 | T021 | 0 (orchestrator glue — test/run.sh on the shared list) | success | ✅ intact; harness 11/11 PASS. **S17 test earned its keep**: caught T010's per-wave edit was only in the INSTALLED copy → wiped by a graphify reinstall (graphify SHIPS speckit-implement-parallel). Fixed by moving the edit into graphify's SOURCE; regression now confirms it survives. T015 targets are stock (safe). |
 
 ## Wave-worktree spike — outcome (T018 · FR-015 · D54 · timebox ≤2h: ran ~18:20–18:25Z, well within cap)
 

@@ -43,11 +43,12 @@ You are the **orchestrator**. You do not implement tasks yourself except trivial
 
 For each wave in order:
 
-1. **Dispatch.** For every task in the wave, spawn a subagent **in the same turn** (parallel) using the Agent tool, with the prompt template below. Serial waves dispatch their single task (or run trivial ones inline).
-2. **Hold the barrier.** Do not start the next wave until every subagent in this one returns.
-3. **Review each result** (dev-orchestrator gate): output exists; matches the task + plan + constitution; imports resolve. Success → mark the task `[X]` in `tasks.md`. Partial → patch inline or re-dispatch with a corrected prompt. Failure → diagnose; for a serial/blocking task STOP; for one parallel task continue the others and report it.
-4. **Integrate** any shared-file edits the wave implies (e.g. register new routes/models/serializers in the shared manifest) — this is legitimate orchestrator glue and must happen in the orchestrator, never in two parallel subagents.
-5. **Log** one line to `FEATURE_DIR/implement.log.md`:
+1. **Re-verify the gate.** Before dispatching this wave's tasks, re-verify the workforce gate is still fresh: run `speckit.git.verify-gate workforce` (`/speckit-git-verify-gate workforce`). If it exits non-zero, hard-block — do not dispatch the wave. The approved `tasks.md`/`assignment.md` changed since the gate was last verified and must be re-approved before this wave can proceed. This complements the one-time `before_implement` entry check, which cannot see drift introduced later in a long, multi-wave `implement` phase.
+2. **Dispatch.** For every task in the wave, spawn a subagent **in the same turn** (parallel) using the Agent tool, with the prompt template below. Serial waves dispatch their single task (or run trivial ones inline).
+3. **Hold the barrier.** Do not start the next wave until every subagent in this one returns.
+4. **Review each result** (dev-orchestrator gate): output exists; matches the task + plan + constitution; imports resolve. Success → commit the wave's outputs **before** marking anything `[X]`, via `speckit.git.commit impl "wave K/N: <summary>"` (`/speckit-git-commit`); the commit must precede the `[X]` mark (or be atomic with it), so an interrupt between the two always leaves a recoverable "committed-but-unmarked" state, never a lossy "marked-but-uncommitted" one — only then mark the task `[X]` in `tasks.md`. Partial → patch inline or re-dispatch with a corrected prompt. Failure → diagnose; for a serial/blocking task STOP; for one parallel task continue the others and report it.
+5. **Integrate** any shared-file edits the wave implies (e.g. register new routes/models/serializers in the shared manifest) — this is legitimate orchestrator glue and must happen in the orchestrator, never in two parallel subagents.
+6. **Log** one line to `FEATURE_DIR/implement.log.md`:
    `<ISO> | wave <N> | tasks: <ids> | agents: <n> | outcome: success|partial|failed`
    Create the file if absent; never edit prior lines.
 
