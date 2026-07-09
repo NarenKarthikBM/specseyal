@@ -53,8 +53,8 @@
 ## Phase 6 — Polish & Validation
 
 - [X] T018 Install/uninstall verification: idempotent `install.sh` → re-install (no dup) → `uninstall.sh` clean, against a target (mirrors graphify's D31 check).
-- [ ] T019 [P] Conformance + quickstart scenarios: `decision-record.md` (SC-003/US3), `traces.jsonl` 1.2 (SC-006), the **SC-005 two-part** check (grep + status-only invariant), reduced-grounding (SC-008), one-revision convergence (SC-004).
-- [ ] T020 [P] Finalize `extensions/council/README.md` + `quickstart.md` results, incl. the **SC-002 measurement + `capture_method: unavailable` count** reporting shape (D47).
+- [X] T019 [P] Conformance + quickstart scenarios: `decision-record.md` (SC-003/US3), `traces.jsonl` 1.2 (SC-006), the **SC-005 two-part** check (grep + status-only invariant), reduced-grounding (SC-008), one-revision convergence (SC-004).
+- [X] T020 [P] Finalize `extensions/council/README.md` + `quickstart.md` results, incl. the **SC-002 measurement + `capture_method: unavailable` count** reporting shape (D47).
 
 ---
 

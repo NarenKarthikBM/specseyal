@@ -9,3 +9,4 @@
 2026-07-09T00:01:31Z | wave 5 | tasks: T012, T014, T016 | agents: 3 | outcome: success
 2026-07-09T00:02:40Z | wave 6 | tasks: T013, T015, T017 | agents: 0 (orchestrator glue: trivial provenance stubs) | outcome: success
 2026-07-09T00:04:47Z | wave 7 | tasks: T018 | agents: 0 (orchestrator verification) | outcome: success — install->re-install(idempotent)->uninstall(clean) vs synthetic target; .specify preserved
+2026-07-09T00:09:58Z | wave 8 | tasks: T019, T020 | agents: 0 (orchestrator: static conformance + docs, shared quickstart.md) | outcome: success

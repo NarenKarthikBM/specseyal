@@ -67,3 +67,24 @@ Run the contract verifier (I-11) against `decision-record.md`:
 - [ ] Scenarios 1–6 pass on M2's plan (the live exercise).
 - [ ] `council_spend` is a real number in the completion report (M1 exit).
 - [ ] All `council/` artifacts validate against the M0 contracts.
+
+## M1 conformance status (static — the extension is built; the live run is M2)
+
+Verified at M1 build time (Wave 8, static — no council has *run* yet; the human was the council for 001's own plan):
+
+- **Extension inventory complete** — installer + uninstaller + 3 command skills + 5 templates + trace-fragment + config + manifest + 3 provenance stubs + spike doc + 2 READMEs (19 files). Installer verified idempotent + clean uninstall against a synthetic target (T018).
+- **SC-003 shape** — 001's `council/decision-record.md` carries every required section (Metadata, Round, Human Gate, Carried Constraints) and validates against `decision-record.md`.
+- **SC-006 shape** — `trace-fragment.md` conforms to `trace-schema.md` 1.2 (`capture_method`, exact-or-null, serial append).
+- **SC-005 — meta-feature caveat.** The blunt rule-5 grep (`opinions/` outside `council/`) trips on 001's *own* spec / plan / data-model / contracts / tasks / quickstart — because 001 **is** the council extension and necessarily *describes* the `opinions/` mechanism. That is a design description, **not** a runtime leak of opinion *content*; the runtime invariant (status-only returns; no opinion bodies in the main thread) is enforced by `speckit-council/SKILL.md`. A normal processed feature's spec never mentions `opinions/`. **The I-11 conformance checker should exempt the council's own feature** (or distinguish "describes the path" from "leaks content").
+
+Deferred to **M2's exit test** (the first live council run, on M2's plan): SC-001 (full loop end-to-end), SC-002 (measured `council_spend`), SC-004 (one-revision convergence), SC-006 live traces, SC-008 live reduced-grounding.
+
+### SC-002 reporting shape (D47)
+
+The completion report / observability MUST print, per feature:
+
+```
+council_spend = <tokens_billable over the council + deck-prep phases>   (capture_method: unavailable × <n> records)
+```
+
+— the count of `unavailable`-token records reported **alongside** the sum, so an interactive measurement states its own completeness rather than presenting a lower bound as the whole (D47). The spike (T005) found `capture_method: transcript` is feasible interactively, so this count should be 0 for a well-behaved run.
