@@ -33,21 +33,21 @@
 
 **Goal**: deck prep + one council round → `suggestions.md`. **Independent Test**: run on a fixture `plan.md`; expect deck + `round-1/opinions/**` + a classified `suggestions.md`; only `suggestions.md` returns to the main thread.
 
-- [ ] T012 [US1] `skills/speckit-council/SKILL.md` — the orchestrator: deck-prep (Sonnet) → members stage 1 (5 × Sonnet ∥, lensed) → stage 2 peer review (5 ∥) → chairman (Opus) → `round-N/suggestions.md`; **status-only returns / file-mediated content** (S2, SC-005); reduced-grounding flag (FR-019); serial trace assembly (T006); **`--reopen delta|full`** interface (FR-017, D46).
+- [X] T012 [US1] `skills/speckit-council/SKILL.md` — the orchestrator: deck-prep (Sonnet) → members stage 1 (5 × Sonnet ∥, lensed) → stage 2 peer review (5 ∥) → chairman (Opus) → `round-N/suggestions.md`; **status-only returns / file-mediated content** (S2, SC-005); reduced-grounding flag (FR-019); serial trace assembly (T006); **`--reopen delta|full`** interface (FR-017, D46).
 - [ ] T013 [P] [US1] `extension/commands/speckit.council.md` (provenance stub).
 
 ## Phase 4 — User Story 3: `/speckit-council-triage` (Priority: P2)  *(also US4)*
 
 **Goal**: apply accepted suggestions → `plan.md`; write the decision record. **Independent Test**: on a fixture `suggestions.md`, expect every suggestion dispositioned with reasoning, and — if any `blocking` — one revision + a chairman delta check.
 
-- [ ] T014 [US3] `skills/speckit-council-triage/SKILL.md` — reads `suggestions.md` **only**; applies accepted → `plan.md`; writes `decision-record.md` (every disposition; `rejected`/`deferred` ⟹ reasoning, D13.5; accepted `blocking` ⟹ commit-named delta); **one-revision-cycle + chairman-only delta check** (US4, D13); `## Reopen` handling (FR-017); trace.
+- [X] T014 [US3] `skills/speckit-council-triage/SKILL.md` — reads `suggestions.md` **only**; applies accepted → `plan.md`; writes `decision-record.md` (every disposition; `rejected`/`deferred` ⟹ reasoning, D13.5; accepted `blocking` ⟹ commit-named delta); **one-revision-cycle + chairman-only delta check** (US4, D13); `## Reopen` handling (FR-017); trace.
 - [ ] T015 [P] [US3] `extension/commands/speckit.council.triage.md` (provenance stub).
 
 ## Phase 5 — User Story 2: `/speckit-council-approve` (Priority: P1)
 
 **Goal**: record the human-gate decision; unlock `/speckit-tasks`. **Independent Test**: on a fixture decision record, `approved` appends a `## Human Gate` section and unlocks tasks; `rejected` returns the plan for one more round.
 
-- [ ] T016 [US2] `skills/speckit-council-approve/SKILL.md` — appends `## Human Gate` (reviewer, decision, reviewed, notes, overrides) to `decision-record.md`; unlocks tasks on `approved*`; `auto` mode (only within `full_auto`) writes the section with `reviewer: auto`. No session → no trace.
+- [X] T016 [US2] `skills/speckit-council-approve/SKILL.md` — appends `## Human Gate` (reviewer, decision, reviewed, notes, overrides) to `decision-record.md`; unlocks tasks on `approved*`; `auto` mode (only within `full_auto`) writes the section with `reviewer: auto`. No session → no trace.
 - [ ] T017 [P] [US2] `extension/commands/speckit.council.approve.md` (provenance stub).
 
 ## Phase 6 — Polish & Validation
