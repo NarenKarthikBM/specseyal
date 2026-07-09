@@ -1,0 +1,78 @@
+# git-config.yml — git policy for the speckit-ext-git extension.
+# Mechanical git only (zero AI): this file is consulted by hooks/scripts;
+# nothing here invokes a model. Keys/values transcribed from
+# specs/002-speckit-ext-git/data-model.md §Config.
+
+# The branch every feature is cut from, and merged back into.
+base_branch: main
+
+merge:
+  # D52: ff-permitted; a merge commit is made only when base_branch has
+  # diverged from the feature branch tip since the branch was cut.
+  # The completion anchor is the `anchor` tag below, not the merge
+  # topology — that's what frees this policy to fast-forward
+  # (supersedes D51's --no-ff).
+  policy: ff-permitted
+  merge_commit: if-base-diverged
+  # Hard invariants, not toggles (FR-011/SC-005): every phase/wave commit
+  # must stay reachable from the base tip after cleanup, so a feature
+  # branch is never squashed or rebase-collapsed before integration.
+  squash: forbidden
+  rebase_collapse: forbidden
+
+# Completion anchor (D52, R1-S27): a mandatory annotated tag, created
+# unconditionally at /speckit-git-cleanup regardless of merge topology.
+anchor:
+  type: annotated-tag
+  pattern: "complete/<spec-id>"
+  mandatory: true
+  created_at_phase: complete
+  enumerate_via: "git for-each-ref refs/tags/complete/*"
+
+branch:
+  # Branch name == spec ID (FR-002), identical to the specs/NNN-slug/ dir.
+  pattern:
+    # Default shape: NNN-slug.
+    default: '^[0-9]{3}-[a-z0-9]+(-[a-z0-9]+)*$'
+    # R1-S25: alternate shape used when the orchestrator's
+    # `feature_numbering: timestamp` mode is configured.
+    timestamp: '^[0-9]{8}-[0-9]{6}-[a-z0-9]+(-[a-z0-9]+)*$'
+
+commit:
+  # Message grammars (FR-006). <spec-id> = FeatureBranch name;
+  # <summary> = short human-readable description.
+  grammar:
+    # PhaseCommit: one commit per changed-artifact phase boundary.
+    # Empty boundary -> no commit (FR-004): the commit primitive is a
+    # no-op when the working tree is clean for the feature's paths.
+    phase: '^(spec|plan|council|gate|tasks|categorize|analyze|agents|impl|complete)\(<spec-id>\): <summary>$'
+    # WaveCommit (FR-005): one commit per implement wave, made by
+    # implement-parallel calling the commit primitive (D-R7).
+    wave: '^impl\(<spec-id>\) wave <K>/<N>: <summary>$'
+
+# Stock Spec Kit phases that get an after_* commit hook (FR-003).
+phases:
+  - specify
+  - clarify
+  - plan
+  - tasks
+  - implement
+
+# Gate -> (artifacts, phase to verify-before) map (FR-008/009).
+# Each binding is a GateSHABinding recorded in the git-ext-owned
+# specs/NNN-slug/gates.yml (R1-S09/R1-S20); the gate section in the
+# artifact itself carries only a one-line reference to it. A binding is
+# fresh iff <sha> equals the artifact's current commit SHA AND the
+# working tree for that artifact is clean (R1-S05) — a stale binding
+# hard-blocks the gated phase. verify-gate fails closed (blocks) on an
+# unparseable binding or gate-format-version drift (R1-S10).
+gates:
+  council:
+    artifacts:
+      - plan.md
+    verify_before: tasks
+  workforce:
+    artifacts:
+      - tasks.md
+      - assignment.md
+    verify_before: implement

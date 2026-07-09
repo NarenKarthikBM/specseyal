@@ -1,0 +1,93 @@
+schema_version: "1.0"
+
+extension:
+  id: git
+  name: "Per-Feature Git Lifecycle"
+  version: "1.0.0"
+  description: "Automates the per-feature git lifecycle M0/M1 ran by hand: branch birth (named from the spec ID at specify), phase-tagged commits at every phase boundary, gate↔SHA binding with a stale-approval hard-block, and completion cleanup that preserves the phase trail behind a complete/<spec-id> tag anchor. Mechanical git only — zero AI: no model calls, no traces.jsonl records (FR-007). Per D25."
+  author: narenkarthikbm
+  license: MIT
+
+requires:
+  speckit_version: ">=0.2.0"
+
+provides:
+  commands:
+    - name: speckit.git.commit
+      file: commands/speckit.git.commit.md
+      description: "Phase-tagged commit in the FR-006 grammar; self-heals the feature branch first (R1-S12); no-op on a clean tree (FR-004); staging scoped to specs/NNN/** + declared outputs, never repo-wide (R1-S11); prints the new SHA"
+    - name: speckit.git.sha
+      file: commands/speckit.git.sha.md
+      description: "Print the SHA of the HEAD commit that last touched an artifact (read-only; the value a gate records, FR-008)"
+    - name: speckit.git.verify-gate
+      file: commands/speckit.git.verify-gate.md
+      description: "Compare gates.yml's recorded <artifact> @ <sha> against current; working-tree-aware + fail-closed (R1-S05/S10); exit non-zero + mismatch on stale — the FR-009 hard-block"
+    - name: speckit.git.cleanup
+      file: commands/speckit.git.cleanup.md
+      description: "Integrate into base (ff-permitted, D52) + mandatory annotated tag complete/<spec-id> + delete branch; conflict aborts and is surfaced (FR-011)"
+
+# ── Hooks ────────────────────────────────────────────────────────────────────
+# Every hook is registered optional:false (R1-S01). optional:false is what marks a
+# hook AUTO-INVOKED / hard-block, vs graphify's optional:true (announce-only) — the
+# round-1 headline defect. ENFORCEMENT IS PROSE-LEVEL in v1 (R1-S08/D53): there is no
+# HookExecutor; the invoking phase-skill runs the hook and honors its exit code. A
+# mechanical dispatcher is deferred to M6. This manifest only DECLARES; it enforces nothing.
+#
+# `phase:` / `gate:` are LIVE metadata (the argument the primitive needs for this boundary),
+# not a zombie field — the installer/invoker passes it to the primitive (prose-level).
+#
+# The installer (install.sh) expands each entry below into a .specify/extensions.yml registry
+# row and, on the two shared keys (before_tasks / before_implement), inserts git's verify-gate
+# AHEAD of graphify's context hook (R1-S07) by giving it a lower priority number.
+hooks:
+  after_specify:
+    command: speckit.git.commit
+    phase: spec
+    optional: false
+    description: "Branch birth — commit.sh self-heals the feature branch from feature.json's spec ID (R1-S12/FR-001), then commits spec(<id>): … (FR-003)"
+  after_clarify:
+    command: speckit.git.commit
+    phase: spec
+    optional: false
+    description: "commit spec(<id>): clarify"
+  after_plan:
+    command: speckit.git.commit
+    phase: plan
+    optional: false
+    description: "commit plan(<id>): …"
+  after_analyze:                      # R1-S14 — analyze can revise tasks.md, so its boundary needs a commit
+    command: speckit.git.commit
+    phase: analyze
+    optional: false
+    description: "commit analyze(<id>): …"
+  after_tasks:
+    command: speckit.git.commit
+    phase: tasks
+    optional: false
+    description: "commit tasks(<id>): …"
+  after_implement:
+    command: speckit.git.commit
+    phase: impl
+    optional: false
+    description: "commit impl(<id>): … — backstops the phase boundary (per-wave commits are called directly by implement-parallel, R1-S06)"
+  after_council_approve:              # R1-S04/S09 — reinstall-surviving gate binding (no council-source edit)
+    command: speckit.git.record-gate  # hook-internal action: scripts/on-council-approve.sh (composes sha.sh + gates.sh); not a reusable primitive, so not in provides.commands
+    gate: council
+    optional: false
+    description: "Write plan.md @ <sha> into git-ext-owned gates.yml; ## Human Gate carries a one-line reference (FR-008). Signer-agnostic (FR-010): must also fire on an auto-written gate."
+  before_tasks:                       # verify-gate inserted AHEAD of graphify by the installer (R1-S07)
+    command: speckit.git.verify-gate
+    gate: council
+    optional: false
+    description: "Verify the council binding (plan.md) is fresh — non-zero ⇒ hard-block the tasks phase (FR-009)"
+  before_implement:                   # verify-gate ahead of graphify (R1-S07); re-run each wave (R1-S23, by implement-parallel)
+    command: speckit.git.verify-gate
+    gate: workforce
+    optional: false
+    description: "Verify the workforce binding (tasks.md + assignment.md) is fresh — non-zero ⇒ hard-block the implement phase (FR-009)"
+
+tags:
+  - "git"
+  - "lifecycle"
+  - "governance"
+  - "mechanical"

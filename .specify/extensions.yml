@@ -1,5 +1,6 @@
 installed:
 - graphify
+- git
 settings:
   auto_execute_hooks: true
 hooks:
@@ -13,6 +14,16 @@ hooks:
     description: Ground the plan in the existing dependency graph
     condition: null
   before_tasks:
+  - extension: git
+    command: speckit.git.verify-gate
+    enabled: true
+    optional: false
+    priority: 1
+    prompt: null
+    description: "Verify the council binding (plan.md) is fresh \u2014 non-zero \u21D2\
+      \ hard-block the tasks phase (FR-009)"
+    condition: null
+    gate: council
   - extension: graphify
     command: speckit.graphify.context
     enabled: true
@@ -22,6 +33,16 @@ hooks:
     description: Verify task parallelism against real dependency edges
     condition: null
   before_implement:
+  - extension: git
+    command: speckit.git.verify-gate
+    enabled: true
+    optional: false
+    priority: 1
+    prompt: null
+    description: "Verify the workforce binding (tasks.md + assignment.md) is fresh\
+      \ \u2014 non-zero \u21D2 hard-block the implement phase (FR-009)"
+    condition: null
+    gate: workforce
   - extension: graphify
     command: speckit.graphify.context
     enabled: true
@@ -30,3 +51,77 @@ hooks:
     prompt: Generate graphify codebase context before implementation?
     description: Pre-resolve per-task blast radius before parallel execution
     condition: null
+  after_specify:
+  - extension: git
+    command: speckit.git.commit
+    enabled: true
+    optional: false
+    priority: 5
+    prompt: null
+    description: "Branch birth \u2014 commit.sh self-heals the feature branch from\
+      \ feature.json's spec ID (R1-S12/FR-001), then commits spec(<id>): \u2026 (FR-003)"
+    condition: null
+    phase: spec
+  after_clarify:
+  - extension: git
+    command: speckit.git.commit
+    enabled: true
+    optional: false
+    priority: 5
+    prompt: null
+    description: 'commit spec(<id>): clarify'
+    condition: null
+    phase: spec
+  after_plan:
+  - extension: git
+    command: speckit.git.commit
+    enabled: true
+    optional: false
+    priority: 5
+    prompt: null
+    description: "commit plan(<id>): \u2026"
+    condition: null
+    phase: plan
+  after_analyze:
+  - extension: git
+    command: speckit.git.commit
+    enabled: true
+    optional: false
+    priority: 5
+    prompt: null
+    description: "commit analyze(<id>): \u2026"
+    condition: null
+    phase: analyze
+  after_tasks:
+  - extension: git
+    command: speckit.git.commit
+    enabled: true
+    optional: false
+    priority: 5
+    prompt: null
+    description: "commit tasks(<id>): \u2026"
+    condition: null
+    phase: tasks
+  after_implement:
+  - extension: git
+    command: speckit.git.commit
+    enabled: true
+    optional: false
+    priority: 5
+    prompt: null
+    description: "commit impl(<id>): \u2026 \u2014 backstops the phase boundary (per-wave\
+      \ commits are called directly by implement-parallel, R1-S06)"
+    condition: null
+    phase: impl
+  after_council_approve:
+  - extension: git
+    command: speckit.git.record-gate
+    enabled: true
+    optional: false
+    priority: 5
+    prompt: null
+    description: 'Write plan.md @ <sha> into git-ext-owned gates.yml; ## Human Gate
+      carries a one-line reference (FR-008). Signer-agnostic (FR-010): must also fire
+      on an auto-written gate.'
+    condition: null
+    gate: council
