@@ -1,7 +1,7 @@
 # Contract — `council/decision-record.md`
 
-> **Status:** 1.0 (M0). Normative.
-> **Implements:** docs/10 §5 (convergence rule), D13, D13.5, D14.
+> **Status:** 1.1 (M0, amended 2026-07-10 by **D55** — `## Human Gate` gains the FR-008 `gates.yml` pointer). Normative.
+> **Implements:** docs/10 §5 (convergence rule), D13, D13.5, D14, **D55** (well-known-path gate-binding pointer).
 > **Consumed by:** the human gate, `/speckit-tasks`, and the central manager (M5).
 
 The decision record is the council's audit trail. Its single reason to exist: **a suggestion may be rejected, but it may not be silently dropped.** Every suggestion the council raises leaves a row here with a disposition, and every non-acceptance carries written reasoning (docs/10 §5.5).
@@ -71,6 +71,8 @@ Suggestion IDs are `R<round>-S<nn>`, assigned by the chairman in `suggestions.md
 
 **Overrides:** none.
 
+**Binding:** plan↔SHA binding recorded at `specs/000-sample/gates.yml` (git-ext-owned; FR-008/D55).
+
 ---
 
 ## Carried Constraints
@@ -89,6 +91,7 @@ Suggestion IDs are `R<round>-S<nn>`, assigned by the chairman in `suggestions.md
 | `disposition` | `accepted` \| `rejected` \| `deferred` |
 | `plan delta` | `<file> §<section> @ <commit-sha>`, or `—` |
 | `decision` (gate) | `approved` \| `approved-with-notes` \| `rejected` |
+| `Binding` (gate) | a one-line pointer to the git-extension-owned `specs/<spec-id>/gates.yml` — the plan↔SHA gate binding (FR-008/D55). **Present when the git extension is installed** (it records the binding via its `after_council_approve` hook, D55); **omitted** in a council-only repo with no `gates.yml`. This section never carries the SHA itself: the git ext owns that record, and principle I keeps the council artifact single-writer (D55). The pointer is written by the section's own author — `/speckit-council-approve` (human) or `/speckit-council-triage` (auto) — never by the git ext. |
 
 `deferred` means *acknowledged, not now, and recorded somewhere it will resurface* — the rationale must name where (an `I-` row in docs/90, a follow-up spec). A `deferred` with nowhere to resurface is a `rejected` wearing a nicer word.
 

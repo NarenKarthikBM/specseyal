@@ -153,8 +153,12 @@ Read `<FEATURE_DIR>/profile.yaml`. If absent, unparseable, or `gates.council.mod
   **Notes:** Auto-approved under `gates.council.mode: auto` (`full_auto: true`) — zero unresolved blocking suggestions.
 
   **Overrides:** none.
+
+  **Binding:** plan↔SHA binding recorded at `specs/<spec-id>/gates.yml` (git-ext-owned; FR-008/D55).
   ```
   Insert it **immediately before** `## Carried Constraints` (with the file's existing `---` divider convention on each side), never after it — `## Carried Constraints` must remain the last section. This unlocks `/speckit-tasks` (`artifact-layout.md` §7 rule 3).
+
+  The `**Binding:**` line is FR-008's one-line pointer to the git-extension-owned `specs/<spec-id>/gates.yml` (D55, `decision-record.md` §3) — **identical to the one `/speckit-council-approve` writes** in the `human` path, which R6 requires (both codepaths must produce a mutually consistent `## Human Gate` section). It is a well-known-path pointer, not a value you compute: the git ext records the actual plan↔SHA binding via its own hook and never writes here (D55 inverted the ownership). Substitute the concrete spec ID; **never write the SHA itself.** **Include the line only when the git extension is installed** (a registered `after_council_approve` hook in `.specify/extensions.yml`); in a council-only repo with no `gates.yml`, omit it — exactly as `/speckit-council-approve` does, so the two paths stay consistent in that case too.
 - **`auto`, but a `blocking` ID is still STILL BLOCKING after the delta check** → **do not auto-approve.** `profile-schema.md` §4: "auto skips the human, never the council" — a residual, chairman-confirmed blocking defect is exactly the correctness guard `auto` may not waive. Leave `## Human Gate` unwritten. Note in your Completion Report that `/speckit-council-approve` will itself refuse to act while `gates.council.mode` reads `auto` with no gate section present (it errors rather than fabricating one) — the concrete unblock path is a human deliberately editing `profile.yaml` to `gates.council.mode: human` (a conscious, out-of-band decision to intervene, not a silent codepath) and then running `/speckit-council-approve` normally.
 
 **Now commit.** Stage everything this run touched under `council/` plus `decision-record.md`:

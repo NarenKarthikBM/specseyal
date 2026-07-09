@@ -79,9 +79,13 @@ Never surface `round-N/opinions/` — it is chairman-only for the life of the fe
    **Notes:** <notes, or "none.">
 
    **Overrides:** <one line per unresolved-blocking item from "Present to the Human", stating the human's ruling on each — or "none.">
+
+   **Binding:** plan↔SHA binding recorded at `specs/<spec-id>/gates.yml` (git-ext-owned; FR-008/D55).
    ```
 
    (Paths in `reviewed` are relative to `council/`, matching the contract's own worked example.)
+
+   **The `**Binding:**` line is FR-008's one-line reference to the git-extension-owned `gates.yml` (D55, `decision-record.md` §3).** It is a **human-discoverability pointer to a well-known path**, not a value this command computes: the git extension records the actual plan↔SHA binding in `specs/<spec-id>/gates.yml` via its own `after_council_approve` hook and never writes into this file, so this section merely names where that binding lives (D55 inverted the ownership — the pointer is the gate command's to write, the record is the git ext's). Substitute the concrete spec ID (`basename(FEATURE_DIR)`); **never write the SHA itself here** — that would recreate the second-writer problem D55 dissolved. **Include this line only when the git extension is installed** — detect it by a registered `after_council_approve` hook in `.specify/extensions.yml` (equivalently, the git extension appearing in its `installed:` list). In a council-only repo with no git extension there is no `gates.yml` to point at, so **omit the line entirely** rather than dangling a pointer at a file that will never exist (`decision-record.md` §3 makes `Binding` present-iff-git-ext).
 4. **Insert it in the right place.** `decision-record.md` §5's section table fixes `## Carried Constraints` at cardinality "1, last" — it must stay the final section in the file. Insert the new `## Human Gate` block **immediately before** `## Carried Constraints`, with a `---` divider on each side matching the file's existing convention between sections — never appended after it, and never editing anything above it. R1 is append-only: no prior section is ever edited or deleted, and that includes never "correcting" an earlier `## Human Gate` section in place — a correction is a new section, and R6 makes the last one in the file authoritative.
 5. If `decision-record.md` has no `## Carried Constraints` section at all, the file is non-conformant upstream — ERROR rather than guess where to insert. That is a triage-side contract violation, not something this command should paper over.
 
@@ -117,7 +121,7 @@ Report, concisely:
 - [ ] `profile.yaml` gate mode resolved, defaulting safely to `human` on absence or parse failure.
 - [ ] Human mode: overview + suggestions verdict + Round-N disposition table presented; any unresolved `blocking` item flagged before a decision was asked for.
 - [ ] Auto mode: no section fabricated by this command; an existing `reviewer: auto` section was detected and reported, or the command stopped cleanly on an out-of-order invocation.
-- [ ] A contract-conforming `## Human Gate` section (reviewer, decision, reviewed, notes, overrides) appended immediately before `## Carried Constraints`, never editing a prior section.
+- [ ] A contract-conforming `## Human Gate` section (reviewer, decision, reviewed, notes, overrides, and the FR-008 `Binding` pointer to `gates.yml` when the git extension is installed) appended immediately before `## Carried Constraints`, never editing a prior section.
 - [ ] Effect reported correctly: `approved` / `approved-with-notes` → tasks unlocked; `rejected` → returned for one more revision round.
 - [ ] No `traces.jsonl` record written, in any mode.
 - [ ] Completion reported to the human.
