@@ -28,7 +28,7 @@ Sibling-of-graphify extension. Payload lives under `extensions/git/`; the one hu
 
 **Purpose**: The `extensions/git/` skeleton, config, and provenance stubs — mirrors `extensions/council/` + `extensions/graphify/`.
 
-- [ ] T001 Create the `extensions/git/` tree per plan §Project Structure — `extension/` (`commands/`, `scripts/`), `skills/speckit-git-cleanup/`, `test/`, and placeholder top-level `README.md` — mirroring the `extensions/council/` + `extensions/graphify/` layout. `files=extensions/git/` `deps=-` `mutates=(new)`
+- [X] T001 Create the `extensions/git/` tree per plan §Project Structure — `extension/` (`commands/`, `scripts/`), `skills/speckit-git-cleanup/`, `test/`, and placeholder top-level `README.md` — mirroring the `extensions/council/` + `extensions/graphify/` layout. `files=extensions/git/` `deps=-` `mutates=(new)`
 - [ ] T002 [P] Author `extensions/git/extension/git-config.yml` — `base_branch: main`; `merge.policy` = **`ff`-permitted, merge-commit only when base diverged** (D52); `anchor` = **mandatory annotated tag `complete/<spec-id>`** (D52/R1-S27); `branch.pattern` = `^[0-9]{3}-[a-z0-9]+(-[a-z0-9]+)*$` (**FR-002**, name = spec ID) **plus the `YYYYMMDD-HHMMSS-slug` carve-out under `feature_numbering: timestamp`** (R1-S25); `commit.grammar` (PhaseCommit/WaveCommit shapes, FR-006); `phases: [specify, clarify, plan, tasks, implement]`; `gates` map (council→`plan.md`/before-`tasks`; workforce→`tasks.md`,`assignment.md`/before-`implement`). `files=extensions/git/extension/git-config.yml` `deps=T001` `mutates=(new)`
 - [ ] T003 [P] Author the four provenance command stubs (dots→hyphens on install) — `extension/commands/speckit.git.commit.md`, `speckit.git.sha.md`, `speckit.git.verify-gate.md`, `speckit.git.cleanup.md`. `files=extensions/git/extension/commands/*.md` `deps=T001` `mutates=(new)`
 - [ ] T004 [P] Author `extensions/git/README.md` + `extension/README.md` (packaging + install/uninstall docs, mirror council/graphify). `files=extensions/git/README.md,extensions/git/extension/README.md` `deps=T001` `mutates=(new)`
@@ -194,8 +194,8 @@ FR-003 names **10** phase-commit boundaries. Not all have a stock hook slot; thi
 - Wave 4 [serial]   : T006                              # Foundational: install.sh hook-merge (R1-S15) — edits shared .specify/extensions.yml
 - Wave 5 [serial]   : T007                              # Foundational: uninstall.sh (R1-S26a) — edits shared .specify/extensions.yml
 - Wave 6 [parallel] : T008 [US1], T011 [US3], T015 [US3], T016 [US4]   # story kickoffs, disjoint (T018 moved late — L1 fix)
-- Wave 7 [parallel] : T009 [US1], T012 [US3], T014 [US3], T017 [US4]               # depend on wave-6 siblings
-- Wave 8 [parallel] : T013 [US3]                        # verify-gate.sh (deps sha.sh + gates.sh)
+- Wave 7 [parallel] : T009 [US1], T012 [US3], T017 [US4]                           # depend on wave-6 siblings
+- Wave 8 [parallel] : T013 [US3], T014 [US3]            # verify-gate.sh + on-council-approve.sh — both deps=T012 (wave 7), disjoint files [DAG fix: T014 was mis-scheduled in wave 7 alongside its own dep T012]
 - Wave 9 [parallel] : T010 [US2]                        # implement-parallel edit (deps commit.sh + verify-gate.sh)
 - Wave 10 [parallel]: T018 [US5], T019                  # spike now after the implement path it experiments on (deps T010, L1 fix); + graphify-context regen (disjoint)
 - Wave 11 [serial]  : T020                              # before_specify assertion fix (shares graphify-context.md with T019)
