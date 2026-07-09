@@ -53,12 +53,21 @@ Getting that file right is the whole job.
 ### MODE: {{mode}} == "synthesis"
 
 ## Inputs
-Read, in full, all ten files:
-- `{{opinions_dir}}/A.md` … `{{opinions_dir}}/E.md`   (stage 1 — independent opinions)
-- `{{peer_dir}}/A.md` … `{{peer_dir}}/E.md`            (stage 2 — anonymized peer review)
+Read, in full, EVERY stage-1 opinion and EVERY stage-2 peer file present — list the peer
+directory rather than assuming a fixed count:
+- `{{opinions_dir}}/A.md` … `{{opinions_dir}}/E.md`   (stage 1 — independent opinions; five)
+- everything under `{{peer_dir}}/`                     (stage 2 — anonymized peer review)
 
-Each opens with a `lens:` metadata line (`correctness` / `risk` / `simplicity` / `testability` /
-`sequencing`) and ends with a `## Suggestions` list shaped
+The number of peer files depends on the council's ceremony tier (D56), which is NOT your concern —
+you synthesize the same way over whatever exists:
+- **`full` tier**: `{{peer_dir}}/A.md … E.md` — five per-member peer reviews (ten files total).
+- **`standard` tier**: `{{peer_dir}}/consolidated.md` — one neutral critique of all five opinions
+  (six files total). It has no `lens:` line and reviews every opinion at once; treat its endorsements
+  and challenges (by letter) exactly as you would a per-member peer review's.
+
+Each stage-1 opinion (and each per-member peer file) opens with a `lens:` metadata line
+(`correctness` / `risk` / `simplicity` / `testability` / `sequencing`) and ends with a
+`## Suggestions` list shaped
 `- [lens] <text> (confidence: <high|med|low>)`. That list is your primary raw material; the
 surrounding prose is context for judging weight and resolving ambiguity.
 

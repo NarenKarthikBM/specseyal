@@ -4,11 +4,44 @@
 # (no keys of its own, but shares this file for consistency).
 member_count: 5
 # Number of independent council members in stage 1 + stage 2 (peer review).
-# This is the M1 cost lever (risk R2, plan.md): one council round is
-# ~2 * member_count + 3 sessions (deck-prep + members x2 stages + chairman + triage).
-# If council_spend (SC-002) runs hot, trim this number first — it's a
-# one-line config edit, no code change. Peer review itself is not cut
-# (see plan.md "Rejected Alternatives").
+# This is the M1 cost lever (risk R2, plan.md): under the `full` tier one
+# round is ~2 * member_count + 3 sessions (deck-prep + members x2 stages +
+# chairman + triage). If council_spend (SC-002) runs hot, the FIRST lever
+# is now `council_tier: standard` (below); trimming member_count is the
+# second. Peer review itself is not cut under `full` (see plan.md
+# "Rejected Alternatives").
+
+council_tier: full
+# Default ceremony tier when a feature's profile.yaml does not set
+# `council_tier` (D56, M3 cost review). Mirrors profile-schema's
+# "absent ⇒ safest/most-thorough" ethos (P1): the default is the fullest
+# review, and cheaper tiers are an explicit per-feature opt-in via
+# `profile.yaml: council_tier: <tier>` — never a silent global downgrade.
+# A feature's profile.yaml value overrides this default; this key is only
+# the fallback for a feature that declares none.
+tiers:
+  full:
+    # The M2 baseline ceremony (5,249,858 billable tok / round, `002`).
+    # Byte-for-byte the pre-D56 behavior — the council-defended design.
+    peer_review: per_member    # stage 2 = member_count parallel sessions,
+                               # each member reviews the other four's opinions.
+    context: eager             # every member reads deck + plan + spec up front.
+    member_output_cap: none    # write as many suggestions as the review warrants.
+  standard:
+    # The cost-controlled tier (D56). Four independent, additive levers cut
+    # the cache-creation churn the `002` finding traced (each member's 25-38
+    # graphify tool-call turns dominated the 5.25M via cache_creation).
+    peer_review: consolidated  # stage 2 = ONE session critiquing all five
+                               # stage-1 opinions -> opinions/peer/consolidated.md
+                               # (4 fewer sessions than per_member).
+    context: lazy              # the technical deck is the sole up-front read;
+                               # plan/spec/graph are resolved ON DEMAND only to
+                               # verify a specific deck claim (per-member plan.md
+                               # read-rate is the effectiveness metric, reported
+                               # by /speckit-council).
+    member_output_cap: 6       # <= 6 suggestions per stage-1 member; the
+                               # consolidated peer critique caps at <= 15 points.
+                               # Bounds padding; tunable, like member_count.
 member_lenses: [correctness, risk, simplicity, testability, sequencing]
 # Soft analytical-lens nudge, assigned one-per-member (A-E) on top of the
 # same base reviewer prompt (member-prompt.md). v1 members are

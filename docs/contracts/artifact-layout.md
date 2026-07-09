@@ -1,8 +1,8 @@
 # Contract — Feature Artifact Layout
 
-> **Status:** 1.2 (M2). Normative.
+> **Status:** 1.3 (M3, amended 2026-07-10 by **D57**). Normative.
 > **Implements:** principle 1 (artifacts are the contract), principle 3 (resumability).
-> **Sources:** docs/00 §3, docs/10 §3, D4, D9, D25, D32, D37, D38, D41, D44, D49, D50, D51.
+> **Sources:** docs/00 §3, docs/10 §3, D4, D9, D25, D32, D37, D38, D41, D44, D49, D50, D51, **D57** (cross-extension seams).
 
 Every feature is one directory under `specs/`. Every pipeline phase reads artifacts and writes **exactly one** artifact. Both the CLI layer and the platform layer (M5+) read and write this same tree — it is the only interface between them.
 
@@ -190,3 +190,15 @@ The workforce gate (D9) is the human approval of the agent roster after `tasks` 
 ### Home and bootstrap note
 
 The section lives in `agents/assignment.md`, written by the assigner (M3) or — until the assigner ships — **by hand**, exactly as `001` hand-wrote its `decision-record.md` gate sections. M3's `assignment.md` contract may relocate this format into itself; until then, this is the normative definition. **Bootstrap exception:** `001-council-extension` recorded its workforce gate inside `council/decision-record.md` because no `agents/assignment.md` existed and its roster was trivial (I-12); that placement is superseded by this section and is **not** retrofitted (append-only history).
+
+## 9. Cross-extension seams (D57, resolving I-14)
+
+§6 governs which extension may write which **artifact**. This section governs the complementary question at the **code** layer: how one extension may couple to another extension's behavior. The rule exists because every extension's `install.sh` does `rm -rf` + `cp -R` of its own installed tree on each (re)install — so an edit one extension makes *inside another extension's installed files* is silently wiped the next time that other extension is reinstalled. The M2 build hit this live: the git extension's per-wave-commit edit, parked in graphify's *installed* `speckit-implement-parallel` skill, vanished on a graphify reinstall until it was relocated into graphify's **source** (`002` Finding-1 / R1-S17, I-14).
+
+| # | Rule |
+|---|---|
+| S1 | **Prefer a hook point.** Cross-extension coupling attaches at an `extension.yml` hook (`before_*` / `after_*`), never a patch to another extension's skill or script body. The git extension's `after_council_approve` hook (firing the git-ext-owned `on-council-approve.sh`) is the model: it reacts to the council gate without editing a single council-owned file. |
+| S2 | **An unavoidable source edit lives in the *owning* extension's source.** If coupling genuinely cannot be a hook, the edit belongs in `extensions/<owner>/` — the source tree of the extension that **owns** the touched file (§6) — so that owner's own `install.sh` carries it on every reinstall. Editing the *installed copy* (`.claude/…`, `.specify/…`) is never acceptable: it is wiped on reinstall and violates ownership regardless. graphify shipping the `002`-authored per-wave-commit edit inside its **own** `speckit-implement-parallel` source is the standing example. |
+| S3 | **Reinstall-survival is a test, not a hope.** Any cross-extension seam — hook or owned-source edit — is covered by a regression that installs both extensions, reinstalls, and asserts the seam still fires. `extensions/git/test/run.sh` §3 is the reference: it reinstalls graphify + council and re-checks both the hook action and the owned-source edit survive. A manual quickstart cannot catch this class — the wipe is silent — so CI must. |
+
+`no writer touches another's artifact` (§6) and `no extension patches another's installed source` (§9) are the same ownership principle at two layers. A developer wiring M3's `categorize` → `agent-assign` coupling (or any future seam) applies S1 first, and falls back to S2 + S3 only when a hook genuinely cannot express the coupling.

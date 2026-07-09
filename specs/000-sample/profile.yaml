@@ -4,6 +4,7 @@ schema_version: "1.0"
 feature: "000-sample"
 
 full_auto: false
+council_tier: full
 
 gates:
   council:
