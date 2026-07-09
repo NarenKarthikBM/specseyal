@@ -51,3 +51,18 @@
 ## Chairman's note
 
 The plan's mechanical-git spine — the branch and commit graph *are* the state, no state file — is sound and well-defended, but the round converged hard (raised independently on three lenses, endorsed by all five peers) on a mechanism-level defect that guts its central guarantees: the hooks that must be non-negotiable are registered `optional: true`, which the dispatch layer only announces rather than auto-invokes, and even when invoked carry no stop-on-failure path — so FR-009's hard-block and SC-001's zero-manual-git are prose-only today, precisely the warn-and-override the spec rejected on 2026-07-09, and this compounds with a verifiably false blast-radius claim (the R1 seam requires editing two other extensions' skills their installers silently overwrite on reinstall). The two live disagreements — reopening `before_specify` (rebutted: D51 closed it same-day, the fix is documentation-only) and descoping the enforced hard-block to record-and-disclose (rebutted: it reopens a ratified spec clarification) — are surfaced for triage to dispose, not pre-empted here. Grounding was full this round (`graph.json` present, though every member independently found it low-signal for the `.sh`/`.yml` files this plan turns on), so no reduced-grounding banner applies.
+
+---
+
+### Chairman delta check — 2026-07-09T13:02:22Z
+
+Re-adjudication of the six prior `blocking` rows (R1-S01…R1-S06) against the triage-revised `plan.md` (commit `bec819e`) — re-adjudication only, no re-review: opinions were not reopened and no new findings were raised.
+
+- R1-S01 — RESOLVED — §B now registers every hard-block/branch/commit hook `optional: false` and has the dispatch layer auto-invoke it, retiring the announce-only `optional: true` that never fired unprompted (the warn-and-override FR-009 rejected).
+- R1-S02 — RESOLVED — §B and Dependency-impact item 4 add an explicit "if the invoked hook exits non-zero, STOP" clause to the `speckit-tasks`/`speckit-implement` pre-checks as its own task, kept distinct from S01's flag flip so neither patch is dropped as "already covered."
+- R1-S03 — RESOLVED — the Dependency/graph-impact section retracts the false "only `extensions.yml` touched" manifest and enumerates all five required existing-file edits, each as its own task, so `/speckit-tasks` cannot omit the R1-seam work.
+- R1-S04 — RESOLVED — the council-approve SHA-record moves to a reinstall-surviving `after_council_approve` hook (never an installer-overwritten source edit), and the sole remaining coupled edit — `implement-parallel`'s per-wave commit, for which no hook vocabulary exists — is documented in Risk R1 and covered by the reinstall-survival regression (R1-S17).
+- R1-S05 — RESOLVED — `verify-gate` is now specified working-tree-aware (a dirty approved `plan.md` reads as stale) and fail-closed on unparseable input, so an uncommitted hand-edit hard-blocks instead of sailing through.
+- R1-S06 — RESOLVED — §B and Dependency-impact item 3 flip the ordering so the per-wave commit lands BEFORE the `[X]` mark, closing the interrupt window that could not distinguish "done, commit missing" from "partial, discard" (principle III / SC-006).
+
+**Delta verdict:** all clear, ready for the gate. All six prior blocking items are resolved by the single authorized revision (FR-010); no new findings were raised in this delta check, so the plan proceeds to the human gate with no residual blocking risk.
