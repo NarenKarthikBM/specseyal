@@ -12,3 +12,4 @@ Gate-freshness baseline: council `plan.md@bec819e` · workforce `tasks.md@30167a
 | 2026-07-09T16:00Z | 1/14 | T001 | 0 (orchestrator glue) | success | ✅ baseline set |
 | 2026-07-09T16:08Z | 2/14 | T002, T003, T004 | 3 (Sonnet) | success | ✅ plan/assignment intact |
 | 2026-07-09T16:20Z | 3/14 | T005 | 0 (orchestrator — subagent stalled on infra watchdog @600s; authored by hand) | success | ✅ intact |
+| 2026-07-09T16:32Z | 4/14 | T006 | 0 (orchestrator glue — shared .specify/extensions.yml) | success | ✅ intact; merge tested in scratch (6/6 assertions, S07 order, idempotent) |
