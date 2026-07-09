@@ -278,7 +278,7 @@ Report completion to the user with:
 - Checklist results summary
 - Readiness for the next phase (`/speckit-clarify` or `/speckit-plan`)
 
-**NOTE:** Branch creation is handled by the `before_specify` hook (git extension). Spec directory and file creation are always handled by this core command.
+**NOTE:** Branch creation is handled by the git extension's **`after_specify`** hook — folded into the first phase-tagged commit (`commit.sh` self-heals the branch from `feature.json`'s spec ID, so the branch is born *co-incident with* `specify`, before `spec.md` is committed; D-R1 / `002`-FR-001). It is **not** a `before_specify` hook: that stock slot is deliberately left unused (it fires before the spec ID exists, which would force re-deriving NNN+slug and risk a dir/branch mismatch — R1-S16/S19). Spec directory and file creation are always handled by this core command.
 
 ## Quick Guidelines
 

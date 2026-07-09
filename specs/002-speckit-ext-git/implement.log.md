@@ -19,6 +19,7 @@ Gate-freshness baseline: council `plan.md@bec819e` · workforce `tasks.md@30167a
 | 2026-07-09T18:00Z | 8/14 | T013, T014 | 2 (Sonnet) | success | ✅ intact; US3 integration smoke PASSED (SC-004): fresh→dirty-uncommitted-stale(S05)→SHA-mismatch-stale→missing-gates-fail-closed(S10); T014 verified decision-record.md checksum unchanged (principle I). US3 complete |
 | 2026-07-09T18:15Z | 9/14 | T010 | 1 (Sonnet) | success | ✅ intact; implement-parallel now carries per-wave verify-gate (S23) + commit-before-[X] (S06), surgical. US2 complete. (Orchestrator still does both BY HAND this run — note 3.) |
 | 2026-07-09T18:20Z | 10/14 | T018, T019 | 0 (orchestrator — spike experiment + disposable-doc regen) | success | ✅ intact; spike concluded ABANDON (below); graphify-context manifest corrected |
+| 2026-07-10T00:10Z | 11/14 | T020 | 0 (orchestrator — shares graphify-context.md with T019, serial) | success | ✅ intact; before_specify assertions fixed (speckit-specify NOTE + graphify-context:13) → after_specify (D-R1) |
 
 ## Wave-worktree spike — outcome (T018 · FR-015 · D54 · timebox ≤2h: ran ~18:20–18:25Z, well within cap)
 
