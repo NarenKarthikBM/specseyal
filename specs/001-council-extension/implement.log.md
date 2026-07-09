@@ -7,3 +7,4 @@
 2026-07-08T23:14:48Z | wave 3 | tasks: T005 | agents: 0 (orchestrator spike) | outcome: success
 2026-07-08T23:43:25Z | wave 4 | tasks: T006, T007, T008, T009, T010, T011 | agents: 6 (2 batches of 3) | outcome: success
 2026-07-09T00:01:31Z | wave 5 | tasks: T012, T014, T016 | agents: 3 | outcome: success
+2026-07-09T00:02:40Z | wave 6 | tasks: T013, T015, T017 | agents: 0 (orchestrator glue: trivial provenance stubs) | outcome: success
