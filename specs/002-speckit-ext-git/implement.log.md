@@ -18,3 +18,18 @@ Gate-freshness baseline: council `plan.md@bec819e` · workforce `tasks.md@30167a
 | 2026-07-09T17:30Z | 7/14 | T009, T012, T017 | 3 (Sonnet) | success | ✅ intact; commit.sh self-heal+scoped-staging (11 scenarios), gates.sh version-tagged fail-closed I/O, cleanup skill (council frontmatter, dmi:false) |
 | 2026-07-09T18:00Z | 8/14 | T013, T014 | 2 (Sonnet) | success | ✅ intact; US3 integration smoke PASSED (SC-004): fresh→dirty-uncommitted-stale(S05)→SHA-mismatch-stale→missing-gates-fail-closed(S10); T014 verified decision-record.md checksum unchanged (principle I). US3 complete |
 | 2026-07-09T18:15Z | 9/14 | T010 | 1 (Sonnet) | success | ✅ intact; implement-parallel now carries per-wave verify-gate (S23) + commit-before-[X] (S06), surgical. US2 complete. (Orchestrator still does both BY HAND this run — note 3.) |
+| 2026-07-09T18:20Z | 10/14 | T018, T019 | 0 (orchestrator — spike experiment + disposable-doc regen) | success | ✅ intact; spike concluded ABANDON (below); graphify-context manifest corrected |
+
+## Wave-worktree spike — outcome (T018 · FR-015 · D54 · timebox ≤2h: ran ~18:20–18:25Z, well within cap)
+
+> The **wave-worktree spike** (distinct from `speckit-implement-parallel`'s pre-existing per-**story** `Agent isolation: worktree` guardrail — R1-S24). Hypothesis (I-4): giving each parallel implement **wave** its own `git worktree`, merging per wave, improves isolation between concurrent subagents vs the shared-tree default.
+
+**What was tried.** A minimal empirical harness in a scratch repo: (A) two "wave tasks" in separate worktrees each committing a **disjoint** new file, merged per wave; (B) two worktree tasks both editing a **shared** file (`registry.yml`), merged per wave. Plus the lived evidence of this build's own 9 waves.
+
+**What happened.**
+- **(A) disjoint files:** worktrees merged clean — but so does the shared tree. **No isolation benefit**, since `[P]` already restricts a wave to disjoint-file sets.
+- **(B) shared file:** worktree-per-wave produced a **merge conflict** on `registry.yml`. Worktrees **reintroduce** the exact shared-file collision that the DAG's "serialize shared/mutable writers as orchestrator glue" rule (taxonomy §2.1, gate-note 2) prevents *by construction*. Worktrees isolate at the **wrong layer** (per-wave filesystem) when the real isolation belongs at the **DAG layer** (don't co-schedule shared-file writers).
+- **Cost:** each wave would add `git worktree add ×N` + per-wave merges + `worktree remove` + branch cleanup — real setup/disk/merge overhead.
+- **This build is the existence proof:** waves 2/6/7/8 ran 2–4 concurrent Sonnet subagents in the **shared** tree with **zero** collisions, because `[P]` was disjoint-new-files only and the 3 shared/mutable files (`.specify/extensions.yml`, `test/run.sh`, `graphify-context.md`) were handled as orchestrator glue. No worktree was ever needed.
+
+**Recommendation: ABANDON for v1 (do not adopt).** Worktree-per-wave adds cost for zero benefit on the disjoint case and is *actively worse* on the shared case (it manufactures conflicts the current design avoids). The correct isolation layer is the DAG (already in place). A null result is a **success** (D25/D54): the firewall held — no FR-001…FR-014 behavior, hook, or command references `worktree`; deleting T018 leaves US1–US4 green (SC-008). Resolves **I-4** (the original worktrees-per-wave idea) → abandon.
