@@ -14,17 +14,17 @@ Design decisions resolved before Phase 1. Each: **Decision · Rationale · Alter
 **Rationale**: Stock phases have hook points; extension-command phases and per-wave do not. One primitive keeps the commit-message grammar (FR-006) and the "no-op if clean" rule (FR-004) in exactly one place.
 **Alternatives rejected**: editing the stock spec-kit skills to embed commits (a re-init would clobber them — breaks the graphify/council compatibility guarantee); a bespoke per-wave hook (spec-kit has no per-wave hook vocabulary).
 
-## D-R3 · Gate↔SHA: the git ext **supplies**, the gate command **records**
+## D-R3 · Gate↔SHA binding = git-ext-owned `gates.yml` (revised at triage, R1-S09/S20)
 
-**Decision**: The git ext exposes `speckit.git.sha <artifact>` (current SHA) and `speckit.git.verify-gate <gate>` (recorded-vs-current compare). The **gate command** writes `<artifact> @ <sha>` into the gate section it already owns; the `before_*` hook calls `verify-gate` and **hard-blocks** on mismatch (FR-009).
-**Rationale**: Keeps principle I clean — no second writer mutates the gate command's artifact. The git ext is a helper + a guard, never an author.
-**Alternatives rejected**: the git ext appends the SHA into the gate section itself (a co-write that muddies artifact ownership, §6).
+**Decision**: The binding lives in a **git-ext-owned `specs/NNN/gates.yml`**, written by the git ext via a reinstall-surviving `after_council_approve` hook; the gate section carries a one-line reference. `verify-gate` reads `gates.yml`, compares **working-tree-aware + fail-closed** (R1-S05/S10), and hard-blocks on stale (FR-009).
+**Rationale**: The git ext owning its own artifact keeps principle I clean **and** dissolves the supply/record seam — the original "git ext supplies, gate command records" split still required editing the gate command, which its installer overwrites on reinstall (R1-S04). One owner, one artifact.
+**Alternatives rejected**: git ext co-writes the gate section (co-write, ownership muddle); the earlier supply/record split (still coupled the git ext to an installer-overwritten command).
 
-## D-R4 · Merge policy = unconditional `--no-ff` (completion anchor)
+## D-R4 · Completion anchor = `complete/<spec-id>` tag; merge `ff`-permitted (amended D52)
 
-**Decision**: `/speckit-git-cleanup` always integrates via `--no-ff` (never ff, never squash/rebase-collapse); a conflict aborts and is surfaced for manual resolution; then the branch ref is deleted.
-**Rationale**: The merge commit is the feature's **completion anchor** — the binding target for D19 phase-completion events / the M5 manager, and the node `git log --first-parent` enumerates one-per-feature. An anchor must exist unconditionally (D51). "Preserve the phase trail" (D25) = every phase commit stays individually reachable.
-**Alternatives rejected**: ff-when-linear (leaves no anchor — rejected at D51; M1's ff is grandfathered pre-policy); squash/rebase (destroys the trail — D25).
+**Decision**: `/speckit-git-cleanup` integrates with **fast-forward permitted** (merge-commit only when the base diverged; never squash/rebase-collapse), creates a **mandatory annotated tag `complete/<spec-id>`** as the completion anchor, then deletes the branch; a conflict aborts and is surfaced.
+**Rationale (D52, superseding D51's merge clause, R1-S27)**: the anchor is the **tag** — immutable, the D19/M5 binding target, enumerable via `git for-each-ref refs/tags/complete/*` **independent of merge topology**. It exists unconditionally as a tag, so `--no-ff` is no longer needed and solo/linear features stay ff-clean. "Preserve the phase trail" (D25) still holds (no squash).
+**Alternatives rejected**: `--no-ff` mandatory (D51's clause — superseded by the tag); squash/rebase (destroys the trail — D25). *M1's ff-merge grandfather is now moot (kept as history).*
 
 ## D-R5 · Re-approval after a stale-approval hard-block routes by gate type
 

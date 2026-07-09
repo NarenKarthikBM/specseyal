@@ -17,11 +17,10 @@ The extension holds **no data of its own** (D32) — its "entities" are git obje
 - A per-wave commit inside `implement` (FR-005). **Grammar:** `^impl\(<spec-id>\) wave <K>/<N>: <summary>$`. Made by `implement-parallel` calling the commit primitive (D-R7).
 
 ### GateSHABinding
-- The `(artifact, commit-SHA)` pair recorded **inside a gate section** the pipeline already writes (FR-008), never a sidecar:
-  - **Council gate** → `decision-record.md` `## Human Gate`: `Plan reviewed: plan.md @ <sha>` (the section already cites artifacts `@ <sha>`; R4 already names an applying commit).
-  - **Workforce gate** → `assignment.md` `## Workforce Gate` (§8): `reviewed: tasks.md @ <sha>, assignment.md @ <sha>`.
-- **Freshness rule (FR-009)**: a binding is *fresh* iff `<sha>` equals the artifact's current commit SHA. A stale binding does not authorize the gated phase (hard-block).
-- `<sha>` is a short (≥7-char) or full git SHA; the value comes from `speckit.git.sha <artifact>`.
+- The `(artifact, commit-SHA)` pair recorded in a **git-ext-owned `specs/NNN/gates.yml`** (owner ruling, R1-S09/S20 — supersedes the earlier "inside the gate section" design, which co-wrote another command's artifact); the gate section (`## Human Gate` / `## Workforce Gate`, §8) carries a **one-line reference** to `gates.yml`.
+  - **Council gate** binds `plan.md @ <sha>`; **workforce gate** binds `tasks.md @ <sha>` + `assignment.md @ <sha>`.
+- **Freshness rule (FR-009)**: a binding is *fresh* iff `<sha>` equals the artifact's current commit SHA **and the working tree for that artifact is clean** (a dirty approved artifact = stale — R1-S05). `verify-gate` **fails closed** (blocks) on an unparseable binding or gate-format-version drift (R1-S10). A stale binding does not authorize the gated phase (hard-block).
+- `<sha>` is a git SHA from `speckit.git.sha <artifact>`.
 
 ### WaveWorktree *(spike only — FR-015)*
 - An isolated `git worktree` per implement wave, merged per wave. **Exists only inside the timeboxed spike**; no hook or command references it. Deliverable: a finding in `implement.log.md`, not a persisted entity.
@@ -31,13 +30,14 @@ The extension holds **no data of its own** (D32) — its "entities" are git obje
 | Key | Meaning | Default |
 |---|---|---|
 | `base_branch` | the branch features are cut from and merged into | `main` |
-| `merge.policy` | integration strategy | `no-ff` (unconditional, D51 — not overridable to `ff`) |
-| `branch.pattern` | branch-name = spec ID | `^[0-9]{3}-[a-z0-9]+(-[a-z0-9]+)*$` |
+| `merge.policy` | integration strategy | `ff`-permitted; merge-commit only when the base diverged (**D52** — the anchor is the tag, not the merge) |
+| `anchor` | completion anchor | annotated tag `complete/<spec-id>`, **mandatory** at cleanup (D52, R1-S27) |
+| `branch.pattern` | branch-name = spec ID | `^[0-9]{3}-[a-z0-9]+(-[a-z0-9]+)*$`, **or `YYYYMMDD-HHMMSS-slug` under `feature_numbering: timestamp`** (R1-S25) |
 | `commit.grammar` | phase/wave message shapes | as PhaseCommit/WaveCommit above |
 | `phases` | which stock phases get `after_*` commit hooks | `[specify, clarify, plan, tasks, implement]` |
 | `gates` | gate → `(artifacts, verify-before-phase)` map | council→(`plan.md`, before `tasks`); workforce→(`tasks.md`,`assignment.md`, before `implement`) |
 
-`merge.policy` is deliberately **not** engineered to accept `ff` — the anchor must exist unconditionally (D51). Recording it as config documents the decision without re-opening it.
+The **completion anchor is the `complete/<spec-id>` tag** (D52, superseding D51's `--no-ff`): it exists unconditionally as a tag regardless of merge topology, enumerable via `git for-each-ref refs/tags/complete/*`, so `merge.policy` is now free to fast-forward.
 
 ## Invariants (checked by quickstart / conformance)
 

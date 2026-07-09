@@ -2,7 +2,9 @@
 
 The extension surface: **hooks** (fired automatically by the phase commands) + **primitives** (called by hooks and by extension commands) + **one human command**. Every one is mechanical git; none calls a model or writes a `traces.jsonl` record (FR-007).
 
-## Hooks (registered in `.specify/extensions.yml`, `optional: true`)
+## Hooks (registered in `.specify/extensions.yml`)
+
+> **Revised at triage (R1-S01/S02):** hard-block / branch-commit hooks are **`optional: false`** so the dispatcher **auto-invokes** them (an `optional: true` hook is only *announced*); and `speckit-tasks`/`speckit-implement` pre-checks **abort on a non-zero hook exit**. `after_analyze` (R1-S14) and `after_council_approve` (R1-S04/S09) are added to the set below.
 
 | Hook | Fires | Action | Exit contract |
 |---|---|---|---|
@@ -37,16 +39,15 @@ Hooks compose with graphify's `before_*` by `priority`; the git commit hook runs
 
 ### `/speckit-git-cleanup` (skill; `disable-model-invocation` not set — human runs it)
 - **In**: the completed feature branch (checked out or named); base from `git-config.yml`.
-- **Does** (FR-011, D51): `git merge --no-ff` the feature branch into `base_branch` (unconditional; the merge commit is the completion anchor) → on success, `git branch -d <feature>`. **On conflict: abort (`git merge --abort`) and surface** for manual resolution — never auto-resolve, never delete an unmerged branch.
-- **Out**: a base-branch merge commit; the feature branch ref deleted; every phase/wave commit still reachable (SC-005). No trace (mechanical git).
-- **Idempotent**: re-running after a completed cleanup is a no-op (branch already gone).
+- **Does** (FR-011, **D52**): integrate into `base_branch` — **`ff` permitted**, `git merge --no-ff` only when the base diverged → **`git tag -a complete/<spec-id>`** at the integration commit (the mandatory completion anchor) → `git branch -d <feature>`. **On conflict: abort (`git merge --abort`) and surface** — never auto-resolve, never delete an unmerged branch.
+- **Out**: the integration commit + the `complete/<spec-id>` tag (enumerable via `git for-each-ref refs/tags/complete/*`); the feature branch ref deleted; every phase/wave commit reachable (SC-005 via per-SHA `merge-base --is-ancestor`). No trace (mechanical git).
+- **Idempotent**: re-running after a completed cleanup is a no-op (branch gone, tag present).
 
-## Gate-command integration points (the R1 seam)
+## Gate-command integration points (the R1 seam — narrowed at triage)
 
-Not new commands — existing commands gain one call each:
-- **`/speckit-council-approve`** records `plan.md @ $(speckit.git.sha plan.md)` in the `## Human Gate` section it already writes.
-- **The M3 workforce-gate writer** records `tasks.md @ …` + `assignment.md @ …` in `## Workforce Gate` (§8).
-- **`/speckit-implement-parallel`** calls `speckit.git.commit impl "wave K/N …"` after each wave (FR-005/D-R7).
+- **Council approve → `after_council_approve` hook** (reinstall-surviving, R1-S04): the git ext writes `plan.md @ <sha>` into **`gates.yml`**; `## Human Gate` carries a one-line reference. **No edit to `speckit-council-approve`'s installer-overwritten source.**
+- **Workforce gate (M3)**: the git ext writes `tasks.md @ …` + `assignment.md @ …` into `gates.yml`; `## Workforce Gate` (§8) references it.
+- **`/speckit-implement-parallel`**: calls `speckit.git.commit impl "wave K/N …"` after each wave **before marking the task `[X]`** (R1-S06), and re-verifies gate freshness each wave (R1-S23). The one genuinely coupled edit (no per-wave hook slot), reinstall-survival-tested (R1-S17).
 
 ## Non-goals (v1)
 

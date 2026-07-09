@@ -18,16 +18,25 @@ grep -A2 'after_specify\|before_tasks' .specify/extensions.yml   # hooks registe
 3. Run an implementation of ≥3 waves. **Expect**: an `impl(NNN) wave K/N: …` commit per wave (SC-003).
 
 ## Scenario 2 — gate↔SHA binding + stale hard-block (SC-004)
-1. Approve the council gate. **Expect**: `## Human Gate` records `plan.md @ <S1>` where `<S1> == speckit.git.sha specs/NNN/plan.md`.
-2. Edit `plan.md`; commit (`<S2>`). Run `/speckit-tasks`. **Expect**: the `before_tasks` hook (`verify-gate council`) exits non-zero → `tasks` is **hard-blocked** with a "stale approval: plan.md S1≠S2" message; it stays blocked until the council gate is re-run (D14 reopen).
+1. Approve the council gate. **Expect**: `gates.yml` records `plan.md @ <S1>` (== `speckit.git.sha specs/NNN/plan.md`); `## Human Gate` carries a one-line `gates.yml` reference (R1-S09).
+2. Edit `plan.md` — test **both** a committed edit and an **uncommitted** one — then run `/speckit-tasks`:
+   ```
+   printf '\n<!-- injected edit -->\n' >> specs/NNN-slug/plan.md   # uncommitted → dirty tree
+   /speckit-tasks
+   ```
+   **Expect** (both cases): `before_tasks` → `verify-gate council` exits non-zero → `tasks` **hard-blocked** ("stale approval: plan.md"); the **uncommitted** case is caught too (working-tree-aware, R1-S05). Stays blocked until the council gate is re-run (D14 reopen).
 
-## Scenario 3 — completion cleanup preserves the trail (SC-005)
-1. Note the feature's phase/wave commit count: `git log --oneline main..HEAD | wc -l` = `C`.
-2. Run `/speckit-git-cleanup`. **Expect**: a `--no-ff` merge commit on `main`; all `C` phase/wave commits still reachable (`git log main | grep -c '(NNN'` unchanged); the feature branch ref gone (`git branch --list NNN-slug` empty); `git log --first-parent main` shows the feature as **one** node (the anchor).
+## Scenario 3 — completion cleanup: trail preserved + tag anchor (SC-005)
+1. Record each phase/wave commit SHA on the branch: `git rev-list main..HEAD`.
+2. Run `/speckit-git-cleanup`. **Expect**: integration into `main` (**ff if linear**, merge-commit if diverged, D52); a **mandatory annotated tag** present — `git for-each-ref refs/tags/complete/NNN-slug` non-empty (the anchor); **each recorded SHA still reachable** — `git merge-base --is-ancestor <sha> main` returns 0 for every one (per-SHA, not a count); the feature branch ref gone.
 3. Force a conflict (edit the same line on `main` first) and retry. **Expect**: `merge --abort` and a surfaced conflict — branch **not** deleted, no silent resolution.
 
-## Scenario 4 — zero AI cost (SC-007)
-- After a full run: `grep -c '"role":"git' specs/NNN/traces.jsonl` → **0**. The extension left no trace record; `cost = 0` tokens.
+## Scenario 3b — interrupt/resume at wave granularity (SC-006, the missing P1 coverage — R1-S18)
+1. Start an implementation of ≥3 waves; kill the process after wave 2 commits.
+2. Resume. **Expect**: git HEAD and `tasks.md` `[X]` markers **agree** (the commit precedes the `[X]`, R1-S06); resumption starts at wave 3; no wave-1/2 work duplicated or lost.
+
+## Scenario 4 — zero AI cost, by construction (SC-007)
+- The extension runs as synchronous git hooks — **there is no session to trace**, so `cost = 0` tokens *by construction* (a `grep '"role":"git"' traces.jsonl → 0` would pass **vacuously** and proves nothing — R1-S18). The real check: no `extensions/git/**` path invokes a model or the Agent tool.
 
 ## Scenario 5 — worktree spike outcome (SC-008)
 - Confirm `implement.log.md` contains a spike entry (what was tried, isolation result, adopt-later/abandon) and that no `extensions/git/**` file references `worktree` outside the spike task — removing the spike leaves Scenarios 1–4 green.

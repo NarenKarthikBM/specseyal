@@ -30,7 +30,7 @@ The design's spine is **the branch and the commit graph *are* the state** (D32):
 |---|---|---|
 | **I. Artifacts are the contract** | The extension **authors no `specs/` artifact**. It *commits* artifacts other phases wrote, and *supplies* SHA values that the **gate command** (not the git ext) records into its own gate section — so no writer's artifact is mutated by a second writer. Ownership (artifact-layout §6) is unchanged. | ✅ PASS |
 | **II. Context hygiene** | The extension runs **no session** — every operation is a synchronous shell hook in the phase already running. Nothing is offloaded; nothing returns opinion/context bodies. | ✅ PASS |
-| **III. Resumability (NON-NEGOTIABLE)** | This extension *is* the resumability mechanism made mechanical: the phase-tagged commit is the checkpoint, the branch is the sole out-of-`specs/` state (a ref), and gate-SHA freshness **extends** "validity, not mere presence" (§3 consequence 2) — a gate section validates only if its recorded SHA matches. **No state file** (D32). | ✅ PASS |
+| **III. Resumability (NON-NEGOTIABLE)** | This extension *is* the resumability mechanism made mechanical: the phase-tagged commit is the checkpoint, the branch is the sole out-of-`specs/` state (a ref), and gate-SHA freshness **extends** "validity, not mere presence" (§3 consequence 2) — a gate section validates only if its recorded SHA matches. **No state file** (D32) — `gates.yml` (the binding home, R1-S09/S20) is a *bindings record*, not phase state; the gate section's existence still marks the phase done. | ✅ PASS |
 | **IV. Observability** | The extension appends **no** `traces.jsonl` record — it is mechanical git, not an AI session, exactly like the `branch`/gate rows that "run no session and so leave no trace" (artifact-layout §2). It does not disable any *other* session's tracing. | ✅ PASS |
 | **V. Subscription-only billing (NON-NEGOTIABLE)** | Zero model calls → billing is moot at runtime; the build runs on subscription auth, `ANTHROPIC_API_KEY` unset. | ✅ PASS |
 | **Model policy (D18)** | Runtime has no model. The **build** uses Sonnet implementers + the Opus main thread. | ✅ PASS |
@@ -44,55 +44,58 @@ The design's spine is **the branch and the commit graph *are* the state** (D32):
 
 `extensions/git/` with an idempotent `install.sh` that copies `extension/` → `.specify/extensions/git/`, the cleanup skill → `.claude/skills/`, **and merges its hook entries into `.specify/extensions.yml`** (the graphify variant — council's installer skipped this because council registers no hooks; this one does). `uninstall.sh` removes only what it added, including its hook entries. The `extensions.yml` merge is **append, never overwrite** — it already holds graphify's three `before_*` hooks (see `graphify-context.md`: this is the one shared/mutable file).
 
-### B. The hook architecture (the heart)
+### B. The hook architecture (the heart) — revised at triage
 
-The extension is a set of hooks on the **stock** phase boundaries plus a shared **commit primitive** for the boundaries that have no stock hook (council/triage/gates, per-wave):
+Hooks carrying **hard-block or branch/commit semantics are registered `optional: false`** and the dispatch layer **auto-invokes** them — *not* `optional: true` (which the stock dispatcher only *announces*, the round's headline defect, **R1-S01**). The stock `speckit-tasks`/`speckit-implement` pre-checks gain an explicit **"if the invoked hook exits non-zero, STOP"** clause (**R1-S02** — an independent second fix: flipping the flag makes the hook *run* but still not *block*). The extension is these hooks plus a shared **commit / sha / verify-gate primitive** for boundaries with no stock hook.
 
-| Pipeline point | Git-ext mechanism | Action |
+| Pipeline point | Git-ext mechanism (`optional: false` unless noted) | Action |
 |---|---|---|
-| after `specify` | `after_specify` hook | **Branch birth (FR-001):** ensure the feature branch — create from the base branch if absent, named exactly the spec ID read from `feature.json`, carrying the uncommitted `spec.md` onto it — then commit `spec(<id>): …`. So `spec.md` lands on the branch; the base never held it. |
-| after `clarify` | `after_clarify` hook | commit the `spec.md` revision (`spec(<id>): clarify`) |
-| after `plan` | `after_plan` hook | commit plan artifacts (`plan(<id>): …`) |
-| council / triage | commit primitive, called by those commands | `council(<id>): …`; at **council approve**, the gate command records `plan.md @ <sha>` into `## Human Gate` using the git-ext `current-sha` helper (FR-008) |
-| before `tasks` | `before_tasks` hook | **gate-verify (FR-009):** the council gate's recorded `plan.md @ <sha>` must equal `plan.md`'s current SHA; mismatch ⇒ **hard-block** `tasks` until re-approval (council → D14 reopen tiers) |
-| after `tasks` | `after_tasks` hook | commit `tasks(<id>): …` |
-| workforce gate | commit primitive + `current-sha` | stamp `tasks.md @ <sha>` + `assignment.md @ <sha>` into `## Workforce Gate` (§8) |
-| before `implement` | `before_implement` hook | **gate-verify:** workforce-gate SHAs fresh? mismatch ⇒ hard-block (workforce → re-run gate) |
-| per wave (implement) | commit primitive, called by `implement-parallel` | `impl(<id>) wave K/N: …` (FR-005) |
-| after `implement` | `after_implement` hook | final implement-boundary commit |
-| completion | **`/speckit-git-cleanup`** (human command) | explicit `--no-ff` merge into base + delete branch (FR-011) |
+| after `specify` | `after_specify` | **Branch birth (FR-001):** `commit.sh` **self-heals** — ensures the feature branch first (create-if-absent from `feature.json`'s spec ID, carrying the uncommitted `spec.md`), then commits `spec(<id>): …`. Folding ensure-branch into the one commit entry point kills the silent base-branch failure mode (**R1-S12**). |
+| after `clarify` | `after_clarify` | commit `spec(<id>): clarify` |
+| after `plan` | `after_plan` | commit `plan(<id>): …` |
+| **after `analyze`** | **`after_analyze`** (**R1-S14**) | commit `analyze(<id>): …` (`speckit-analyze` exists, has working hooks, can revise `tasks.md`) |
+| council / triage | commit primitive, called by those commands | `council(<id>): …` |
+| council approve | **`after_council_approve` hook** (reinstall-surviving, **R1-S04/S09**) | git ext writes `plan.md @ <sha>` into **`gates.yml`**; `## Human Gate` carries a one-line reference |
+| before `tasks` | `before_tasks` | **gate-verify (FR-009):** council binding fresh? Compare is **working-tree-aware** (dirty approved `plan.md` = stale, **R1-S05**) and **fails closed** on unparseable/format-drift (**R1-S10**); mismatch ⇒ hard-block until reopen (D14). |
+| after `tasks` | `after_tasks` | commit `tasks(<id>): …` |
+| workforce gate | git ext writes to `gates.yml` | binds `tasks.md @ <sha>` + `assignment.md @ <sha>` (§8 ref) |
+| before `implement` | `before_implement` | gate-verify workforce binding (same wt-aware / fail-closed rules) ⇒ hard-block on stale |
+| per wave (`implement`) | commit primitive, called by `implement-parallel` | `impl(<id>) wave K/N: …` (FR-005), **committed BEFORE the `[X]` mark** (**R1-S06** — else an interrupt can't tell "done, commit missing" from "partial, discard"; breaks principle III / SC-006); **re-verify gate freshness each wave** for `implement` (**R1-S23**). |
+| after `implement` | `after_implement` | backstop the phase boundary |
+| completion | **`/speckit-git-cleanup`** (human) | integrate (**`ff`-permitted**; merge-commit only if base diverged) + create the mandatory **`complete/<spec-id>` annotated tag** (the anchor) + delete branch (**R1-S27**, D52) |
 
-**Three shared primitives** (extension commands the hooks and the pipeline call): `speckit.git.commit "<phase>" "<summary>"` (phase-tagged commit with the FR-006 grammar, **no-op if nothing changed** — FR-004), `speckit.git.sha <artifact>` (prints the current commit SHA touching that artifact — the value gate commands record), `speckit.git.verify-gate <gate>` (compares recorded vs current SHA; exit non-zero ⇒ stale).
+**Shared primitives** (extension commands the hooks + pipeline call): `speckit.git.commit "<phase>" "<summary>"` — phase-tagged commit (FR-006), no-op if clean (FR-004), **staging scoped to `specs/NNN-feature/**` + the task's declared outputs only — never a repo-wide `git add -A`** (**R1-S11**: an unattended repo-wide add would sweep a stray `.env`/credential into permanent history); `speckit.git.sha <artifact>` — current SHA (read-only); `speckit.git.verify-gate <gate>` — recorded-vs-current compare, **working-tree-aware, fail-closed** (R1-S05/S10).
 
 ### C. Branch birth folded into the first commit (FR-001, §2 D51)
 
 The branch is **not** a `before_specify` hook. `before_specify` fires *before* `specify` assigns the spec ID, so a branch created there would have to **duplicate** `create-new-feature.sh`'s NNN+slug logic and risk a slug mismatch with the dir. Instead, the **`after_specify` commit hook creates the branch** — by then the spec ID exists in `feature.json`, so the branch name is read, not recomputed (FR-002 guaranteed). `git checkout -b <id>` carries the still-uncommitted `spec.md` onto the new branch; the base branch never receives a `spec.md` commit → it stays clean (SC-002). This is exactly "co-incident with `specify`, before `spec.md` is committed" (artifact-layout §2, D51).
 
-### D. Gate↔SHA binding — the git ext supplies, the gate command records (FR-008/009)
+### D. Gate↔SHA binding — git-ext-owned `gates.yml` (FR-008/009; revised at triage)
 
-To keep principle I clean, the **gate command owns its gate section**; the git ext only supplies the SHA and the freshness verdict. At approval, `council-approve` / the workforce-gate writer calls `speckit.git.sha plan.md` (etc.) and records `<artifact> @ <sha>` in the section it already writes. Before a gated phase, the git ext's `before_*` hook calls `verify-gate`; a stale verdict **hard-blocks** (FR-009). Re-approval routes by gate type (D51): council → D14 reopen tiers via the manual reopen interface (`001`-FR-017); workforce → re-run the gate. *This requires the council-approve skill (and the M3 workforce-gate writer) to call the `sha` helper — the one place the git ext couples to another extension's command (Risk R1).*
+The binding lives in a **git-ext-owned artifact `specs/NNN/gates.yml`** (owner ruling; **R1-S09/S20**), written by the git ext itself as a side effect of a call the gate already makes — so no gate command's artifact is co-written by a second writer (principle I stays clean; this **dissolves the D-R3 supply/record seam** that manufactured half of R1). Wiring is a **reinstall-surviving `after_council_approve` hook** (**R1-S04**), never an edit to `speckit-council-approve`'s installer-overwritten source; the `## Human Gate` section carries a one-line `gates.yml` reference. Before a gated phase, `verify-gate` reads `gates.yml` and compares recorded-vs-current **working-tree-aware** and **fail-closed** (R1-S05/S10); a stale verdict **hard-blocks** (FR-009). Re-approval routes by gate type (D51): council → D14 reopen tiers (`001`-FR-017); workforce → re-run. *The one genuinely coupled edit with no hook slot — `implement-parallel`'s per-wave commit — is named in the Risk register (R1) and covered by the reinstall-survival regression (R1-S17).*
 
-### E. Completion cleanup — explicit, unconditional `--no-ff` (FR-011, D51)
+### E. Completion cleanup — explicit; `complete/<spec-id>` tag anchor, `ff`-permitted (FR-011, **D52**)
 
-`/speckit-git-cleanup` is **human-invoked** (never automatic — retiring a branch is consequential). It performs an **unconditional `--no-ff` merge** into the base (the merge commit is the feature's **completion anchor**: the D19/M5 phase-event binding target, and the node `git log --first-parent` enumerates per feature), preserving every phase-tagged commit; then deletes the feature branch ref. A textual conflict **aborts and is surfaced** for manual resolution (mechanical git never guesses). M1's `main` ff-merge predates this policy and is **grandfathered — never rewritten**.
+`/speckit-git-cleanup` is **human-invoked** (never automatic — retiring a branch is consequential). It (a) integrates into the base — **fast-forward permitted**, a merge-commit only when the base diverged; (b) creates the **mandatory annotated tag `complete/<spec-id>`** at the integration commit — the immutable **completion anchor** (the D19/M5 binding target, enumerable via `git for-each-ref refs/tags/complete/*`, **independent of merge topology**); then (c) deletes the feature branch ref. A textual conflict **aborts and is surfaced** for manual resolution. *The tag replaces D51's `--no-ff` requirement (D52, R1-S27): the anchor exists unconditionally as a tag, so merge topology is free and solo/linear features stay ff-clean. M1's ff-merge grandfather is now moot (kept as history).*
 
-### F. Composition & the per-wave seam (FR-013)
+### F. Composition & the per-wave seam (FR-013; revised at triage — R1-S07)
 
-Hooks are `optional: true, priority: N` (graphify's schema) so they compose; the git commit hook runs *after* graphify's context hook at a shared boundary. `feature.json` stays the feature resolver — the git ext reads the spec ID from it but never makes a downstream phase depend on the branch name. **Per-wave commits (FR-005) and council/gate commits have no stock hook point**, so they are driven by the *commands themselves* calling `speckit.git.commit` — `implement-parallel` per wave (it already commits per wave by hand — the M1 trail), and the council/triage/approve commands at their boundaries. This command→primitive coupling is the design's main integration seam (R1).
+The earlier "git commit hook runs after graphify's context hook at a shared boundary" was **impossible** (every git commit hook is `after_*`; graphify is exclusively `before_*`) — **R1-S07**. The only real shared keys are `before_tasks` / `before_implement`, where git's `verify-gate` meets graphify's context-gen; there the **installer inserts `verify-gate` ahead of graphify** (so the hard-block runs before graphify's heavy context regeneration). The `priority` field is **dead code** in the stock dispatcher (a static `5`, never read) — v1 **either implements priority ordering or deletes it; no zombie schema**. `feature.json` stays the feature resolver (the git ext reads the spec ID, never couples a downstream phase to the branch name). The **one** boundary with no hook slot — `implement-parallel`'s per-wave commit — is the design's genuine seam (R1), reinstall-survival-tested (R1-S17).
 
-### G. The worktree spike (FR-015, firewalled)
+### G. The wave-worktree spike (FR-015, firewalled)
 
-A **timeboxed Phase-4 task**: give each parallel implement wave its own `git worktree`, merge per wave, measure whether isolation beats the shared-tree default. Outcome (adopt-later / abandon) is recorded in `implement.log.md` + an I-row regardless. **No v1 hook or command depends on it**; deleting it leaves FR-001…FR-014 intact.
+A **timeboxed Phase-4 task, named the *wave-worktree spike*** — distinct from `speckit-implement-parallel`'s pre-existing per-*story* `Agent isolation: worktree` guardrail (R1-S24), so `implement.log.md`'s recorded outcome is not misattributed. Give each parallel implement *wave* its own `git worktree`, merge per wave, measure whether isolation beats the shared-tree default. Outcome (adopt-later / abandon) recorded in `implement.log.md` + an I-row regardless. **No v1 hook or command depends on it**; deleting it and re-running Scenarios 1–4 green proves the firewall (SC-008).
 
 ## Rejected Alternatives
 
-- **`before_specify` branch creation** (stock spec-kit's model). Rejected: it fires before the spec ID exists, forcing the hook to re-derive NNN+slug and risking a mismatch with the dir the specify skill computes. Folding branch birth into the `after_specify` commit hook reads the ID from `feature.json` — zero duplication, FR-002 guaranteed (§C).
-- **A state file / DB tracking branches and gate SHAs.** Rejected outright by D32 (principle III): the branch is a ref, the SHAs live in the gate artifacts. A state file is forbidden, not merely discouraged.
-- **The git ext writes the SHA into the gate section itself.** Rejected: a second writer mutating the gate command's artifact muddies principle I. The git ext *supplies* the SHA; the gate command *records* it (§D).
-- **Squash- or rebase-collapse merge at cleanup.** Rejected by D25/D51: it destroys the phase trail the whole feature built. `--no-ff`, unconditional.
-- **Fast-forward-when-linear as the cleanup default.** Rejected at spec review (D51): the merge commit must exist unconditionally as the completion anchor; ff leaves no anchor. (ff remains only as M1's grandfathered pre-policy act.)
-- **Automatic cleanup at the `complete` phase.** Rejected at clarify: branch retirement is consequential; it stays an explicit human command.
-- **Editing the stock spec-kit skills to insert commits.** Rejected: hooks + a commit primitive keep a Spec Kit re-init non-clobbering (the graphify/council compatibility guarantee).
+- **`before_specify` branch creation** (stock spec-kit's model). Rejected: it fires before the spec ID exists, forcing the hook to re-derive NNN+slug and risking a mismatch with the dir. Folding branch birth into `after_specify` reads the ID from `feature.json` — zero duplication (§C). *(R1-S19: this slot is **deliberately left unused, not missed** — its own contract already tolerates the cited mismatch; D51 closed the question same-day. Two stale `before_specify` assertions still in the codebase are corrected as a task, R1-S16.)*
+- **A state file / DB for phase state.** Rejected by D32 (principle III): the branch is a ref; phase state is inferred from artifacts. (`gates.yml` is a **bindings record**, not phase state — the gate section's existence still marks the phase done.)
+- **The git ext co-writes the SHA into the gate section.** Rejected (principle I: a second writer mutating the gate command's artifact). Resolved at triage by a **git-ext-owned `gates.yml`** (R1-S09/S20) — the git ext owns its own artifact.
+- **Squash / rebase-collapse merge at cleanup.** Rejected by D25: destroys the phase trail. (Still rejected — D52 permits `ff`/merge-commit, never squash.)
+- **`--no-ff` as the mandatory anchor** (D51's original clause). **Superseded at triage (D52, R1-S27):** the anchor is a `complete/<spec-id>` **tag**, independent of merge topology, so `ff` is now permitted.
+- **Descope the gate hard-block to record-and-disclose** (R1-S21). Rejected: reproduces the warn-and-override the spec rejected **by name** on 2026-07-09; adopting it needs a spec-delta re-litigating that clarification and would leave FR-009/SC-004 with nothing to hard-block-test. No such authorization exists (contrast the FR-011 delta, which the owner *did* authorize).
+- **Automatic cleanup at `complete`.** Rejected at clarify: branch retirement is consequential; explicit human command.
+- **Editing stock / other-extension skills' *source* to insert commits or SHA-records.** Rejected (R1-S04): their installers `rm -rf`+`cp -R` on reinstall → edits wiped, and source edits are ownership violations. Use **hooks** (`after_analyze`, `after_council_approve`); the one unavoidable coupled edit (`implement-parallel` per-wave) is reinstall-survival-tested (R1-S17).
 
 ## Project Structure
 
@@ -122,29 +125,42 @@ extensions/git/
 # install.sh copies extensions/git/skills/* → .claude/skills/ and merges hooks → .specify/extensions.yml
 ```
 
-**Structure Decision**: sibling-of-graphify, hook-registering. The mechanical git lives in `scripts/*.sh` (testable in isolation, invoked by hooks and by the commit primitive); the one human-facing skill (`/speckit-git-cleanup`) is installed to `.claude/skills/` so a Spec Kit re-init never clobbers it.
+**Structure Decision**: sibling-of-graphify, hook-registering. The mechanical git lives in `scripts/*.sh` (testable in isolation); the one human-facing skill (`/speckit-git-cleanup`) is installed to `.claude/skills/` so a Spec Kit re-init never clobbers it. **Revised at triage:** add `scripts/gates.sh` (write/read `specs/NNN/gates.yml`, R1-S09/S20) and **`test/run.sh`** (unit tests + the reinstall-survival regression, R1-S17); the branch regex supports `feature_numbering: timestamp` mode (R1-S25); and **correcting the two stale `before_specify` assertions** (`speckit-specify/SKILL.md` closing NOTE + `graphify-context.md`:13, R1-S16) is its own task — both currently point a future implementer at the rejected design.
 
 ## Dependency / graph impact
 
-All-new code under `extensions/git/`. The **only** existing file touched is `.specify/extensions.yml` (hook-merge, append-only) — the single shared/mutable file (`graphify-context.md`). No source file is mutated. The one behavioral coupling is command→primitive (§F/R1): `implement-parallel` (per-wave) and `council-approve` (SHA record) call git-ext primitives — additive, not a rewrite. Blast radius otherwise: none.
+*(Corrected at triage — **R1-S03**: the earlier "only `.specify/extensions.yml` touched, no source mutated" manifest was **false** and would have let `/speckit-tasks` omit the R1-seam work entirely.)*
 
-## Risk register
+New code under `extensions/git/`, **plus edits to existing files that MUST each be their own task** (enumerated so none is dropped):
+
+1. `.specify/extensions.yml` — hook-merge (append-only; the single shared/mutable file per `graphify-context.md`).
+2. `speckit-council-approve` — add the `gates.yml` SHA-record call (R1-S09) via an **`after_council_approve` hook** so the wiring is **reinstall-surviving** (**R1-S04**: council's installer `rm -rf`+`cp -R`s its skills, so editing the installed copy is silently wiped and editing council's *source tree* is an ownership violation — a hook is neither).
+3. `speckit-implement-parallel` — the per-wave commit call **with commit-before-`[X]`** ordering (R1-S06). No per-wave hook vocabulary exists, so this is the one genuinely coupled edit — named as a risk (R1-S04) and covered by the reinstall-survival regression test (R1-S17).
+4. `speckit-tasks` + `speckit-implement` — the stop-on-non-zero pre-check clause (R1-S02).
+5. Regenerate `graphify-context.md`'s shared/mutable list to match.
+
+The installer/`extensions.yml` blast-radius claims are **engineer assertion re-derived by reading files, not graph fact** — `graphify explain`/`path` return "No node matching" for `.sh`/`.yml` (**R1-S22**, filed **I-13**). Blast radius beyond the five above: none.
+
+## Risk register (post-triage)
 
 | # | Risk | Likelihood | Mitigation |
 |---|---|---|---|
-| **R1** | **No stock hook point for extension-command boundaries** (council/triage/gates) and **per-wave** commits, so they depend on those commands calling the git-ext primitive — a command→primitive coupling. If a command forgets to call it, that boundary is silently uncommitted. | **Med** | v1 makes the primitives the single commit path and documents the call site in each command; the `after_implement`/`after_tasks` hooks backstop the phase boundary even if a per-wave call is missed (no *lost* work, only coarser checkpoints). **Flagged for the council** — this is the design's load-bearing seam. |
-| **R2** | **Gate-verify hook points.** `before_tasks` guards the council gate and `before_implement` guards the workforce gate — but an artifact edited *after* the gated phase already ran isn't re-checked. | Med | v1 scopes freshness to the *entry* of the gated phase (the moment the approval is consumed); continuous re-verification is out of v1 scope. Documented as a known bound. **Flagged.** |
-| **R3** | **Branch-at-`after_specify` when the base already advanced / re-run.** If `specify` is re-run or the branch exists, the hook must be idempotent and must not fork a second branch. | Low | `branch.sh` is create-if-absent + checkout (FR-012); re-running switches to the existing branch. |
-| **R4** | **`extensions.yml` merge corrupts the shared registry** → breaks *all* phases. | Low | Append-only merge with a parse-check; `uninstall.sh` reverts exactly its entries; mirrors graphify's proven merge. |
-| **R5** | **Worktree spike bleeds into v1** if a wave's worktree merge is treated as load-bearing. | Low | Firewalled by FR-015; the spike writes only to `implement.log.md`; no hook references it. |
+| **R1** | **The command→primitive seam**, narrowed at triage: the council-approve SHA-record moved to a reinstall-surviving `after_council_approve` hook and the binding to `gates.yml` (R1-S04/S09/S20), so **only** `implement-parallel`'s per-wave commit remains a coupled edit (no per-wave hook vocabulary). | Low (was Med) | That one edit is reinstall-survival-**tested** (R1-S17); `after_implement` backstops the phase even if a per-wave call is missed (coarser checkpoint, never lost work). |
+| **R2** | **Gate-verify mid-phase blind spot** — entry-only freshness leaves the longest, most-interruption-prone phase (`implement`) unchecked across its waves. | Low (was Med) | **Addressed (R1-S23):** re-verify gate freshness at **each wave boundary** in `implement`. |
+| **R3** | **Concurrent `/speckit-specify` race** on the unlocked NNN scan; `branch.sh` create-if-absent would turn a loud collision into a *silent shared-branch merge*. | Med (sharpened) | **R1-S13:** `flock` on NNN allocation **and** loud fail on NNN-exists-with-different-slug (the case a same-slug guard misses); add a concurrency test. |
+| **R4** | **`extensions.yml` merge / uninstall corrupts the shared registry** → breaks *all* phases; a dangling `optional:false` hook would hard-block every phase. | Low | Append-only merge + parse-check; **`uninstall.sh` deregisters hooks *before* payload removal or fails hard** (R1-S26a); the merge is its own budgeted task (R1-S15). *(A merge-`flock` was rejected as duplicative — R1-S26b; S13's allocation lock is a different lock and stands.)* |
+| **R5** | **Enforcement is prose-level, not mechanical** (R1-S08): even corrected `optional:false`+stop-on-nonzero hooks are enforced by an LLM following prose (no `HookExecutor` implemented in-repo). | **Med — accepted** | Named honestly in the Testability claim; the falsifiable-without-a-model claim is downgraded; a mechanical `HookExecutor` is **deferred to M6 (D53)**; the D50 drift lint (R1-S29) partially compensates. |
+| **R6** | **Wave-worktree spike bleeds into v1.** | Low | Firewalled by FR-015; writes only to `implement.log.md`; distinct name from the pre-existing per-story `Agent isolation: worktree` (R1-S24); removal re-runs Scenarios 1–4 green (SC-008). |
 
 ## Cost / complexity estimate
 
-**Runtime cost: zero** — no model, no tokens, no trace (SC-007). The complexity is **integration, not algorithm**: the hard parts are the branch-birth timing (§C), the command→primitive seam (§F/R1), and the gate freshness contract (§D/R2) — all mechanical git wired into the existing hook system. No novel data structures; ~5 short `sh` scripts + one skill.
+**Runtime cost: zero** — no model, no tokens, no session to trace (SC-007). Complexity is **integration, not algorithm**. The largest, most failure-prone piece is **the installer's `extensions.yml` hook-merge, budgeted as its own task (R1-S15)** — not "a short sh script": graphify needed a 193-line embedded-Python YAML merge with a 5-way interpreter fallback to merge **3 uniform** entries; git-ext merges **7 entries across 3 shapes into 5 new keys + 2 append targets**. Beyond it: ~5 short `sh` scripts (`branch/commit/sha/verify-gate/cleanup`), `gates.yml` I/O, one human skill, and a CI test harness (R1-S17).
 
-## Testability claim
+## Testability claim (revised at triage)
 
-Every FR/SC is falsifiable without a model: a full pipeline run on a *later* feature proves SC-001/002/003 (branch auto-created, phase+wave commits present); an injected post-approval edit + a blocked `tasks` proves SC-004; a `git log --first-parent` + reachability count after cleanup proves SC-005; a `traces.jsonl` scan proves SC-007 (zero git-ext records); the spike's `implement.log.md` entry proves SC-008. See [quickstart.md](./quickstart.md).
+**Honest scope (R1-S08):** the extension is deterministic git, but its *enforcement* is **prose-level in v1** — the stock dispatcher has no implemented `HookExecutor`, so a corrected `optional:false`+stop-on-nonzero hook is enforced by an LLM following skill prose, not by code. The "falsifiable without a model" claim is downgraded accordingly; mechanical enforcement is deferred to M6 (**D53**), and the D50 **drift lint** (R1-S29) catches the `before_specify`-style drift class mechanically meanwhile.
+
+What **is** mechanically testable ships as a **scripted, CI-able harness `extensions/git/test/run.sh` (R1-S17)**: unit tests for `branch.sh` create-if-absent (scratch repo + fabricated `feature.json`, no model) and a **reinstall-survival regression** (reinstall council+graphify, assert the R1-seam call sites survived — the S04 class a manual quickstart never catches). `quickstart.md` is corrected to actually prove its SCs (R1-S18): the missing **SC-006 interrupt/resume** scenario added; SC-005 via per-SHA `merge-base --is-ancestor` + the `complete/<spec-id>` tag; SC-007 by-construction, not a vacuous grep; SC-008 removes the spike and re-runs. SCs are **existence proofs**, not "100%" (R1-S29). See [quickstart.md](./quickstart.md).
 
 ## Phase outputs
 
@@ -154,3 +170,18 @@ Every FR/SC is falsifiable without a model: a full pipeline run on a *later* fea
 ## Complexity Tracking
 
 *No Constitution violations — section intentionally empty.*
+
+## Triage revisions — Round 1 (2026-07-09)
+
+The council's round-1 suggestions (disposed in `council/decision-record.md`) applied here — **28 accepted, 1 rejected (S21)**. By area:
+
+- **Spec deltas (owner-authorized, applied to `spec.md` first)**: FR-011 → mandatory `complete/<spec-id>` **tag** anchor, `ff`-permitted (**D52**, S27); FR-008 → `gates.yml` binding home (S09/S20); FR-009 → working-tree-aware + fail-closed (S05/S10); FR-002 → timestamp-mode carve-out (S25); FR-015 → "wave-worktree spike" (S24); SC-002/004 softened to existence-proofs, SC-005/007/008 verification corrected (S18/S29); triage note grandfathers `002`'s own gate + disambiguates D51 timing (S28).
+- **§B hook table**: `optional:false` + auto-invoke (S01); stop-on-nonzero (S02); self-healing `commit.sh` ensure-branch (S12); `after_analyze` (S14); commit-before-`[X]` + per-wave freshness (S06/S23); staging scope pinned (S11).
+- **§D**: `gates.yml` via a reinstall-surviving `after_council_approve` hook (S04/S09/S20).  **§E**: tag anchor, ff-permitted (S27/D52).  **§F**: impossible-ordering fixed, verify-gate ahead of graphify, `priority` implement-or-delete (S07).
+- **Dependency/graph impact**: false manifest corrected — 4 skill-edit tasks enumerated (S03); graph claims labeled assertion + **I-13** (S22).
+- **Risk register**: R1 narrowed; R2 addressed (S23); R3 NNN flock + loud-fail (S13); R4 uninstall-order (S26a; merge-flock rejected S26b); R5 prose-enforcement accepted → M6 (S08/**D53**).
+- **Cost** (S15), **Testability** (S08/S17/S18/S29), **Structure** (S16 stale-assertion task; `gates.sh`; `test/run.sh`), **Rejected Alternatives** (S19 doc-line; S21 descope **rejected**).
+
+**Rejected — S21** (descope the FR-009 hard-block to record-and-disclose): reproduces the warn-and-override the spec rejected *by name* 2026-07-09; unlike the FR-011 delta, no owner authorization exists. **Partial** — S19 (doc-line accepted; `before_specify` switch rejected), S26 (uninstall-order (a) accepted; merge-flock (b) rejected).
+
+All 6 blocking (S01–S06) are applied above; the **chairman delta-check** (`decision-record.md` → `### Chairman delta check`) re-adjudicates them against this revised plan.
