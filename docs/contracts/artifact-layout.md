@@ -1,8 +1,8 @@
 # Contract — Feature Artifact Layout
 
-> **Status:** 1.0 (M0). Normative.
+> **Status:** 1.1 (M2). Normative.
 > **Implements:** principle 1 (artifacts are the contract), principle 3 (resumability).
-> **Sources:** docs/00 §3, docs/10 §3, D4, D25, D32, D37, D38.
+> **Sources:** docs/00 §3, docs/10 §3, D4, D9, D25, D32, D37, D38, D41, D44, D49, D50.
 
 Every feature is one directory under `specs/`. Every pipeline phase reads artifacts and writes **exactly one** artifact. Both the CLI layer and the platform layer (M5+) read and write this same tree — it is the only interface between them.
 
@@ -35,7 +35,7 @@ specs/NNN-feature-slug/
 ├── tasks.md                  ← /speckit-tasks-graph (stock format + `## Execution Waves`)
 ├── categorization.md         ← speckit-ext-categorize    [taxonomy-v0.md]  (M3)
 ├── agents/
-│   └── assignment.md         ← speckit-ext-agents; roster + workforce-gate decision (M3)
+│   └── assignment.md         ← speckit-ext-agents; roster + workforce-gate decision (M3)  [§8]
 │
 ├── implement.log.md          ← /speckit-implement-parallel, one line per wave
 ├── completion-report.md      ← M4
@@ -125,10 +125,66 @@ A feature directory conforms iff:
 
 1. `NNN-feature-slug` matches `^[0-9]{3}-[a-z0-9]+(-[a-z0-9]+)*$`.
 2. Every artifact present validates against its contract (§3.2).
-3. No artifact exists whose upstream phase (§2) is incomplete — e.g. `tasks.md` without an approved `decision-record.md` gate section is a contract violation unless `profile.yaml` sets `gates.council.mode: auto`.
+3. No artifact exists whose upstream phase (§2) is incomplete — e.g. `tasks.md` without an approved `decision-record.md` gate section is a contract violation unless `profile.yaml` sets `gates.council.mode: auto`; likewise committed code / `implement.log.md` without an approved `agents/assignment.md` `## Workforce Gate` section (§8) is a violation unless `gates.workforce.mode: auto`.
 4. `traces.jsonl` has at least one record per completed phase that runs a session (i.e. all but `branch`, `council-gate`, `workforce-gate`).
-5. No file **inside the feature directory** but outside `council/` mentions the `opinions/` path.
+5. No file **inside the feature directory** but outside `council/` mentions the `opinions/` path — **unless the feature is a declared meta-feature** (carve-out below).
 
 Rule 5 is deliberately blunt — a `grep` for the path, not a judgment about whether a reference is a real read. Context hygiene (§4) fails silently and late; a mechanical invariant that occasionally rejects innocent prose is worth more than a nuanced one nobody can run in CI. Docs outside `specs/` (this contract, for instance) are out of scope.
 
+**Meta-feature carve-out (D50, resolving I-11).** A feature whose subject *is* the pipeline — the council extension, say — must *describe* paths like `opinions/` in its own `spec.md` / `plan.md` / `quickstart.md` to specify the very thing it builds. That is description, not an opinion-content leak, but rule 5's grep cannot tell the two apart and deliberately does not try. Such a feature is **exempt from rule 5** iff its `spec.md` carries a fixed, self-declared marker of the form:
+
+```text
+> **Rule-5 exempt (meta-feature):** <reason>. See <D-row>.
+```
+
+A checker greps for a line matching `^>\s*\*\*Rule-5 exempt \(meta-feature\):` and, if present, skips rule 5 for that feature alone; every other feature is checked unchanged. The exemption is therefore **mechanical** (still a grep, no judgment in CI), **reasoned** (the marker names why and cites a decision, so it cannot be applied silently), and **local** (it lives in the feature that needs it, not a central allowlist). For an exempt feature, opinion-content hygiene falls back to the skill-enforced runtime invariant (§4) and the human gate — the same guarantees that hold whenever rule 5 passes. `001-council-extension` is the inaugural exempt meta-feature.
+
 `specs/000-sample/` is the executable statement of this contract: it exercises every artifact above, and any conformance checker built later must pass it.
+
+## 8. Workforce-gate record (D49, resolving I-12)
+
+The workforce gate (D9) is the human approval of the agent roster after `tasks` and `agent-assign`. Like the council gate (§3, D32), its decision is an **artifact, not an event**: a `## Workforce Gate` section appended to **`agents/assignment.md`** — the home §2 and D32 already fixed. This section defines that record's *format*, whose prior absence (the council gate's `## Human Gate` is specified in `decision-record.md`; this one was specified nowhere) was I-12 — a contracts bug that forced `001` to record its gate as a flagged addendum inside `council/decision-record.md`, exceeding that contract's section set.
+
+### Format
+
+```markdown
+## Workforce Gate — 2026-07-09T14:03:00Z
+
+| Field | Value |
+|---|---|
+| reviewer | Babu |
+| decision | `approved` |
+| reviewed | `tasks.md`, `assignment.md` (roster) |
+
+### Roster approved
+
+| Task(s) | Assembled agent (base) | Model | Skills (`id@ver`) | Elevated grants |
+|---|---|---|---|---|
+| T001, T003 | `data-model` specialist | Sonnet | `refactor-discipline@1.0` | none |
+| T007 | `scaffold` specialist | Sonnet | `dep-version-lookup@1.1` | `web_search` |
+
+**Notes:** none.
+
+**Overrides:** none.
+```
+
+### Fields
+
+| Field | Domain |
+|---|---|
+| `decision` | `approved` \| `approved-with-notes` \| `rejected` (mirrors the council gate, `decision-record.md` §3) |
+| `Model` | the D18-permitted model of the assembled base; a `prompt`-tagged task holds the **Sonnet floor** (D48), auditable in this column |
+| `Elevated grants` | the **union** of the assembled agent's skills' declared grants beyond the core toolset `{Read, Write, Edit, Bash, Glob, Grep}` (D41, D44); `none` when the union is empty |
+
+### Rules
+
+| # | Rule |
+|---|---|
+| W1 | One row per assembled agent (a base + its ≤3 skills, D40); each task appears in exactly one row's `Task(s)` cell. |
+| W2 | The `Elevated grants` column is **mandatory and never omitted** — approving the roster *is* approving that network/tool access (D41). Core-toolset grants are assumed and not listed (D44). |
+| W3 | `decision: rejected` sends the roster back for reassignment; the section may recur, and the last one is authoritative (mirrors `decision-record.md` R6). |
+| W4 | Present **iff** `gates.workforce.mode: human` (profile-schema); under `auto` the assigner writes the roster and no gate section is required (§7 rule 3). |
+
+### Home and bootstrap note
+
+The section lives in `agents/assignment.md`, written by the assigner (M3) or — until the assigner ships — **by hand**, exactly as `001` hand-wrote its `decision-record.md` gate sections. M3's `assignment.md` contract may relocate this format into itself; until then, this is the normative definition. **Bootstrap exception:** `001-council-extension` recorded its workforce gate inside `council/decision-record.md` because no `agents/assignment.md` existed and its roster was trivial (I-12); that placement is superseded by this section and is **not** retrofitted (append-only history).

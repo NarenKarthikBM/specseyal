@@ -10,6 +10,8 @@
 
 > **Reading note.** This feature is a pipeline extension — developer tooling — so its "users" are the engineer driving the SDD pipeline and, at the gate, any stakeholder reading the plan. The requirements below describe the council's **observable behavior and artifacts**; the *how* (subagent wiring, member prompts, exact tool plumbing) is deferred to `/speckit-plan`. Decisions already ratified in `docs/90` (D3, D9–D15, D18, D28, D38, D40–D44) and the M0 contracts appear under **Constraints & Assumptions** as givens, not open choices — this is a dogfood build of a designed component (`docs/10`), not a greenfield product.
 
+> **Rule-5 exempt (meta-feature):** this spec specifies the council's own artifact structure, which it must describe. See D50.
+
 ## Clarifications
 
 ### Session 2026-07-09
