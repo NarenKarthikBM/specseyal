@@ -10,3 +10,4 @@ Gate-freshness baseline: council `plan.md@bec819e` · workforce `tasks.md@30167a
 | ISO | wave | tasks | agents | outcome | gate-freshness |
 |---|---|---|---|---|---|
 | 2026-07-09T16:00Z | 1/14 | T001 | 0 (orchestrator glue) | success | ✅ baseline set |
+| 2026-07-09T16:08Z | 2/14 | T002, T003, T004 | 3 (Sonnet) | success | ✅ plan/assignment intact |
