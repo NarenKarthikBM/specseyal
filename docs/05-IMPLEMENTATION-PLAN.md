@@ -43,6 +43,8 @@ Branch-before-plan (naming from spec ID), phase-tagged commit conventions, featu
 
 **Done when:** a full pipeline run happens on an auto-created branch with phase-tagged commits.
 
+**✅ CLOSED (2026-07-10).** Built through the pipeline (14 waves, 23/23 tasks), council-defended (first live council, 5.25M tok), merged to `main` by hand (ff, D52) — the last manual branch ritual — installed live (`bash extensions/git/install.sh .`, 9 hooks, verify-gate ahead of graphify), and `/speckit-git-cleanup` cut the first `complete/002-speckit-ext-git` anchor. Exit criterion met: `002` itself ran on its own auto-created branch with a phase-tagged commit at every boundary; SC-001–008 are validated existence proofs. The wave-worktree spike (I-4) concluded **abandon** (D54). See `specs/002-speckit-ext-git/completion-report.md`. Carried to M3: D55, I-14, FR-010 auto-trigger, HookExecutor→M6 (D53).
+
 ## Milestone 3 — categorize + agent creator · **M/L**
 
 The pair (they share the taxonomy as their interface, D16): categorizer session emitting fixed-core keys + free tags; seed library of 5–6 specialists in `.claude/agents/` with schema metadata; gap generator producing bespoke definitions; assignment-proposal artifact rendered at the **workforce gate** (D9); D18 model map enforced; flywheel persistence for good generated agents (D24 — the one self-evolving component).
