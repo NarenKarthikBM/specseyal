@@ -1,6 +1,6 @@
 # Agent Assignment — speckit-ext-git
 
-> **Manual pass (agent-assign phase run by hand).** The agents extension (assigner + skill builder) ships in M3; until then the roster is assembled by hand from `categorization.md`, exactly as `001` did (artifact-layout §8 bootstrap note). **Owner**: agents extension — `agents/assignment.md` only. The `## Workforce Gate` section below is the **human's** decision artifact (D32) and is **PENDING** — this build STOPs here.
+> **Manual pass (agent-assign phase run by hand).** The agents extension (assigner + skill builder) ships in M3; until then the roster is assembled by hand from `categorization.md`, exactly as `001` did (artifact-layout §8 bootstrap note). **Owner**: agents extension — `agents/assignment.md` only. The `## Workforce Gate` section below is the **human's** decision artifact (D32): **`approved-with-notes`** (Babu, 2026-07-09) — Phase 4 implement proceeds under the **four binding notes** recorded below.
 
 ## Roster derivation
 
@@ -13,15 +13,15 @@ Each task's `(type, specialization)` from `categorization.md` selects one **base
 
 ---
 
-## Workforce Gate — 2026-07-09T15:37:18Z
+## Workforce Gate — 2026-07-09T15:57:50Z
 
 | Field | Value |
 |---|---|
 | reviewer | Babu |
-| decision | `PENDING — awaiting reviewer` |
+| decision | `approved-with-notes` |
 | reviewed | `tasks.md`, `assignment.md` (roster) |
 
-### Roster proposed
+### Roster approved
 
 | Task(s) | Assembled agent (base) | Model | Skills (`id@ver`) | Elevated grants |
 |---|---|---|---|---|
@@ -38,6 +38,11 @@ Each task's `(type, specialization)` from `categorization.md` selects one **base
 
 *10 assembled base agents · 23 tasks · every task in exactly one row (§8 W1) · **elevated grants: none** across the whole roster (§8 W2 — the core toolset `{Read, Write, Edit, Bash, Glob, Grep}` covers all shell/git/file work; no task needs `web_search`, network, or any grant beyond core).*
 
-**Notes:** *(pending reviewer)*
+**Notes:** *(binding on Phase 4 implement)*
 
-**Overrides:** *(pending reviewer)*
+1. **Spike timebox confirmed** — T018 hard-capped at **≤2h**; outcome recorded either way per D25 — a spike concluding "worktrees don't pay" is a **success, not a failure**. Timebox D-row booked at gate-close (**D54**).
+2. **Width-4 approved, no cap-down to `001`'s max-3.** Rationale for the record: `[P]` rests on the file-disjointness fallback here (I-13 — no graph nodes for `.sh`/`.yml`), but **disjoint NEW-file sets are the strong case** of that fallback: new files cannot collide with anything existing. The genuinely collision-prone surfaces (`.specify/extensions.yml`, `test/run.sh`) are already serialized as orchestrator glue per taxonomy §2.1 — where the actual risk lived.
+3. **Bootstrap discipline binding on this build** — `002` implements commit-before-`[X]` (T010/S06) and wave-boundary gate-freshness (S23); **until its own waves land those mechanisms, the orchestrator performs both BY HAND at every wave.** The last manual performance of the rituals this feature automates.
+4. **Gate-close hygiene precedes Wave 1** — the `docs/90` session-log row for Phase 3 and the spike-timebox D-row (D54) are committed as part of the `gate(002)` boundary, not deferred past it.
+
+**Overrides:** none.
