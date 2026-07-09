@@ -84,5 +84,25 @@ if [ -f "$ipar" ] && grep -q "$marker" "$ipar"; then ok "T010 per-wave edit SURV
 if grep -q 'after_council_approve' "$T/.specify/extensions.yml" 2>/dev/null; then ok "T014 hook registration SURVIVED reinstall"; else bad "after_council_approve deregistered by reinstall"; fi
 
 # ---------------------------------------------------------------------------
+bold "4. before_specify drift lint (R1-S29 / D50)"
+# Mechanical, CI-runnable guard (rule-5 ethos: a grep, not a judgment) against reintroducing
+# the REJECTED design — branch creation via a before_specify git-ext hook. The ratified design
+# is branch-birth folded into after_specify (D-R1). Homed here as the concrete v1 vehicle until
+# the D50 conformance checker ships (D50: "building the checker stays open"); relocate then.
+SPECIFY_SKILL="$REPO/.claude/skills/speckit-specify/SKILL.md"
+GCTX="$REPO/specs/002-speckit-ext-git/graphify-context.md"
+# (a) drift signatures MUST be absent
+if grep -Eq 'Branch creation is handled by the `?before_specify`? hook' "$SPECIFY_SKILL" 2>/dev/null; then
+  bad "drift: speckit-specify NOTE attributes branch creation to before_specify (rejected design)"
+else ok "no before_specify branch-creation claim in speckit-specify NOTE"; fi
+if grep -Eq 'registers `?before_specify`? \+ commit' "$GCTX" 2>/dev/null; then
+  bad "drift: graphify-context claims 002 registers a before_specify hook (rejected design)"
+else ok "no before_specify-hook registration claim in graphify-context"; fi
+# (b) ratified markers MUST be present (branch birth = after_specify) — affirms the corrected
+#     design is stated, not merely that the drift phrasing was deleted. (Robust to markdown bold.)
+if grep -q 'after_specify' "$SPECIFY_SKILL" 2>/dev/null; then ok "ratified after_specify branch-birth marker present in speckit-specify"; else bad "ratified after_specify marker missing from speckit-specify NOTE"; fi
+if grep -q 'after_specify' "$GCTX" 2>/dev/null; then ok "ratified after_specify marker present in graphify-context"; else bad "ratified marker missing from graphify-context"; fi
+
+# ---------------------------------------------------------------------------
 bold "Result: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] || exit 1
