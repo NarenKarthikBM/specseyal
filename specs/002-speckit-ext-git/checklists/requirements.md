@@ -31,6 +31,6 @@
 
 ## Notes
 
-- **All items pass.** Ready for `/speckit-clarify` and then the spec-review STOP.
-- **Two flagged positions for the gate**: FR-001 refines `artifact-layout.md` §2's phase ordering (branch co-incident with `specify`, not a post-`clarify` step); FR-011 standardizes a merge policy (`--no-ff` default) that D25 left open. Both are load-bearing positions the description asked the spec to take — surfaced explicitly rather than buried, so the human (and, at plan, the council) can ratify or flip them.
+- **All items pass. Spec APPROVED at review (D51).**
+- **Two positions ratified (D51)**: FR-001 (branch co-incident with `specify`) is applied to `artifact-layout.md` §2 (contract → 1.2); FR-011 is strengthened to **unconditional `--no-ff`** — the merge commit is the feature's D19/M5 completion anchor, so it must exist even when history is linear (no fast-forward exception; M1's ff grandfathered). FR-008/009 amended: stale-approval re-approval routes by gate type.
 - **Standing rule honored (D46)**: the Constraints & Assumptions section carries only D-row-cited givens; the four contested positions live in Functional Requirements (observable behavior), not Constraints.

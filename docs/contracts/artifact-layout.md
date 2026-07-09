@@ -1,8 +1,8 @@
 # Contract — Feature Artifact Layout
 
-> **Status:** 1.1 (M2). Normative.
+> **Status:** 1.2 (M2). Normative.
 > **Implements:** principle 1 (artifacts are the contract), principle 3 (resumability).
-> **Sources:** docs/00 §3, docs/10 §3, D4, D9, D25, D32, D37, D38, D41, D44, D49, D50.
+> **Sources:** docs/00 §3, docs/10 §3, D4, D9, D25, D32, D37, D38, D41, D44, D49, D50, D51.
 
 Every feature is one directory under `specs/`. Every pipeline phase reads artifacts and writes **exactly one** artifact. Both the CLI layer and the platform layer (M5+) read and write this same tree — it is the only interface between them.
 
@@ -52,8 +52,8 @@ Each row is a phase. **Context in** is exhaustive — a phase that runs in a sep
 | Phase | Session | Context in | Artifact out |
 |---|---|---|---|
 | specify | main | user prompt | `spec.md` |
+| branch | main | spec ID (assigned by `specify`) | *(git ref, not a file)* |
 | clarify | main | `spec.md` | `spec.md` (revised) |
-| branch | main | `spec.md` | *(git ref, not a file)* |
 | graph-context | hook | repo graph | `graphify-context.md` |
 | plan | main | `spec.md`, `graphify-context.md` | `plan.md` |
 | deck-prep | separate (A) | `plan.md`, `spec.md`, graph summary | `council/defense-deck/` |
@@ -73,6 +73,8 @@ Every session, in every phase, appends one record to `traces.jsonl` (principle 4
 
 Three rows run **no session** and so leave no trace: `branch` (a git ref), `council-gate` and `workforce-gate` (a human). The gates still write artifacts — their decision sections — which is what keeps §3 working.
 
+**Branch birth (D51, `002`-FR-001):** the `branch` phase is **co-incident with `specify`** — the feature branch is created as soon as `specify` assigns the spec ID (the `specs/NNN-slug/` directory) and **before `spec.md` is committed**, so `spec.md` and every later artifact land on the feature branch and the base branch stays clean. Its context-in is the spec ID, not `spec.md`'s content; its name is exactly the spec ID (D25). The branch creation is itself a mechanical git operation with no session, so it still leaves no trace.
+
 ## 3. Resumability rule (D32)
 
 **Phase state is inferred from artifacts. There is no state file, and adding one is forbidden.**
@@ -86,7 +88,7 @@ Two consequences the design must honor:
 
 `graphify-context.md` is the one exception: it is disposable and may be regenerated at any time without invalidating downstream phases.
 
-The `branch` phase has no artifact-out. Its completion check is the git ref itself — observable, idempotent, and derivable from the spec ID (D25). It is the only phase whose state lives outside `specs/`, and git is a source of truth we already trust.
+The `branch` phase has no artifact-out. Its completion check is the git ref itself — observable, idempotent, and derivable from the spec ID (D25). It is the only phase whose state lives outside `specs/`, and git is a source of truth we already trust. It is created **co-incident with `specify`** (D51, `002`-FR-001), before `spec.md` is committed.
 
 ## 4. Council subtree (docs/10 §3, D38)
 
