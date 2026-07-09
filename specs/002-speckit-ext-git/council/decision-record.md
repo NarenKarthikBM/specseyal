@@ -69,6 +69,20 @@ Re-adjudication of the six prior `blocking` rows (R1-S01…R1-S06) against the t
 
 ---
 
+## Human Gate — 2026-07-09T13:15:41Z
+
+| Field | Value |
+|---|---|
+| reviewer | Naren Karthik B M |
+| decision | `approved` |
+| reviewed | `defense-deck/overview.md`, `round-1/suggestions.md`, this record |
+
+**Notes:** none.
+
+**Overrides:** none.
+
+---
+
 ## Carried Constraints
 
 > Accepted suggestions that constrain task generation. `/speckit-tasks` reads this section and nothing else from this file.
