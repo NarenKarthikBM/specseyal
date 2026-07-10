@@ -6,49 +6,51 @@
 
 **Grounding**: [graphify-context.md](./graphify-context.md) (fresh D59 baseline, 497 nodes / 888 edges).
 
+> **Round-1 council triage revision (2026-07-10).** This plan folds all **25 accepted** suggestions (R1-S01…R1-S25) and three owner rulings: **D60** (grant `web_search` to the skill builder — the system's first elevated grant), **D61** (`council_tier` default flips to `standard`), **D62** (deck-prep improvement task). Both blocking items resolved here — **S01** (total-order every set before serialization) and **S02** (the workforce gate-*write* path, clustered with **S10**+**S13**: the pair becomes **one `workforce` extension** with a dedicated approve command, and git-ext generalizes its gate-record hook). Dispositions + reasoning: [council/decision-record.md](./council/decision-record.md).
+
 ## Summary
 
-Build the M3 workforce pair as **two new pipeline extensions** delivered together (D40 makes them one composable system): **`speckit-ext-categorize`** (the categorizer) and **`speckit-ext-agents`** (the skill builder + the assembler). The categorizer is a Sonnet session that tags every task with the blessed taxonomy v0 and writes `categorization.md`, guarded by a **code** cap-check that fails the phase if `general > 20%`. The assembler is a **deterministic script** (`assemble`) implementing `agent-library-schema.md` §3 verbatim — base lookup by `(type, specialization)`, tag-ranked skill injection (cap 3), grant union, and the D48 Sonnet-floor guard — so the roster is byte-reproducible on gap-free runs (FR-015/SC-005). On a ∅-match the script hands off to a Sonnet **skill builder** that authors one additive-only `SKILL.md`, persists it to the library (the D24 flywheel), and re-runs assembly. The roster lands in `agents/assignment.md`'s `## Workforce Gate` section (D49/§8) with mandatory Model + Elevated-grants columns; the human signs; `/speckit-implement-parallel` consumes it and every dispatch trace carries the assembly (D43).
+Build the M3 workforce pair as **one pipeline extension — `speckit-ext-workforce`** (S10: a single `extensions/workforce/` tree echoing `extensions/council/`'s one-directory/multi-command shape) exposing **three commands**: `/speckit-categorize` (the categorizer), `/speckit-agent-assign` (the skill builder + the assembler), and `/speckit-workforce-approve` (the dedicated workforce-gate approval, mirroring `/speckit-council-approve`). The categorizer is a Sonnet session that tags every task with the blessed taxonomy v0 and writes `categorization.md`, guarded by a **code** validator that fails the phase on an over-cap or out-of-enum categorization. The assembler is a **deterministic script** (`assemble.py`) implementing `agent-library-schema.md` §3 verbatim — base lookup, tag-ranked skill injection (cap 3), grant union, the D48 Sonnet-floor guard — and **it writes the roster table itself** (S08: a tool-permission fact, not a prose promise). Every set-typed intermediate is **total-ordered before serialization** (S01), so the roster is byte-reproducible on gap-free runs (FR-015/SC-005). On a ∅-match the script hands off to a Sonnet **skill builder** — now holding a **declared `web_search` grant** (D60) — that authors one additive-only `SKILL.md` whose tags must intersect the triggering task's (S04), persists it (the D24 flywheel), and re-runs assembly. The roster lands in `agents/assignment.md`'s `## Workforce Gate`; **`/speckit-workforce-approve` records the human's signature and fires git-ext's generalized `on-gate-approve` hook** to bind `tasks.md`+`assignment.md` into git-ext-owned `gates.yml` (S02/S13); `/speckit-implement-parallel` then consumes the roster and every dispatch trace carries the assembly (D43).
 
-The technical approach splits the LLM work from the deterministic work by design: **categorization = inference (Sonnet), assembly = code, skill-building = inference (Sonnet).** That split is what lets one artifact (`categorization.md`) be a non-reproducible LLM product while the roster built from it is byte-reproducible.
+The technical approach splits the LLM work from the deterministic work by design: **categorization = inference (Sonnet), assembly = code, skill-building = inference (Sonnet)**. That split is what lets one artifact (`categorization.md`) be a non-reproducible LLM product while the roster built from it is byte-reproducible.
 
 ## Technical Context
 
-**Language/Version**: Bash (installers, hooks, config — mirrors git-ext) + **Python 3** (the deterministic `assemble` matcher and the `skill-module` validator — YAML-frontmatter parsing + Jaccard set math want a real language, and graphify already establishes Python 3 as the repo's scripting runtime). No new runtime dependency beyond what graphify installs; frontmatter parsing uses a **minimal stdlib parser** over the `specseyal:` block (no PyYAML hard-dependency — see research.md R2).
+**Language/Version**: Bash (installers, hooks, config — mirrors git-ext) + **Python 3** (the deterministic `assemble.py` matcher and the `skill-module` validator). Python 3 is **already established** by graphify (Technical Context adds **no new runtime dependency**, S19). Frontmatter parsing uses **one shared, independently unit-tested `frontmatter.py` module** (S21) consumed by both `assemble.py` and `validate-skill.py` — never two hand-rolled copies (a second parser is the same silent-divergence hazard that motivated rejecting Bash for the matcher). It parses only the closed `specseyal:` shape (`agent-library-schema.md` §1.1 / `skill-module.md` §1); `body_sha256` uses the §2 reference definition.
 
-**Primary Dependencies**: the five M0 contracts the pair consumes — `taxonomy-v0.md` (BLESSED), `agent-library-schema.md` §3/§4, `skill-module.md`, `artifact-layout.md` §2/§6/§8/§9, `trace-schema.md` §1/§5. Claude Code's native `.claude/agents/` (subagent) + `.claude/skills/` (skill) loaders. The three existing extensions as packaging exemplars (graphify-context.md).
+**Primary Dependencies**: the five M0 contracts the pair consumes — `taxonomy-v0.md` (BLESSED), `agent-library-schema.md` §3/§4, `skill-module.md`, `artifact-layout.md` §2/§6/§8/§9, `trace-schema.md` §1/§5. Claude Code's native `.claude/agents/` + `.claude/skills/` loaders. The git extension (its generalized `on-gate-approve` action + the `before_implement` workforce `verify-gate` hook) — an install-order dependency (S25/sequencing). The three existing extensions as packaging exemplars.
 
 **Storage**: repo files only — `categorization.md`, `agents/assignment.md` (feature tree); `.claude/agents/*.md` + `.claude/skills/*/SKILL.md` (the per-repo library, D17). No database (Resumability III).
 
-**Testing**: per-extension `test/run.sh` (the git-ext model, D57 S3): install → reinstall-survival → deterministic-assembly golden test → validator unit checks. Dogfood exit test = SC-009 on `003` itself.
+**Testing**: one `extensions/workforce/test/run.sh` (the git-ext model, D57 S3): install → reinstall-survival → the deterministic-assembly golden test → validator unit checks → the committed per-SC tests (see § Plan-time verifications, S12). Dogfood exit test = SC-009 on `003` itself.
 
 **Target Platform**: Claude Code CLI (interactive, subscription-only, D28); M6 Agent SDK later — no change to these artifacts.
 
-**Project Type**: two pipeline extensions (`extensions/categorize/`, `extensions/agents/`) + a seed library — the `extensions/<name>/` sibling pattern (D26 monorepo layout).
+**Project Type**: **one** pipeline extension (`extensions/workforce/`, S10) + a seed library — the `extensions/<name>/` sibling pattern (D26 monorepo layout).
 
-**Performance Goals**: assembly is O(tasks × skills) Jaccard — trivial at pipeline scale (tens of tasks, tens of skills). No perf concern; **determinism, not speed, is the property that matters** (SC-005).
+**Performance Goals**: assembly is O(tasks × skills) Jaccard — trivial at pipeline scale. **Determinism, not speed, is the property that matters** (SC-005).
 
-**Constraints**: subscription-only (V/D28, no `ANTHROPIC_API_KEY`); Sonnet floor for the categorizer, skill builder, and every base (D18); additive-only skills (D40.4); assembly cap 3 (D40); single-writer artifacts (§6/D37).
+**Constraints**: subscription-only (V/D28, no `ANTHROPIC_API_KEY`); Sonnet floor for the categorizer, skill builder, and every base (D18); additive-only skills (D40.4); assembly cap 3 (D40); single-writer artifacts (§6/D37); the skill builder's **one declared elevated grant is `web_search`** (D60) — every other role is core-toolset-only.
 
-**Scale/Scope**: 2 extensions + **7 seed base specialists + 5 seed skills** (§ Seed Library). Indicative task count ~20–26 (comparable to 001's 20 / 002's 23), across categorizer · skill-builder · assembler · seed-library · install/test.
+**Scale/Scope**: 1 extension (3 commands) + **7 seed base specialists + 5 seed skills** + the deck-prep improvement task (D62). Indicative task count ~24–30, across categorizer · skill-builder · assembler · approve-command · seed-library · git-ext-generalization · install/test.
 
 ## Constitution Check
 
-*GATE: evaluated before Phase 0 and re-checked after design. PASSES (no violations).*
+*GATE: evaluated before Phase 0 and re-checked after design + after Round-1 revision. PASSES (no violations).*
 
 | Principle | Verdict | How this plan honors it |
 |---|---|---|
-| **I. Artifacts Are the Contract** | ✅ | `categorize` writes **only** `categorization.md` (D37, never mutates `tasks.md`); `agents` writes **only** `agents/assignment.md`. The skill builder's `SKILL.md` persistence writes to the repo-root **library** (`.claude/skills/`), *outside* the feature tree — a shared-infrastructure mutation (the D24 flywheel), not a second feature artifact and not another phase's artifact. Documented, not a violation (see note ★). |
-| **II. Context Hygiene** | ✅ | Categorizer, skill builder, and (when a gap fires) the assembler's builder each run as **separate Sonnet sessions** returning one compact artifact. The deterministic `assemble` matcher is a script — it adds no context to the main thread. |
-| **III. Resumability (NON-NEGOTIABLE)** | ✅ | Phase state inferred from artifacts: `categorization.md` valid ⇒ categorize complete; `assignment.md` with a roster ⇒ assign complete; the `## Workforce Gate` section ⇒ gate complete (D32). No state file. Determinism (FR-015) makes a re-run idempotent. |
-| **IV. Observability** | ✅ | Categorizer (`categorizer`) and skill builder (`agent-creator`) append one `traces.jsonl` record each; implement dispatches carry `skills[]` + `elevated_grants[]` (D43, FR-021). Note ★★ on the gap-free assembly trace. |
-| **V. Subscription-Only (NON-NEGOTIABLE)** | ✅ | Categorizer + skill builder run on subscription (Sonnet); no key. The `assemble`/validator scripts are zero-AI (like git-ext). |
-| **Model Policy (D18)** | ✅ | Categorizer + skill builder = Sonnet (mechanical/generative). Every seed base declares `model: sonnet` (all accept ≥1 implementation type; `agent-library-schema.md` §4 enforced). The D48 guard holds the Sonnet floor for `prompt`-tagged tasks **in code**. |
-| **Autonomy & Gates (D9)** | ✅ | The workforce gate: categorizer + assembler **PROPOSE**, human **signs** (`gates.workforce.mode: human`, this feature's profile). `auto` only under `full_auto` (§8 W4). |
+| **I. Artifacts Are the Contract** | ✅ | `categorize` writes **only** `categorization.md` (D37); `agent-assign` writes **only** `agents/assignment.md`; `workforce-approve` writes **only** the `## Workforce Gate` section (mirroring `/speckit-council-approve`). The skill builder's `SKILL.md` persistence writes to the repo-root **library** (`.claude/skills/`), *outside* the feature tree — the sanctioned D24 flywheel (note ★). One extension, three single-writer commands. |
+| **II. Context Hygiene** | ✅ | Categorizer, skill builder, and (on a gap) the builder each run as **separate Sonnet sessions** returning one compact artifact. The deterministic `assemble.py` matcher is a script — no main-thread context. |
+| **III. Resumability (NON-NEGOTIABLE)** | ✅ | Phase state inferred from artifacts (D32). Determinism (FR-015, now with total-ordered serialization S01) makes a re-run idempotent; a **library-snapshot hash stamped in the roster** (S18) makes the reproducibility claim machine-checkable. |
+| **IV. Observability** | ✅ | Categorizer (`categorizer`) and skill builder (`agent-creator`) append one `traces.jsonl` record each; the builder's dispatch records `elevated_grants: ["web_search"]` when it searched (D60/D43); implement dispatches carry `skills[]` + `elevated_grants[]` (FR-021). Note ★★ on the gap-free assembly trace. |
+| **V. Subscription-Only (NON-NEGOTIABLE)** | ✅ | Categorizer + skill builder run on subscription (Sonnet); `web_search` is a Claude Code tool, **not** an API key — no `ANTHROPIC_API_KEY`. The `assemble.py`/validator scripts are zero-AI. |
+| **Model Policy (D18)** | ✅ | Categorizer + skill builder = Sonnet. Every seed base declares `model: sonnet`. The D48 guard holds the Sonnet floor for `prompt`-tagged tasks **in code**, and SC-006 now exercises the guard's `else` branch against a synthetic non-Sonnet fixture base (S03). |
+| **Autonomy & Gates (D9)** | ✅ | The workforce gate: categorizer + assembler **PROPOSE**, human **signs via `/speckit-workforce-approve`** (`gates.workforce.mode: human`). `auto` only under `full_auto` (§8 W4), in which case the assigner writes the section — the approve command's auto codepath mirrors `/speckit-council-triage`'s. |
 
-★ **The flywheel write is not a principle-I violation.** Principle I governs *feature-tree* artifacts (one per phase in `specs/NNN/`). The generated `SKILL.md` lands in the repo-root library `.claude/skills/` — shared infrastructure the whole pipeline reads, explicitly sanctioned as the year-one self-evolving component (D24, `agent-library-schema.md` §5). It is the D40.2 replacement for "author a bespoke agent," not a second output of the *feature*. Recorded here so the boundary is deliberate, not smuggled.
+★ **The flywheel write is not a principle-I violation.** The generated `SKILL.md` lands in the repo-root library `.claude/skills/` — shared infrastructure, the sanctioned D24 self-evolving component, and (S07) it lives **outside** any extension's `rm -rf` install payload: the library is **user/flywheel data, not extension payload**, so no reinstall (self or foreign) can clobber it.
 
-★★ **Gap-free assembly may legitimately run no model session** (see Risk R2) — the deterministic `assemble` matcher is mechanical (git-ext precedent: "zero-AI, no trace"). The `agent-creator` trace appears when the skill builder fires. Flagged for the council rather than forced.
+★★ **Gap-free assembly may legitimately run no model session** (Risk R2) — the deterministic matcher is mechanical (git-ext precedent). The `agent-creator` trace appears when the skill builder fires. Flagged for ratification, not forced.
 
 ## Project Structure
 
@@ -56,131 +58,130 @@ The technical approach splits the LLM work from the deterministic work by design
 
 ```text
 specs/003-workforce/
-├── plan.md              # this file
-├── research.md          # Phase 0 — the deferred design choices resolved
-├── data-model.md        # Phase 1 — categorization.md format, library entry shapes, roster
-├── quickstart.md        # Phase 1 — SC-001..SC-009 validation scenarios
-├── contracts/
-│   └── commands.md      # Phase 1 — the /speckit-categorize + /speckit-agent-assign command contracts
-├── graph-baseline.json  # committed D59 council baseline (already present)
-└── tasks.md             # Phase 3 (/speckit-tasks-graph) — NOT created here
+├── plan.md · research.md · data-model.md · quickstart.md · contracts/commands.md
+├── graphify-context.md · graph-baseline.json (committed D59 council baseline)
+└── council/  (defense-deck/, round-1/{opinions/,suggestions.md}, decision-record.md)
 ```
 
 ### Source Code (repository root)
 
 ```text
-extensions/categorize/                     # speckit-ext-categorize (new; mirrors extensions/git/)
-├── install.sh · uninstall.sh              # copy source → .specify/extensions/categorize/ + .claude/skills/; deregister-first
+extensions/workforce/                       # speckit-ext-workforce — ONE extension (S10; mirrors extensions/council/)
+├── install.sh · uninstall.sh               # copy source → .specify/extensions/workforce/ + .claude/skills/; SEED library additively; deregister-first
 ├── extension/
-│   ├── extension.yml                      # registers the categorize command; no cross-ext source edits (D57)
-│   ├── categorize-config.yml              # cap=0.20, taxonomy path, model=sonnet
-│   ├── commands/speckit.categorize.md
-│   ├── scripts/validate-categorization.py # CODE cap-check + enum/coverage validation (FR-004/SC-002)
-│   └── templates/categorizer-prompt.md · categorization.template.md
-├── skills/speckit-categorize/SKILL.md
+│   ├── extension.yml                        # registers 3 commands + the after_categorize / after_agent-assign / after_workforce_approve hook points (S25)
+│   ├── workforce-config.yml                 # general_cap 0.20, assembly_cap 3, model sonnet, seed-library manifest, skill_builder.web_search: true (D60)
+│   ├── commands/
+│   │   ├── speckit.categorize.md
+│   │   ├── speckit.agent-assign.md
+│   │   └── speckit.workforce-approve.md      # NEW (S13) — records the human signature, fires git-ext on-gate-approve
+│   ├── scripts/
+│   │   ├── frontmatter.py                    # SHARED closed-shape parser (S21), unit-tested; imported by the two below
+│   │   ├── assemble.py                       # DETERMINISTIC §3 matcher; TOTAL-ORDERS every set before serialize (S01); WRITES the roster table itself (S08); stamps library-snapshot hash (S18) + FR-022 library|built marks
+│   │   ├── validate-categorization.py        # cap + enum + coverage check; asserts no-write on breach (FR-004/SC-001/SC-002)
+│   │   └── validate-skill.py                 # skill-module S1-S3 + tag-intersection with triggering task (S04)
+│   └── templates/categorizer-prompt.md · skill-builder-prompt.md · assignment.template.md · skill-module.template.md
+├── seed/agents/agt-*.md  ·  seed/skills/*/SKILL.md   # 7 bases + 5 skills (§ Seed Library)
+├── skills/speckit-categorize/ · speckit-agent-assign/ · speckit-workforce-approve/ (SKILL.md each)
 └── test/run.sh
 
-extensions/agents/                         # speckit-ext-agents (new)
-├── install.sh · uninstall.sh
-├── extension/
-│   ├── extension.yml
-│   ├── agents-config.yml                  # assembly_cap=3, model=sonnet, seed-library manifest, web_search decision (§ below)
-│   ├── commands/speckit.agent-assign.md
-│   ├── scripts/assemble.py                # DETERMINISTIC §3 matcher: base lookup, tag-Jaccard rank, cap-3, grant union, D48 guard, FR-022 library|built marks
-│   ├── scripts/validate-skill.py          # skill-module.md validator: S1-S3 additive-only, skl_ id, semver, grants⊄core
-│   └── templates/skill-builder-prompt.md · assignment.template.md · skill-module.template.md
-├── seed/                                   # the SEED LIBRARY (installed additively to repo-root .claude/)
-│   ├── agents/agt-*.md                     # 7 base specialists (§ Seed Library)
-│   └── skills/*/SKILL.md                   # 5 seed skills incl. refactor-discipline
-├── skills/speckit-agent-assign/SKILL.md
-└── test/run.sh
+# git extension — own-source generalization (D57 S2; git owns gates.yml, D55/Q1):
+extensions/git/extension/scripts/on-council-approve.sh  →  on-gate-approve.sh   # gate-agnostic (S02): takes a {council|workforce} gate arg, records plan.md@sha OR tasks.md+assignment.md@sha into gates.yml
+extensions/git/extension/extension.yml                                          # after_council_approve + NEW after_workforce_approve → on-gate-approve.sh <gate>
+# reinstall git-ext after this edit; the S07/S17 reinstall-survival regression proves both gate wirings fire.
 
-.claude/agents/  ·  .claude/skills/         # the live per-repo library (D17) — seeded by extensions/agents/install.sh
+.claude/agents/  ·  .claude/skills/          # the live per-repo library (D17), seeded additively; OUTSIDE the install rm -rf payload (S07)
 ```
 
-**Structure Decision**: two `extensions/<name>/` trees on the git/council sibling pattern (graphify-context.md "Patterns to follow"). The **deterministic core is a script** (`assemble.py`), not the LLM — the single most important structural decision, and the one that makes SC-005 real. Cross-`categorize`↔`agents` coupling is a **hook point**, never a source edit (D57 §9).
+**Structure Decision**: **one `extensions/workforce/` tree** (S10) — the packaging echo of the one-feature ruling; a dedicated `/speckit-workforce-approve` command (S13) is the natural home for the gate signature and the gate-write trigger. The **deterministic core is a script** (`assemble.py`) that **writes its own output artifact** (S08) — the decision that makes SC-005 real *by mechanism*, not prose. The **`.specify/extensions.yml` hook-merge** is the one shared/mutable file both new-extension installs touch; S06 corrects the earlier "degree 15" framing — three `graphify explain` runs return **degree 1** (one inbound edge), so it is **not** a graph-computed hub. The real concern is that the YAML merge is a **lock-free read-modify-write**: `install.sh` performs the merge under a **`flock` (or atomic write-to-temp + `mv` rename)** and a defined install order (git before workforce, so the `verify-gate`/`on-gate-approve` hooks exist first). Cross-extension coupling is a **hook point**, never a foreign source edit (D57 §9); the one unavoidable source edit — generalizing git-ext's gate-record action — lives in **git-ext's own source** (S02, D57 S2). The **self-hook-check** that fires `after_categorize`/`after_agent-assign`/`after_workforce_approve` is registered in `workforce/extension.yml` and invoked by the installed-registry dispatch (S25 — named explicitly, not assumed to "just work" by analogy; the `after_council_approve` precedent is invoked from the registry, not its command file).
 
 ## Architecture & data flow
 
 ```
-tasks.md + plan.md ──▶ [categorize: Sonnet session] ──▶ categorization.md
-                          └─ validate-categorization.py (CODE): general≤20% else FAIL, no write (FR-004)
-categorization.md + library ──▶ [agent-assign command]
-   1. assemble.py (CODE, deterministic §3) ──▶ roster + ∅-match gap list
-   2. if gaps: [skill-builder: Sonnet subagent] ──▶ new SKILL.md (additive-only) ──▶ .claude/skills/  (flywheel, D24)
-   3. assemble.py re-run (now gap-free) ──▶ final roster with FR-022 library|built marks
-   4. write agents/assignment.md ## Workforce Gate (Model + Elevated-grants mandatory)
-[human signs] ──▶ /speckit-implement-parallel dispatches each assembled agent ──▶ trace carries skills[]+elevated_grants[] (FR-021/D43)
+tasks.md + plan.md ──▶ [categorize: Sonnet] ──▶ categorization.md
+     └─ validate-categorization.py (CODE): coverage+enum (SC-001) AND general≤20% (FR-004) else FAIL + NO WRITE (asserted, S22)
+categorization.md (+ its tasks.md SHA binding, S14) + library ──▶ [agent-assign command]
+   1. assemble.py (CODE, deterministic §3): base lookup; tag-Jaccard rank; force refactor-discipline if preserves_behavior; inject first-3 + LOG dropped;
+      grant union — TOTAL-ORDERED before serialize (S01); D48 guard (prompt⇒Sonnet else hard-error); mark library|built (FR-022); stamp library-snapshot hash (S18).
+      assemble.py ITSELF writes agents/assignment.md's Workforce Gate table (S08) ──▶ roster + ∅-match gap list.
+   2. if gaps: [skill-builder: Sonnet, grant web_search (D60)] ──▶ new SKILL.md (additive-only; tags MUST ∩ triggering task's tags, S04; stale-knowledge flag if it did NOT search, S17) ──▶ validate-skill.py ──▶ .claude/skills/ (flywheel, D24)
+   3. assemble.py re-run — STABLE (S15): only the gap task's row may change; every already-matched task's row is byte-identical (checkable via FR-022 marks + the snapshot hash).
+   4. [workforce-approve command] records the human decision in ## Workforce Gate; fires git-ext after_workforce_approve → on-gate-approve.sh workforce ──▶ binds tasks.md+assignment.md@sha into gates.yml (S02/S13).
+[before_implement verify-gate (git, workforce)] ──▶ /speckit-implement-parallel dispatches each assembled agent ──▶ trace carries skills[]+elevated_grants[] (FR-021/D43)
 ```
 
-The **categorizer** derives `type` + `preserves_behavior` from the graphify signals already in `tasks.md` (`files=`/`deps=`/`mutates=`/TDD position — the mechanical axis) and `specialization` from `plan.md`'s stack + spec domain (the interpretive axis) — the two-evidence-source split that justifies a Sonnet categorizer (taxonomy §1). The **assembler** never guesses: its base lookup, ranking (Jaccard → success_rate → version → id total order, §3 step 4), cap trim, grant union, and D48 guard are all in `assemble.py`.
+- **Categorization freshness (S14):** `categorization.md` records the `tasks.md` SHA it was derived from; if `assemble.py` sees `tasks.md` has moved, it **hard-warns and routes to re-categorize** rather than assembling against stale classification — closing the prose-only phase-order risk R1 flagged for sequencing itself.
+- **Determinism, three reinforcements (S01/S08/S18):** total-ordered serialization (no `PYTHONHASHSEED` leak), the script (not an LLM) writing the artifact, and a library-snapshot hash stamped in the roster so SC-005 is checkable in one line.
+- **Gap-rerun stability (S15):** the re-run recomputes every task, but a newly built skill can only *win* on the gap task; unrelated rows are proven identical by their unchanged FR-022 marks + snapshot hash. A ≥2-task, one-gap golden fixture asserts it.
 
-## Seed Library (proposed — the council reviews this set)
+## Seed Library (proposed — council-reviewed, R1-S11/S16 applied)
 
-The library seed is **deferred to the plan** (spec Key Entities); docs/05's "5–6 specialists" is indicative. Proposed from the empirically-exercised lanes of the two real dogfood features to date (001 categorization: `ai-agents`×10 + `devtools-cli`×9; 002: `devtools-cli`×15, `security`×3, `qa-automation`×3, `ai-agents`×2) plus the taxonomy worked-example's `backend-service`/`data-persistence` cluster. **Bases are curated-static (D44); skills alone evolve (D24).**
+Fitted to the empirically-exercised lanes of the two real dogfood features (001: `ai-agents`×10 + `devtools-cli`×9; 002: `devtools-cli`×15, `security`×3, `qa-automation`×3, `ai-agents`×2). **Bases curated-static (D44); skills alone evolve (D24).**
 
 ### Base specialists — 7 (`.claude/agents/agt-*.md`, all `model: sonnet`)
 
-| `id` | Specialization | Accepts `type` | Lane rationale (evidence) |
+| `id` | Specialization | Accepts `type` | Evidence tier |
 |---|---|---|---|
-| `agt_ai_agents` | `ai-agents` | service, endpoint, scaffold, test, **docs** | LLM/prompt/agent/MCP work — 001's dominant lane. Accepts `docs` so a `prompt`-tagged (`docs × ai-agents`) task lands on a **Sonnet** base, satisfying the D48 floor by construction. |
-| `agt_devtools_cli` | `devtools-cli` | scaffold, service, endpoint, test, infra | CLIs/build tooling/extensions — the lane that *builds the pipeline itself* (001+002 dominant). |
-| `agt_security` | `security` | service, endpoint, test | AuthZ / gate-integrity / secrets — 002's gate-integrity trio. |
-| `agt_qa_automation` | `qa-automation` | test, scaffold | Harness/fixture/e2e expertise (distinct from writing tests — taxonomy §4). |
-| `agt_backend_service` | `backend-service` | data-model, service, endpoint, test | The taxonomy worked-example's dominant lane; the canonical server lane. |
-| `agt_data_persistence` | `data-persistence` | data-model, service | Schema/migration/ORM/query lane. |
-| `agt_generic` | `general` | *(all 7 implementation types)* | The FR-016 **fallback base** for any unmatched `(type, specialization)` and every `general`-specialized task; the empty lane is reported on the roster. Skills still compose on top. |
+| `agt_ai_agents` | `ai-agents` | service, endpoint, scaffold, test, **docs** | ✅ dogfood (001). Accepts `docs` so a `prompt`-tagged (`docs × ai-agents`) task lands on a **Sonnet** base (D48 floor by construction). |
+| `agt_devtools_cli` | `devtools-cli` | scaffold, service, endpoint, test, infra | ✅ dogfood (001+002 dominant). |
+| `agt_security` | `security` | service, endpoint, test | ✅ dogfood (002 gate-integrity trio). |
+| `agt_qa_automation` | `qa-automation` | test, scaffold | ✅ dogfood (002). |
+| `agt_backend_service` | `backend-service` | data-model, service, endpoint, test | ⚠ **`provisional: true`** (S11) — seeded on the taxonomy worked-example only, **not** dogfood evidence; the metadata flag makes the weaker basis visible, not silent. |
+| `agt_data_persistence` | `data-persistence` | data-model, service | ⚠ **`provisional: true`** (S11) — same worked-example-only basis. |
+| `agt_generic` | `general` | *(all 7 implementation types)* | The FR-016 fallback for any unmatched `(type, specialization)` + every `general` task; empty lane reported on the roster. |
 
-Every lane is unique (`agent-library-schema.md` §6 rule 5). Absent lanes (`frontend-web`, `mobile`, `infra-platform`, `performance`) are **deliberately unseeded** — no dogfood evidence yet; a task hitting them falls to `agt_generic` + a reported empty lane (honest, and it earns the lane its first real evidence for v0→v1). Bases carry lane-level discipline only, **no framework knowledge** (§1.1) — that lives in skills.
+**Type-coverage matrix (S16):** the seven bases' `taxonomy.type` lists jointly cover **all 7 implementation types** across their lanes; `docs` is covered (via `agt_ai_agents`, D48). Any `(type, specialization)` whose specialization is one of the four **unseeded** lanes (`frontend-web`, `mobile`, `infra-platform`, `performance`) routes to `agt_generic` + a **reported** empty lane **by design** — stated, not accidental; it earns each lane its first dogfood evidence for v0→v1. `provisional: true` is a library-metadata field (ignored by matching; surfaced in the roster + v0→v1 review).
 
 ### Seed skills — 5 (`.claude/skills/*/SKILL.md`)
 
-| `id` | `origin` | `tags` | `grants` | Why seeded |
-|---|---|---|---|---|
-| `skl_refactor_discipline` | seed | refactor, blast-radius, behavior-preserving | `[]` | **Exists** (`skill-module.md` §5); auto-injected on `preserves_behavior: true` (FR-012). The reason OQ1 could be overruled. |
-| `skl_orchestration` | seed | orchestration, subagent, dispatch, parallel, wave | `[]` | 001 tagged all three command skills `orchestration`; the pipeline's dominant cross-cutting skill. |
-| `skl_shell_scripting` | seed | bash, shell, sh, posix, install | `[]` | 002 (git-ext) is entirely shell; the extension-building tag. |
-| `skl_yaml_hooks` | seed | yaml, config, manifest, hooks, extension-yml | `[]` | Hook-registry / `extension.yml` work — the shared-registry lane both 001/002 exercised. |
-| `skl_installer_hygiene` | seed | install, uninstall, idempotent, reinstall, reinstall-survival | `[]` | 002's reinstall-survival discipline (I-14/D57) — every extension needs it. |
+`skl_refactor_discipline` (seed, exists; auto-inject on `preserves_behavior`, `grants: []`) · `skl_orchestration` (orchestration/subagent/dispatch/parallel, `[]`) · `skl_shell_scripting` (bash/shell/posix/install, `[]`) · `skl_yaml_hooks` (yaml/config/manifest/hooks, `[]`) · `skl_installer_hygiene` (install/uninstall/idempotent/reinstall, `[]`). **All seed skills `grants: []`** — the first elevated grant in the system is the skill builder's `web_search` (D60), a deliberate, gate-visible event, never a seed default. `skl_refactor_discipline` relocates from the `000-sample` fixture into the live repo-root library.
 
-**All seed skills declare `grants: []`** — none needs elevation. This keeps the seed library entirely inside the core toolset, so the *first* elevated grant in the whole system is a deliberate, gate-visible event (the `web_search` question below), never a seed default. `skl_refactor_discipline` is relocated from the `000-sample` fixture into the live library at repo root.
+## The `web_search` grant — GRANTED to the skill builder (owner ruling D60; R1-S20)
 
-## The `web_search` grant question — both options costed (spec OPEN item; D58-5d)
+The spec's OPEN item is **resolved by the owner: the skill-builder role declares `web_search`** — the system's **first elevated grant** (D41). Conditions, all mechanical:
+- **Declared in the builder's skill-module frontmatter** (`grants: [web_search]`, per A-2) — not a role-level ambient default; it reaches a dispatch only via that declaration.
+- **Surfaces on every roster** whose assembly includes the builder path — **003's own workforce gate displays it: the first elevated grant a human approves** (D41/§8 W2).
+- **Recorded in traces** `elevated_grants: ["web_search"]` on any builder dispatch that searched (D43).
+- **The S17 stale-knowledge flag ships anyway** as a complement: when the builder authors a module for a framework past its training cutoff and **chose not to search**, it stamps a `provenance.stale_risk: true` flag — so a confidently-stale module is visible even with the grant available. *(D60 rationale: a builder authoring skills for post-cutoff frameworks without search produces confidently-stale modules — the exact failure A-2's grant machinery exists to make visible and governable; granting search + flagging non-search is the honest resolution.)*
 
-The spec poses it and defers the answer to the plan for the council to decide: **does the skill-builder *role* declare `web_search`** — the system's first elevated grant (D41)? The builder authors `SKILL.md`s that may themselves declare `web_search`; to author them well it may want to consult current library/dependency docs. This is distinct from a *library skill* (e.g. a future `dep-version-lookup`) declaring `web_search` — that is uncontroversial and unaffected by this decision. The question is only about the **builder session's own tool access while authoring**.
+This retires the plan's earlier Option-A recommendation. The audit invariant holds: the grant is skill-declared, gate-visible, and trace-recorded — network reach in the system is still 100% accounted for.
 
-**Plan's recommendation: Option A (NO web_search for the builder in v1).** Costed both ways:
+## Plan-time verifications & per-SC test coverage (D58-5 + R1-S03/05/09/12/22/23/24)
 
-| | **Option A — builder has NO `web_search` (recommended)** | **Option B — builder declares `web_search`** |
+Every SC with a mechanical existence-proof gets a **committed test** in `test/run.sh`; judgment-SCs are documented manual checks with a named procedure (S12). The full map:
+
+| SC | Enforcement | Committed test? |
 |---|---|---|
-| **What the builder loses / gains** | Loses live doc lookup: it authors `SKILL.md` bodies from the task's `tags` + the spec/plan/graph context it already holds, and from Claude's own knowledge. A skill needing *current* dependency facts is authored as a stub declaring `grants: [web_search]` **for the implementer to use**, rather than the builder resolving them at authoring time. | Gains live doc lookup while authoring — richer first-draft skill bodies for fast-moving libraries; fewer "author a stub, resolve later" cases. |
-| **Grant machinery exercised** | **None at the builder.** The system's first elevated grant stays a *skill* declaration surfaced at the workforce gate — the exact audit path D41 designed. `elevated_grants` on traces still exercises via any library skill that declares it. | Exercises the grant machinery **at a new site** — a role-level (not skill-level) grant. That is precisely the "not an agent-level default" A-2/D44 warned against: a session-level network reach that **does not appear on any workforce-gate roster** (the builder runs at assign time, before the gate). |
-| **Audit / safety** | Network reach in the system remains **100% skill-declared and gate-visible**. No un-gated network session exists. | Introduces the *one* network reach that is **not** gate-visible (the builder authors before the human signs). Would need its own audit story (a builder-run trace flag), i.e. new machinery to stay honest. |
-| **Subscription/D28** | Unaffected. | Unaffected (web_search is a Claude Code tool, not an API key). |
-| **Reversibility** | Trivially add later if authoring quality demands it (a config flag + a gate-surfaced builder-grant note). | Harder to walk back once skills are authored assuming live lookup. |
+| SC-001 (coverage + closed enums) | **CODE** — `validate-categorization.py` checks all four fields + enum membership before write (S05: enforcement pinned, no longer "manual") | ✅ fixture: a malformed categorization → non-zero exit |
+| SC-002 (over-cap fails, no write) | **CODE** — cap check; test asserts **both** non-zero exit **and** file-absence / unchanged-dir diff (S22) | ✅ over-cap fixture |
+| SC-003 (roster completeness) | roster columns mandatory; **plus a grant-union correctness test** with **≥2 grant-declaring skills** asserting no grant dropped/mis-merged (S09) | ✅ multi-grant fixture |
+| SC-004 (cap ≤3 + logged drops) | `assemble.py` injects first-3, logs remainder | ✅ >3-candidate fixture |
+| SC-005 (gap-free determinism) | total-order (S01) + script-writes-artifact (S08) + snapshot hash (S18); golden test asserts **byte-identical roster incl. grant ORDER** | ✅ double-run diff |
+| SC-006 (Sonnet floor) | `assemble.py` D48 guard; **synthetic non-Sonnet fixture base** added to the frozen snapshot so the guard's `else: hard-error` branch actually executes (S03) | ✅ prompt-task + non-Sonnet-base fixture |
+| SC-007 (∅-match → one SKILL.md) | builder authors one; **dedup fixture: two tasks sharing one novel tag** → assert exactly one persisted, not one-per-task (S24) | ✅ shared-novel-tag fixture |
+| SC-008 (traces carry assembly) | **a committed script** diffs each dispatch trace's `skills[]`/`elevated_grants[]` against its approved roster row (S23 — not human inspection) | ✅ trace↔roster diff script |
+| SC-009 (M3 exit) | dogfood chain on 003 itself | manual (documented procedure) |
+| S9 additive-only | `validate-skill.py` rejects S1–S3 violations | ✅ negation/override fixture |
 
-**Recommendation rationale:** the first elevated grant in the system should be **skill-declared and gate-visible** (D41's whole thesis), not a role-level default on a session that runs *before* the gate. Option A keeps the audit invariant intact ("a grant that reaches an agent without appearing on the roster is a contract violation" — `skill-module.md` §4) and is trivially reversible. The council decides; if it prefers B, the plan's fallback is B **plus** a mandatory builder-run trace flag + a `## Skill Builder` note on the roster so the reach stays auditable.
+**R1 determinism-boundary mitigation (S08), both axes:** (1) `assemble.py` **itself** is the tool-call writer of the Workforce Gate table — the session structurally cannot hand-transcribe or re-rank (the D53 prose→mechanism lesson); (2) a committed integration test runs the **real skill-builder** on a gap fixture and asserts the roster reflects only `assemble.py`'s algorithm (catches ranking influence).
 
-## Plan-time verifications (D58-5; report, do NOT reopen the spec)
+## Risks flagged for the council → dispositions applied
 
-The D58 spec-approval booked four items to *verify at plan time*. Confirmed against the design:
-
-- **(a) FR-004 / SC-002 — the 20% `general` cap is an FR with failure behavior, not prose.** ✅ Verified and made **code**: `validate-categorization.py` counts `general` and, when `count(general) > 0.20 × count(tasks)`, exits non-zero → the command writes **no** `categorization.md` and the phase does not complete (FR-004 exactly; taxonomy §4 "failure is not a warning"). SC-002 is measured by that script's exit, not the LLM's self-report. Small-`n` edge (`⌊0.2n⌋=0` for `n<5`, D44) stands for v0.
-- **(b) FR-014 / SC-006 — the D48 Sonnet-floor guard is enforced by code.** ✅ Verified: `assemble.py` carries the guard — for any task with the `prompt` tag, it asserts the selected base is a Sonnet implementation specialist (never a `docs`-exempt non-Sonnet base) and **errors** otherwise. With the seed library (every base Sonnet, `agt_ai_agents` accepting `docs`), a `prompt × docs × ai-agents` task provably lands on Sonnet. SC-006 is a golden test over such a task.
-- **(c) FR-007 / FR-011 / SC-004 — assembly cap ≤3 + additive-only are testable constraints.** ✅ Verified: the cap is `assemble.py` injecting `first 3 of (forced ++ ranked)` and **logging** `dropped` (never silent — FR-011/SC-004); a >3-candidate golden test asserts exactly 3 injected + the rest logged. Additive-only (FR-007) is enforced by `validate-skill.py` rejecting S1–S3 violations (negation/override/relaxation, model/dispatch keys) on every generated `SKILL.md` — a unit-testable validator, the `skill-module.md` §3 table made executable.
-
-## Risks flagged for the council
-
-- **R1 — Determinism boundary vs. an LLM in the loop.** SC-005's byte-reproducibility rests entirely on `assemble.py` being the sole authority for matching — if any matching judgment leaks into the `agent-creator` Sonnet session, determinism breaks. Mitigation: the session **only** dispatches skill-building and writes the artifact; it never ranks or selects. The council should pressure-test whether the command prose can truly hold that line (the 002 lesson: prose-level enforcement is only as good as the model following it, D53).
-- **R2 — Gap-free assign may leave no `agent-creator` trace.** The deterministic matcher is mechanical; on a gap-free run no model session runs in the assign phase (git-ext precedent). Is `agent-assign` a *model phase* (expects a trace, artifact-layout §2) or a *mechanical phase* (like `branch`/git)? Recommendation: mechanical — the honest reading — with the skill-builder trace appearing only on gaps. Council to ratify (touches trace-schema rule 9 / §2's "separate session" label).
-- **R3 — Seed-library overfit (OQ6).** `ai-agents` + `devtools-cli` are SpecSeyal-shaped lanes; the seed is fitted to two features that both *build this pipeline*. The v0→v1 review (taxonomy §8) re-tests them against a non-SpecSeyal repo. Bounded by D17 (per-repo library) — noted, not blocking.
-- **R4 — `web_search` decision (above).** The council's to decide; the plan recommends A and provides a B-fallback with an audit flag.
-- **R5 — Flywheel write path vs. reinstall (I-14/D57).** The skill builder persists `SKILL.md` into `.claude/skills/` — the exact tree installers `rm -rf`. The generated-skill path must be the **live** library, never an extension's installed copy, and `agents/install.sh` must seed additively (never clobber a generated skill). `test/run.sh` reinstall-survival covers it.
+- **R1 — Determinism boundary.** Mitigated by S01 (total order) + S08 (script writes the artifact + integration test). Residual: none blocking.
+- **R2 — Gap-free assign may leave no `agent-creator` trace.** Recommendation stands (mechanical phase, git-ext precedent); **S18** stamps a snapshot hash so even a trace-less run leaves a machine-checkable record. Council to ratify the trace-schema §2 reading.
+- **R3 — Seed-library overfit (OQ6).** Now **visible**: the two worked-example-only bases carry `provisional: true` (S11); v0→v1 (taxonomy §8) re-tests all lanes. Per-repo library (D17) bounds it.
+- **R5 — Flywheel write vs. reinstall.** Resolved (S07): the library lives **outside** the install `rm -rf` payload (user/flywheel data), so neither a foreign nor a **self** reinstall clobbers a generated skill; the builder checks the live `.claude/skills/` listing before naming and **hard-fails (or warns+renames)** on a collision — never a silent skip. `test/run.sh` reinstall-survival covers both.
+- **R6 — `web_search`.** Resolved by owner ruling D60 (granted, above).
 
 ## Complexity Tracking
 
-*No unjustified constitution violations.* The one nuance worth naming (★ above) — the flywheel writing `SKILL.md` outside the feature tree — is a **sanctioned** D24 behavior, not a violation, and is recorded in the Constitution Check rather than smuggled here.
+*No unjustified constitution violations.* The one nuance (★) — the flywheel writing `SKILL.md` outside the feature tree — is sanctioned D24 behavior, recorded in the Constitution Check.
 
 | Item | Why needed | Simpler alternative rejected because |
 |---|---|---|
-| Python for `assemble.py` (not pure Bash) | Deterministic YAML-frontmatter parse + Jaccard set math + total-order tie-break (§3 step 4) must be exact and testable | Bash + `yq`/`awk` ranking is fragile on the tie-break total order; a non-deterministic sort silently breaks SC-005 — the one property the whole feature exists to guarantee |
+| Python for `assemble.py` (not Bash) | Deterministic frontmatter parse + Jaccard + total-order tie-break (§3 step 4) must be exact/testable; **total-ordered serialization** (S01) is trivial in Python, fragile in shell sort | Bash+`yq` ranking breaks the total order silently → breaks SC-005, the one property the feature exists to guarantee. *(Python is already a repo dependency via graphify — no new-runtime cost, S19.)* |
+| One `workforce` extension, three commands | S10: packaging echo of the one-feature ruling; S13's dedicated approve command + S02's gate-write hook share one natural home | Two independent extensions double install/uninstall/test/packaging and force cross-extension `after_*`→`git.commit` hook coupling for an internal two-step sequence |
+
+## Round-1 revision task addendum (D62 — deck-prep improvement)
+
+Add to `tasks.md`: **mine this round's five member transcripts** for which `plan.md` sections the four plan-readers actually pulled (read-rate was 4/5 plan · 1/5 spec · 3/5 graph), then **enrich the deck-prep template** (`extensions/council/` **own source**, D57 S2; reinstall after) so those high-demand sections ride in the technical deck by default. **After-metric:** the `plan.md` read-rate at the *next* council run — target: the deck trusted by a majority of the bench (fewer members needing to open `plan.md`).
