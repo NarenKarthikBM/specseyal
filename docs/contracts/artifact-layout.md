@@ -1,8 +1,8 @@
 # Contract — Feature Artifact Layout
 
-> **Status:** 1.3 (M3, amended 2026-07-10 by **D57**). Normative.
+> **Status:** 1.4 (M3, amended 2026-07-10 by **D57**, **D58**). Normative.
 > **Implements:** principle 1 (artifacts are the contract), principle 3 (resumability).
-> **Sources:** docs/00 §3, docs/10 §3, D4, D9, D25, D32, D37, D38, D41, D44, D49, D50, D51, **D57** (cross-extension seams).
+> **Sources:** docs/00 §3, docs/10 §3, D4, D9, D25, D32, D37, D38, D41, D44, D49, D50, D51, **D57** (cross-extension seams), **D58** (analyze-before-categorize order).
 
 Every feature is one directory under `specs/`. Every pipeline phase reads artifacts and writes **exactly one** artifact. Both the CLI layer and the platform layer (M5+) read and write this same tree — it is the only interface between them.
 
@@ -61,8 +61,8 @@ Each row is a phase. **Context in** is exhaustive — a phase that runs in a sep
 | triage | main | `suggestions.md` **only** | `plan.md` (revised) + `decision-record.md` entry |
 | council-gate | human | `overview.md`, `suggestions.md`, `decision-record.md` | `decision-record.md` gate section |
 | tasks | main | `plan.md`, `spec.md`, `graphify-context.md`, `decision-record.md` | `tasks.md` |
-| categorize | separate | `tasks.md`, `plan.md` | `categorization.md` |
 | analyze | main | `spec.md`, `plan.md`, `tasks.md` | `tasks.md` patch **or** reopened `plan.md` (D11) |
+| categorize | separate | `tasks.md`, `plan.md` | `categorization.md` |
 | agent-assign | separate | `categorization.md`, `.claude/agents/` | `agents/assignment.md` |
 | workforce-gate | human | `tasks.md`, `agents/assignment.md` | `assignment.md` gate section |
 | implement | main + subagents | `tasks.md`, `plan.md`, `graphify-context.md`, `assignment.md` | code + `implement.log.md` |
@@ -74,6 +74,8 @@ Every session, in every phase, appends one record to `traces.jsonl` (principle 4
 Three rows run **no session** and so leave no trace: `branch` (a git ref), `council-gate` and `workforce-gate` (a human). The gates still write artifacts — their decision sections — which is what keeps §3 working.
 
 **Branch birth (D51, `002`-FR-001):** the `branch` phase is **co-incident with `specify`** — the feature branch is created as soon as `specify` assigns the spec ID (the `specs/NNN-slug/` directory) and **before `spec.md` is committed**, so `spec.md` and every later artifact land on the feature branch and the base branch stays clean. Its context-in is the spec ID, not `spec.md`'s content; its name is exactly the spec ID (D25). The branch creation is itself a mechanical git operation with no session, so it still leaves no trace.
+
+**Analyze before categorize (D58, `003`).** `analyze` precedes `categorize` in this table because `analyze` may patch `tasks.md` (D11 remediation) — categorizing first would classify tasks that can still change, so **classification follows stabilization**. The §3 resume walk therefore runs `analyze` then `categorize`, and `categorize`'s context-in (`tasks.md`) is the *post-analyze* task list. (M1/M2 dogfood practice already ran this order; this 1.4 amendment reconciles the table to it, resolving the mismatch `003`'s spec flagged rather than silently fixed.)
 
 ## 3. Resumability rule (D32)
 

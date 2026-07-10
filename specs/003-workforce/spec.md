@@ -16,7 +16,7 @@
 
 ### Session 2026-07-10
 
-- Q: How is the determinism guarantee (FR-015 / SC-005) scoped, given the skill builder is an LLM that authors new skills (not byte-reproducible) and mutates the library mid-run? → A: **Assembly-only, against a fixed library snapshot.** Determinism is a property of the assignment *algorithm* — the same `categorization.md` + the same library yields the same roster. A run that invokes the skill builder (∅-match, FR-006) is **explicitly excluded** from the byte-identical claim: LLM authorship is not byte-reproducible and the run grows the library; determinism for such a run means that re-running against the *resulting* library reproduces the roster. SC-005 is therefore measured on **gap-free** runs. (Consistent with D24: the flywheel persists generated skills, which then become part of the fixed library deterministic assembly consumes.)
+- Q: How is the determinism guarantee (FR-015 / SC-005) scoped, given the skill builder is an LLM that authors new skills (not byte-reproducible) and mutates the library mid-run? → A: **Assembly-only, against a fixed library snapshot.** Determinism is a property of the assignment *algorithm* — the same `categorization.md` + the same library yields the same roster. A run that invokes the skill builder (∅-match, FR-006) is **explicitly excluded** from the byte-identical claim: LLM authorship is not byte-reproducible and the run grows the library; determinism for such a run means that re-running against the *resulting* library reproduces the roster. SC-005 is therefore measured on **gap-free** runs. (Consistent with D24: the flywheel persists generated skills, which then become part of the fixed library deterministic assembly consumes.) **Tightened at spec review (D58):** the fixed-library-vs-built-this-run boundary is recorded per skill on the roster (FR-022), so "gap-free" is a checkable property of the artifact, not an assertion.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -135,6 +135,10 @@ When a task's tags match no existing skill, the skill builder authors ONE new `S
 
 - **FR-021**: Every implementation dispatch of an assembled agent MUST leave a trace record carrying `skills: [{id, version}]` (the injected skills, `[]` if none) and `elevated_grants: [...]` (the gate-approved set active), with `agent_id` = the assembled base (D43).
 
+**Determinism provenance (D58 tightening)**
+
+- **FR-022**: The roster MUST record, per injected skill, whether it was **`library`** (present in the library at run start) or **`built`** (authored by the skill builder *during this run*). This makes SC-005's "gap-free" boundary a **checkable property of the artifact** — a gap-free run is one whose roster carries zero `built`-marked skills — not an assertion. (This is distinct from a skill's lifetime `origin`: a skill carrying `origin: generated` from a *prior* feature is `library` for this run.)
+
 ### Key Entities
 
 - **Categorization (`categorization.md`)** — the categorizer's sole output: the task list, each task carrying `(type, specialization, preserves_behavior, tags)`. The categorize extension owns it and writes nothing else (D37).
@@ -152,7 +156,7 @@ When a task's tags match no existing skill, the skill builder authors ONE new `S
 - **SC-002**: The `general` cap holds: a feature is categorized only if `count(general) ≤ 0.20 × count(tasks)`; an over-cap attempt produces no `categorization.md`.
 - **SC-003**: Every categorized task appears in exactly one roster row naming a base, its injected skills, its model, and its elevated-grant set — no row omits the grants column.
 - **SC-004**: No assembled agent exceeds `base + 3` skills; whenever the cap trims, the dropped skills are recorded.
-- **SC-005**: Assembly is reproducible on **gap-free** runs — two runs over the same `categorization.md` + the same fixed library (no ∅-match skill-building) produce byte-identical rosters. Runs that invoke the skill builder are excluded from the byte-identical claim (LLM authorship); their determinism is that re-running against the *resulting* library reproduces the roster (Clarifications 2026-07-10).
+- **SC-005**: Assembly is reproducible on **gap-free** runs — two runs over the same `categorization.md` + the same fixed library (no ∅-match skill-building) produce byte-identical rosters. "Gap-free" is **verifiable from the roster** (zero `built`-marked skills, FR-022), not asserted. Runs that invoke the skill builder are excluded from the byte-identical claim (LLM authorship); their determinism is that re-running against the *resulting* library reproduces the roster (Clarifications 2026-07-10; tightened D58).
 - **SC-006**: No `prompt`-tagged task is ever assembled below the Sonnet floor (the D48 guard holds on 100% of such tasks).
 - **SC-007**: A task with a tag no skill covers yields exactly one new persisted `SKILL.md` with `origin: generated` and its source feature recorded.
 - **SC-008**: Every implementation dispatch of an assembled agent leaves a trace carrying the injected skills (`id@version`) and elevated grants that match its approved roster row.
@@ -174,7 +178,7 @@ Every entry is a ratified given — a `docs/90` D-row or an M0 contract — per 
 - **Autonomy** (D9, `profile-schema.md`): the workforce gate is the second gate-capable checkpoint; the categorizer and assembler PROPOSE, the human signs — unless `gates.workforce.mode: auto` under `full_auto`.
 - **This feature's `profile.yaml` sets `council_tier: standard`** (D56): its plan's council review runs the cost-controlled tier, measured against the 5.25M `full` baseline.
 - **Subscription-only** (D28): the categorizer and skill builder run on the Claude subscription; no `ANTHROPIC_API_KEY`.
-- **Pipeline position** (owner ruling; docs/00 §3): `tasks → analyze → categorize → agent-assign → workforce-gate → implement`. **Reconciliation flagged:** the owner's order runs `analyze` *before* `categorize` (dogfood practice — `analyze` may patch `tasks.md` before it is categorized), whereas `artifact-layout.md` §2 currently lists `categorize` before `analyze`; the §2 row order is to be reconciled during this feature (a contract touch, not a new decision).
+- **Pipeline position** (owner ruling, **RATIFIED D58**; docs/00 §3): `tasks → analyze → categorize → agent-assign → workforce-gate → implement`. `analyze` runs **before** `categorize` — `analyze` may patch `tasks.md` (D11 remediation), so **classification follows stabilization** (categorizing first would classify tasks that can still change). `artifact-layout.md` §2 is amended to this order (→ 1.4, cites D58), reconciling the phase table to the M1/M2 dogfood practice this feature flagged.
 
 **OPEN — deferred to the plan; the council weighs it at plan review (deliberately *not* a `/speckit-clarify` target):**
 
