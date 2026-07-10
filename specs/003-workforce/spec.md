@@ -12,6 +12,12 @@
 >
 > The categorizer and the assembler **PROPOSE**; the human **signs** at the workforce gate (D9). Nothing here decides autonomously unless a feature's `profile.yaml` sets `gates.workforce.mode: auto` (legal only under `full_auto`, `profile-schema.md`).
 
+## Clarifications
+
+### Session 2026-07-10
+
+- Q: How is the determinism guarantee (FR-015 / SC-005) scoped, given the skill builder is an LLM that authors new skills (not byte-reproducible) and mutates the library mid-run? → A: **Assembly-only, against a fixed library snapshot.** Determinism is a property of the assignment *algorithm* — the same `categorization.md` + the same library yields the same roster. A run that invokes the skill builder (∅-match, FR-006) is **explicitly excluded** from the byte-identical claim: LLM authorship is not byte-reproducible and the run grows the library; determinism for such a run means that re-running against the *resulting* library reproduces the roster. SC-005 is therefore measured on **gap-free** runs. (Consistent with D24: the flywheel persists generated skills, which then become part of the fixed library deterministic assembly consumes.)
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Every task is classified by the blessed taxonomy (Priority: P1)
@@ -115,7 +121,7 @@ When a task's tags match no existing skill, the skill builder authors ONE new `S
 - **FR-012**: `preserves_behavior: true` MUST auto-inject the `refactor-discipline` skill, counting against the cap of 3 (taxonomy §2.3).
 - **FR-013**: The assembled agent's elevated-grant set MUST equal the union of its injected skills' declared grants — nothing else grants anything (D41).
 - **FR-014**: A `prompt`-tagged task MUST be assembled onto an implementation specialist under the D18 Sonnet floor, enforced as a **code-level guard** in the assigner — never onto a docs-exempt non-Sonnet specialist (D48).
-- **FR-015**: Assembly MUST be deterministic: the same `categorization.md` against the same library yields the identical roster every run.
+- **FR-015**: **Assembly** MUST be deterministic against a **fixed library snapshot**: the same `categorization.md` + the same library yields the identical roster every run. Determinism is a property of the assignment *algorithm*, not of the skill builder — a run that invokes the builder (∅-match, FR-006) authors new skills (LLM, not byte-reproducible) and grows the library; once those skills exist, re-runs are deterministic (see Clarifications 2026-07-10).
 - **FR-016**: When no base lane matches `(type, specialization)`, the assembler MUST fall back to the generic base AND report the empty lane on the roster (never a silent fallback).
 
 **Workforce gate & roster (`agents/assignment.md`)**
@@ -146,7 +152,7 @@ When a task's tags match no existing skill, the skill builder authors ONE new `S
 - **SC-002**: The `general` cap holds: a feature is categorized only if `count(general) ≤ 0.20 × count(tasks)`; an over-cap attempt produces no `categorization.md`.
 - **SC-003**: Every categorized task appears in exactly one roster row naming a base, its injected skills, its model, and its elevated-grant set — no row omits the grants column.
 - **SC-004**: No assembled agent exceeds `base + 3` skills; whenever the cap trims, the dropped skills are recorded.
-- **SC-005**: Assembly is reproducible — two runs over the same `categorization.md` + library produce byte-identical rosters.
+- **SC-005**: Assembly is reproducible on **gap-free** runs — two runs over the same `categorization.md` + the same fixed library (no ∅-match skill-building) produce byte-identical rosters. Runs that invoke the skill builder are excluded from the byte-identical claim (LLM authorship); their determinism is that re-running against the *resulting* library reproduces the roster (Clarifications 2026-07-10).
 - **SC-006**: No `prompt`-tagged task is ever assembled below the Sonnet floor (the D48 guard holds on 100% of such tasks).
 - **SC-007**: A task with a tag no skill covers yields exactly one new persisted `SKILL.md` with `origin: generated` and its source feature recorded.
 - **SC-008**: Every implementation dispatch of an assembled agent leaves a trace carrying the injected skills (`id@version`) and elevated grants that match its approved roster row.

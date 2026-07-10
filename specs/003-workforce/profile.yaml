@@ -1,0 +1,17 @@
+# Autonomy profile — 003-workforce
+# Both gates human: the default posture (D9). council_tier: standard — the M3
+# feature opts into the cost-controlled council ceremony (D56), measured at the
+# plan gate against the 5.25M full-tier baseline. See docs/contracts/profile-schema.md.
+schema_version: "1.0"
+feature: "003-workforce"
+
+full_auto: false
+council_tier: standard
+
+gates:
+  council:
+    mode: human
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: human
