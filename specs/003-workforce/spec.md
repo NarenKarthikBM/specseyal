@@ -8,7 +8,7 @@
 
 **Input**: User description: "M3 — the workforce pair: task categorization + agent assembly (speckit-ext-categorize + speckit-ext-agents: categorizer, skill builder, assembler), delivered as one feature. Owner rulings encoded."
 
-> **Reading note.** This feature is the M3 "workforce pair" (docs/00 §3, docs/05 M3): two pipeline extensions delivered as **one feature** — **`speckit-ext-categorize`** (the categorizer) and **`speckit-ext-agents`** (the skill builder + the assembler/assigner). Its "users" are the engineer driving the SDD pipeline and the human who signs the workforce gate. The requirements describe **observable behavior and the artifacts produced** (`categorization.md`, new `SKILL.md` modules, `agents/assignment.md` with its `## Workforce Gate` roster); the *how* — session prompts, the ranking code, hook wiring — is deferred to `/speckit-plan`. Decisions already ratified in `docs/90` (D9, D16–D18, D24, D37, D40–D44, D48, D49, D56) and the M0 contracts (`taxonomy-v0.md` **BLESSED**, `agent-library-schema.md`, `skill-module.md`, `artifact-layout.md` §8, `trace-schema.md`) appear under **Constraints & Assumptions** as givens citing their D-row, not open choices — this is a dogfood build of a *designed* component (D40 blessed), not greenfield. Unlike `002`, this extension **does AI work at runtime**: the categorizer and skill builder are model sessions (Sonnet, D18), so subscription/model policy (D28/D18) governs both its build *and* its runtime.
+> **Reading note.** This feature is the M3 "workforce pair" (docs/00 §3, docs/05 M3): two pipeline **roles** delivered as **one feature** — the **categorizer** and the **skill builder + assembler/assigner**. *(Drafted as two extensions, `speckit-ext-categorize` / `speckit-ext-agents`; the plan and round-1 council folded the packaging into a single `workforce` extension exposing three commands — `/speckit-categorize`, `/speckit-agent-assign`, `/speckit-workforce-approve` — S10/S13. The roles are stable; packaging is the plan's, authoritative there.)* Its "users" are the engineer driving the SDD pipeline and the human who signs the workforce gate. The requirements describe **observable behavior and the artifacts produced** (`categorization.md`, new `SKILL.md` modules, `agents/assignment.md` with its `## Workforce Gate` roster); the *how* — session prompts, the ranking code, hook wiring — is deferred to `/speckit-plan`. Decisions already ratified in `docs/90` (D9, D16–D18, D24, D37, D40–D44, D48, D49, D56) and the M0 contracts (`taxonomy-v0.md` **BLESSED**, `agent-library-schema.md`, `skill-module.md`, `artifact-layout.md` §8, `trace-schema.md`) appear under **Constraints & Assumptions** as givens citing their D-row, not open choices — this is a dogfood build of a *designed* component (D40 blessed), not greenfield. Unlike `002`, this extension **does AI work at runtime**: the categorizer and skill builder are model sessions (Sonnet, D18), so subscription/model policy (D28/D18) governs both its build *and* its runtime.
 >
 > The categorizer and the assembler **PROPOSE**; the human **signs** at the workforce gate (D9). Nothing here decides autonomously unless a feature's `profile.yaml` sets `gates.workforce.mode: auto` (legal only under `full_auto`, `profile-schema.md`).
 
@@ -99,7 +99,7 @@ When a task's tags match no existing skill, the skill builder authors ONE new `S
 
 ### Functional Requirements
 
-**Categorizer (`speckit-ext-categorize`)**
+**Categorizer** (the `workforce` extension's `/speckit-categorize` command)
 
 - **FR-001**: The categorizer MUST run as a separate session (session-boundary rule) that reads `tasks.md` + `plan.md` and writes `categorization.md` and no other artifact (D37).
 - **FR-002**: It MUST tag every task with exactly one `type` (of the 8), exactly one `specialization` (of the 11), a boolean `preserves_behavior`, and zero or more free `tags`, every enum value being a member of the blessed taxonomy v0.
@@ -107,14 +107,14 @@ When a task's tags match no existing skill, the skill builder authors ONE new `S
 - **FR-004**: It MUST FAIL — writing no `categorization.md` and not completing the phase — when `count(general) > 0.20 × count(tasks)` (the cap is a floor on evidence, D42).
 - **FR-005**: The categorizer PROPOSES; it MUST NOT itself sign off the categorization — acceptance is the human's at the workforce gate (D9).
 
-**Skill builder (`speckit-ext-agents`)**
+**Skill builder** (the `workforce` extension's `/speckit-agent-assign` gap path)
 
 - **FR-006**: When a task's tags yield an empty skill-candidate set, the builder MUST author exactly one new `SKILL.md` module (not a bespoke agent — D40.2) conforming to `skill-module.md`.
 - **FR-007**: A generated module MUST be additive-only (no negation/override of base behavior; obligations added, never relaxed — S1–S3) and MUST declare its tool grants explicitly (`grants`, D41).
 - **FR-008**: The builder MUST persist a generated module into the library with provenance (`origin: generated`, `provenance.source_feature` = this feature) so it becomes a candidate for future tasks (the flywheel, D24).
 - **FR-009**: Promotion of a generated module to the trusted set (`origin: promoted`) MUST be a separate manual action in v1 — never automatic on accumulated stats.
 
-**Assembler / assigner (`speckit-ext-agents`)**
+**Assembler / assigner** (the `workforce` extension's `/speckit-agent-assign` + `/speckit-workforce-approve` commands)
 
 - **FR-010**: The assembler MUST run as a separate session that reads `categorization.md` + the library (`.claude/agents/`, `.claude/skills/`) and writes `agents/assignment.md` and no other artifact.
 - **FR-011**: Per task, it MUST select exactly one base specialist by `(type, specialization)` and inject at most 3 skill modules selected/ranked by tags — additive-only (A-1, D40). What the cap trims MUST be logged, never silently dropped.
@@ -180,10 +180,10 @@ Every entry is a ratified given — a `docs/90` D-row or an M0 contract — per 
 - **Subscription-only** (D28): the categorizer and skill builder run on the Claude subscription; no `ANTHROPIC_API_KEY`.
 - **Pipeline position** (owner ruling, **RATIFIED D58**; docs/00 §3): `tasks → analyze → categorize → agent-assign → workforce-gate → implement`. `analyze` runs **before** `categorize` — `analyze` may patch `tasks.md` (D11 remediation), so **classification follows stabilization** (categorizing first would classify tasks that can still change). `artifact-layout.md` §2 is amended to this order (→ 1.4, cites D58), reconciling the phase table to the M1/M2 dogfood practice this feature flagged.
 
-**OPEN — deferred to the plan; the council weighs it at plan review (deliberately *not* a `/speckit-clarify` target):**
+**OPEN — deferred to the plan; the council weighs it at plan review (deliberately *not* a `/speckit-clarify` target):** — **→ RESOLVED (D60).**
 
-- **Does the skill-builder role itself declare `web_search` — the system's first elevated grant (D41)?** The builder authors skills that may themselves declare `web_search`; to author them well it may need to consult current library/dependency docs. Granting the builder network access would be the first real network reach in the system and deserves council scrutiny. The spec poses it; the plan proposes an answer; the council decides at plan review.
+- **Does the skill-builder role itself declare `web_search` — the system's first elevated grant (D41)?** The builder authors skills that may themselves declare `web_search`; to author them well it may need to consult current library/dependency docs. Granting the builder network access would be the first real network reach in the system and deserves council scrutiny. The spec poses it; the plan proposes an answer; the council decides at plan review. **→ RESOLVED at round-1 triage (owner ruling D60): `web_search` is GRANTED** — the builder declares `grants: [web_search]` (A-2), it surfaces on every builder-path roster row (§8 W2), and it is trace-recorded (D43); the S17 `stale_risk` flag ships as a complement. The plan had recommended Option A (no grant); D60 supersedes it.
 
-**Deferred to the plan (not fixed in this spec):**
+**Deferred to the plan (not fixed in this spec) — → RESOLVED in the plan:**
 
-- The **seed library** — the seed base specialists and seed skills. The plan proposes the set; the council reviews it (docs/05 M3's "5–6 specialists" is indicative only).
+- The **seed library** — the seed base specialists and seed skills. The plan proposes the set; the council reviews it (docs/05 M3's "5–6 specialists" is indicative only). **→ RESOLVED: plan § Seed Library set 7 bases + 5 skills (council-reviewed, R1-S11/S16 applied).**
