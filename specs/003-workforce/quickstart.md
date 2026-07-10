@@ -5,9 +5,12 @@ Runnable scenarios proving the workforce pair works end-to-end. Each maps to a s
 ## Prerequisites
 
 ```bash
-bash extensions/categorize/install.sh .    # → .specify/extensions/categorize/ + .claude/skills/speckit-categorize
-bash extensions/agents/install.sh .        # → .specify/extensions/agents/ + seed library into .claude/agents/ (7) + .claude/skills/ (5)
-# verify: /speckit-categorize and /speckit-agent-assign resolve; 7 agt-*.md + 5 skl skills present; refactor-discipline relocated from 000-sample
+# Install order matters (S06/S25): git-ext — with the generalized on-gate-approve.sh — BEFORE workforce,
+# so the workforce gate-write handler + the before_implement verify-gate exist first.
+bash extensions/git/install.sh .           # reinstall — brings the gate-agnostic on-gate-approve.sh + after_workforce_approve (S02)
+bash extensions/workforce/install.sh .     # → .specify/extensions/workforce/ + seed library into .claude/agents/ (7) + .claude/skills/ (5)
+# verify: /speckit-categorize, /speckit-agent-assign, /speckit-workforce-approve resolve;
+#         7 agt-*.md + 5 skl skills present; refactor-discipline relocated from 000-sample
 ```
 
 ## Scenarios
@@ -61,20 +64,21 @@ Attempt to persist a generated skill whose body negates/overrides the base (S1) 
 ```
 **Expect:** each per-task dispatch trace carries `skills: [{id,version}]` and `elevated_grants: [...]` matching its approved roster row; `agent_id` = the assembled base; a zero-skill task carries `skills: []`, `elevated_grants: []`. *(SC-008)*
 
-### S11 — Reinstall-survival (D57 S3)
+### S11 — Reinstall-survival (D57 S3, S07/S17)
 ```bash
-bash extensions/agents/install.sh . && bash extensions/graphify/install.sh . && bash extensions/agents/install.sh .
-# assert: seed library intact, a `built` skill from a prior run NOT clobbered, hooks still registered
+bash extensions/workforce/install.sh . && bash extensions/graphify/install.sh . && bash extensions/git/install.sh . && bash extensions/workforce/install.sh .
+# assert: seed library intact; a `built` skill from a prior run NOT clobbered (it lives OUTSIDE the install rm -rf payload, S07);
+#         both gate wirings still fire — after_categorize/after_agent-assign → git.commit, and after_workforce_approve → on-gate-approve.sh workforce
 ```
-**Expect:** the seed library and any generated skill survive a foreign-extension reinstall; the `after_categorize`/`after_agent-assign` hook points still fire. *(R5/I-14/D57)*
+**Expect:** the seed library and any generated skill survive a **foreign- and self-**reinstall (S07); the `after_categorize`/`after_agent-assign` hook points still fire, and git-ext's generalized `on-gate-approve.sh` still records the workforce binding after a git reinstall. *(R5/R8/I-14/D57)*
 
 ### S12 — M3 EXIT (SC-009)
 Run the full chain on a real feature:
 ```bash
-/speckit-tasks-graph → /speckit-analyze → /speckit-categorize → /speckit-agent-assign → [human signs ## Workforce Gate] → /speckit-implement-parallel
+/speckit-tasks-graph → /speckit-analyze → /speckit-categorize → /speckit-agent-assign → /speckit-workforce-approve (human signs ## Workforce Gate) → /speckit-implement-parallel
 ```
-**Expect:** `categorize → assign → workforce-gate (human approves) → implement-parallel` end-to-end, the roster consumed by implementation. *(SC-009 — the M3 exit criterion)*
+**Expect:** `categorize → assign → workforce-gate (human approves via /speckit-workforce-approve) → implement-parallel` end-to-end, the roster consumed by implementation. *(SC-009 — the M3 exit criterion)*
 
-## Deterministic-assembly golden test (in `extensions/agents/test/run.sh`)
+## Deterministic-assembly golden test (in `extensions/workforce/test/run.sh`)
 
-A committed `categorization.fixture.md` + a frozen library snapshot → `assemble.py` twice → assert byte-identical roster (SC-005) with a `prompt`-tagged task (SC-006) and a >3-candidate task (SC-004). Zero-AI, so CI-runnable without a model.
+A committed `categorization.fixture.md` + a frozen library snapshot → `assemble.py` twice → assert byte-identical roster **including grant order** (SC-005/S01) with a `prompt`-tagged task **onto a synthetic non-Sonnet fixture base** so the D48 guard's error branch actually executes (SC-006/S03) and a >3-candidate task (SC-004). The frozen snapshot's library-hash is stamped in the roster (S18). Zero-AI, so CI-runnable without a model. The single `test/run.sh` (git-ext model, D57 S3) also covers install → reinstall-survival → validator unit checks → the grant-union correctness test (≥2 grant-declaring skills, S09).
