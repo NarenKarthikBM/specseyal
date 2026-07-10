@@ -86,6 +86,8 @@ Read all five stage-1 opinions — `opinions/A.md … opinions/E.md`, each in fu
 
 Obey the output cap the appendix names (≤ 15 consolidated points). Write your single consolidated critique to **`opinions/peer/consolidated.md`**. Everything else — the graphify grounding tool and its reduced-grounding rule, the `## Suggestions` bullet grammar, and the status-only return — applies unchanged (your return line is `Wrote opinions/peer/consolidated.md — <n> points.`).
 
+> **Status-only is absolute (D62 tier-mechanics patch).** Your entire reply is that one line — nothing before it, nothing after it. Do **not** summarize what you verified, list which claims you checked, or describe your process (even "I verified X against the graph" grazes review content and breaks the S2 invariant, SC-005). Every observation you have goes **into the file**; the orchestrator reads it there. If your reply is longer than the single `Wrote …` line, you have broken context hygiene.
+
 ## Output format (both stages)
 
 Every opinion file — Stage 1 or Stage 2 — has the same shape:

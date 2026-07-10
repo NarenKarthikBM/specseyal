@@ -11,12 +11,17 @@ member_count: 5
 # second. Peer review itself is not cut under `full` (see plan.md
 # "Rejected Alternatives").
 
-council_tier: full
+council_tier: standard
 # Default ceremony tier when a feature's profile.yaml does not set
-# `council_tier` (D56, M3 cost review). Mirrors profile-schema's
-# "absent ⇒ safest/most-thorough" ethos (P1): the default is the fullest
-# review, and cheaper tiers are an explicit per-feature opt-in via
-# `profile.yaml: council_tier: <tier>` — never a silent global downgrade.
+# `council_tier`. Flipped full -> standard by D61 (2026-07-10) on the `003`
+# measurement: the first live standard-tier round cost 2,830,593 billable tok
+# vs the 5.25M full baseline (-46.1%), 8 sessions vs 12, and rigor held — 2 real
+# blocking defects, receipts-checked corrections, no opinion below bar (D56).
+# `standard` is now the default; `full` stays opt-in via
+# `profile.yaml: council_tier: full`, recommended (docs/05 sizing guidance) for
+# L-sized or architecture-changing features. Revisit clause (N=1): reopen this
+# default if any standard round misses a defect a full round would plausibly
+# have caught.
 # A feature's profile.yaml value overrides this default; this key is only
 # the fallback for a feature that declares none.
 tiers:
