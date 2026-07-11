@@ -79,7 +79,7 @@
 - [X] T023 [P] [US3] Author `extensions/workforce/extension/templates/skill-module.template.md` — the generated-`SKILL.md` shell (`skl_` id, semver, `origin: generated`, `provenance.source_feature`, `taxonomy.tags`, `grants`).
 - [X] T024 [US3] Author `extensions/workforce/extension/scripts/validate-skill.py` (imports `frontmatter.py`) — `skill-module.md` **S1–S3** (additive-only) **plus S04**: the generated skill's tags **MUST intersect** the triggering task's tags; `skl_` id unique, semver, `grants` disjoint from the core toolset; `origin`→`source_feature` rule.
 - [X] T025 [US3] Wire the ∅-match handoff into `/speckit-agent-assign` (edit `speckit.agent-assign.md`): for each gap dispatch the `skill-builder` (with its `web_search` grant) → `validate-skill.py` → persist to `.claude/skills/` (`origin: generated`, `source_feature: 003-workforce`); **check the live `.claude/skills/` listing and hard-fail/rename on collision** (S07); then **re-run `assemble.py`** — stable, only the gap row changes (S15). (depends on T016, T022, T024)
-- [ ] T026 [P] [US3] Committed skill-builder tests in `extensions/workforce/test/test_skill_builder.sh` + fixtures: an additive-only **violation is rejected**, not persisted (FR-007/S9); **two tasks sharing one novel tag → exactly one** persisted skill, not one-per-task (SC-007/S24); a tags-miss is rejected (S04). (depends on T024, T025)
+- [X] T026 [P] [US3] Committed skill-builder tests in `extensions/workforce/test/test_skill_builder.sh` + fixtures: an additive-only **violation is rejected**, not persisted (FR-007/S9); **two tasks sharing one novel tag → exactly one** persisted skill, not one-per-task (SC-007/S24); a tags-miss is rejected (S04). (depends on T024, T025)
 
 **Checkpoint**: the flywheel closes; the long tail is covered.
 
@@ -90,7 +90,7 @@
 **Goal**: `/speckit-implement-parallel` dispatches each assembled agent; every trace carries the approved assembly.
 **Independent Test**: an approved `assignment.md` → each per-task trace carries `skills: [{id,version}]` + `elevated_grants: [...]` matching its roster row.
 
-- [ ] T027 [US4] Wire the assembly into implement dispatch traces: `/speckit-implement-parallel` reads the approved `agents/assignment.md` roster and each dispatch trace carries `skills[]` + `elevated_grants[]`, `agent_id` = the base (FR-021/D43); a builder dispatch that searched records `elevated_grants: ["web_search"]` (D60). **Cross-extension seam** — implement-parallel is graphify-owned; couple via the roster **artifact** and keep the edit in graphify's **source** (D57 §9). (depends on T016, T017, T025)
+- [X] T027 [US4] Wire the assembly into implement dispatch traces: `/speckit-implement-parallel` reads the approved `agents/assignment.md` roster and each dispatch trace carries `skills[]` + `elevated_grants[]`, `agent_id` = the base (FR-021/D43); a builder dispatch that searched records `elevated_grants: ["web_search"]` (D60). **Cross-extension seam** — implement-parallel is graphify-owned; couple via the roster **artifact** and keep the edit in graphify's **source** (D57 §9). (depends on T016, T017, T025)
 - [ ] T028 [P] [US4] Author the committed **trace↔roster diff script** `extensions/workforce/test/trace-roster-diff.sh` — mechanically diffs each dispatch trace's `skills[]`/`elevated_grants[]` against its approved roster row (SC-008/S23, replaces human inspection). (depends on T027)
 
 **Checkpoint**: the loop is closed; the grant approval is auditable end-to-end.
@@ -100,8 +100,8 @@
 ## Phase 7: Polish & Cross-Cutting Concerns
 
 - [ ] T029 Author `extensions/workforce/test/run.sh` — the one harness (git-ext model, D57 S3): install → reinstall-survival → the deterministic-assembly golden test → validator unit checks → the committed per-SC tests. (aggregates T005, T013, T021, T026, T028)
-- [ ] T030 [P] **D62 deck-prep improvement (council own source, D57 S2)**: mine round-1's five member transcripts for which `plan.md` sections the readers pulled, then enrich the deck-prep template in `extensions/council/extension/templates/` so those high-demand sections ride in the technical deck by default; **reinstall council**. After-metric: `plan.md` read-rate at the next council run (target: majority of the bench trusts the deck).
-- [ ] T031 [P] Author the workforce-extension docs — `extensions/workforce/README.md` + `extension/README.md` (packaging, the three commands, the D60 grant, the S02 seam).
+- [X] T030 [P] **D62 deck-prep improvement (council own source, D57 S2)**: mine round-1's five member transcripts for which `plan.md` sections the readers pulled, then enrich the deck-prep template in `extensions/council/extension/templates/` so those high-demand sections ride in the technical deck by default; **reinstall council**. After-metric: `plan.md` read-rate at the next council run (target: majority of the bench trusts the deck).
+- [X] T031 [P] Author the workforce-extension docs — `extensions/workforce/README.md` + `extension/README.md` (packaging, the three commands, the D60 grant, the S02 seam).
 - [ ] T032 Run `quickstart.md` scenarios S1–S12 and the **SC-009 dogfood exit** on `003` itself (`categorize → assign → workforce-gate → implement-parallel`). The M3 exit criterion. (depends on T029, T020, T027)
 
 ---

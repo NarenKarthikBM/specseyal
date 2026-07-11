@@ -18,12 +18,12 @@ The M3 **workforce pair** as **one** pipeline extension — the packaging echo o
 extensions/workforce/
 ├── install.sh · uninstall.sh          # copy source → .specify/extensions/workforce/ + .claude/skills/; seed the library additively (outside the rm -rf payload)
 ├── extension/
-│   ├── extension.yml                   # registers 3 commands + after_categorize/after_agent-assign/after_workforce_approve fire-points
+│   ├── extension.yml                   # registers 3 commands + after_categorize/after_agent-assign fire-points (after_workforce_approve is emitted by workforce-approve but registered+handled in git-ext's own extension.yml, S02)
 │   ├── workforce-config.yml            # general_cap · assembly_cap · model · seed manifest · skill_builder.web_search
 │   ├── commands/                       # speckit.categorize · speckit.agent-assign · speckit.workforce-approve
 │   ├── scripts/                        # frontmatter.py (shared) · assemble.py · validate-categorization.py · validate-skill.py
 │   └── templates/                      # categorizer-prompt · skill-builder-prompt · assignment.template · skill-module.template
-├── seed/agents/agt-*.md                # 7 curated base specialists (all model: sonnet)
+├── seed/agents/agt_*.md                # 7 curated base specialists (all model: sonnet)
 ├── seed/skills/*/SKILL.md              # 5 seed skill modules (all grants: [])
 ├── skills/                             # the Claude Code skill wrappers for the 3 commands
 └── test/run.sh                         # install → reinstall-survival → deterministic-assembly golden → validators → per-SC tests
