@@ -71,10 +71,15 @@ hooks:
     optional: false
     description: "commit impl(<id>): … — backstops the phase boundary (per-wave commits are called directly by implement-parallel, R1-S06)"
   after_council_approve:              # R1-S04/S09 — reinstall-surviving gate binding (no council-source edit)
-    command: speckit.git.record-gate  # hook-internal action: scripts/on-council-approve.sh (composes sha.sh + gates.sh); not a reusable primitive, so not in provides.commands
+    command: speckit.git.record-gate  # hook-internal action: scripts/on-gate-approve.sh council (composes sha.sh + gates.sh); not a reusable primitive, so not in provides.commands
     gate: council
     optional: false
     description: "Write plan.md @ <sha> into git-ext-owned gates.yml; ## Human Gate carries a one-line reference (FR-008). Signer-agnostic (FR-010): must also fire on an auto-written gate."
+  after_workforce_approve:            # S02/R8 (003-workforce) — reinstall-surviving gate binding (no workforce-source edit); generalized on-gate-approve.sh's sibling wiring to after_council_approve
+    command: speckit.git.record-gate  # hook-internal action: scripts/on-gate-approve.sh workforce (composes sha.sh + gates.sh); not a reusable primitive, so not in provides.commands
+    gate: workforce
+    optional: false
+    description: "Write tasks.md @ <sha> + assignment.md @ <sha> into git-ext-owned gates.yml; ## Workforce Gate carries a one-line reference (FR-008). Signer-agnostic (FR-010/W4): must also fire on an auto-written gate."
   before_tasks:                       # verify-gate inserted AHEAD of graphify by the installer (R1-S07)
     command: speckit.git.verify-gate
     gate: council
