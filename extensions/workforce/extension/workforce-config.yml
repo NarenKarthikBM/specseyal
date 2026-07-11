@@ -1,0 +1,94 @@
+# workforce-config.yml — policy for the speckit-ext-workforce extension.
+# Governs /speckit-categorize, /speckit-agent-assign, and /speckit-workforce-approve
+# (one config, S10 — replaces the drafted categorize-config.yml + agents-config.yml).
+# Keys/values transcribed from specs/003-workforce/contracts/commands.md
+# § "Config surface — workforce-config.yml" and plan.md § Seed Library.
+
+general_cap: 0.20
+# The FR-004 evidence floor (taxonomy-v0.md §4): count(general) must not
+# exceed 20% of a feature's tasks. validate-categorization.py enforces
+# this in code — over-cap ⇒ exit non-zero, categorization.md is NOT
+# written, the phase does not complete (FR-004/SC-002, asserted by
+# file-absence, S22). Not a style preference: it is a floor on evidence.
+
+assembly_cap: 3
+# The D40 injection cap (agent-library-schema.md §3): assemble.py injects
+# at most 3 skills onto a base. The force-injected `refactor-discipline`
+# (auto-injected whenever preserves_behavior: true, taxonomy-v0.md §2.3)
+# counts against this cap like any tag-ranked skill. Candidates trimmed
+# beyond the cap are logged, never silently discarded (FR-011/SC-004).
+
+model: sonnet
+# D18 role -> model policy. The categorizer, the skill builder, and every
+# seed base specialist run on Sonnet — the floor the D48 guard enforces
+# in code for `prompt`-tagged tasks (FR-014/SC-006). Global policy for
+# this extension; not a per-feature setting.
+
+taxonomy: docs/contracts/taxonomy-v0.md
+# The blessed enum (BLESSED, 2026-07-09): 8 types x 11 specializations
+# (`general` capped, above). validate-categorization.py treats every
+# field's domain as closed (SC-001) — an un-enumerable value FAILs the
+# phase; it is never invented here (taxonomy §8 change process instead).
+
+seed_library:
+  # The manifest install.sh reads to seed .claude/agents/ + .claude/skills/
+  # additively (D17 per-repo library, outside any install rm -rf payload —
+  # S07). Bases are curated-static (D44); skills alone evolve (D24).
+  # Full rationale + dogfood evidence per entry: plan.md § Seed Library.
+  bases:
+    # 7 base specialists (.claude/agents/agt_*.md, all model: sonnet, no
+    # tags). `provisional: true` flags the two entries seeded from the
+    # taxonomy worked example only — not dogfood evidence (S11) — so the
+    # weaker basis is visible on the roster, never silent.
+    - id: agt_ai_agents
+      file: seed/agents/agt_ai_agents.md
+      specialization: ai-agents
+    - id: agt_devtools_cli
+      file: seed/agents/agt_devtools_cli.md
+      specialization: devtools-cli
+    - id: agt_security
+      file: seed/agents/agt_security.md
+      specialization: security
+    - id: agt_qa_automation
+      file: seed/agents/agt_qa_automation.md
+      specialization: qa-automation
+    - id: agt_backend_service
+      file: seed/agents/agt_backend_service.md
+      specialization: backend-service
+      provisional: true
+    - id: agt_data_persistence
+      file: seed/agents/agt_data_persistence.md
+      specialization: data-persistence
+      provisional: true
+    - id: agt_generic
+      file: seed/agents/agt_generic.md
+      specialization: general
+  skills:
+    # 5 seed skills (.claude/skills/<name>/SKILL.md). Every seed skill
+    # declares grants: [] (D41) — the sole elevated grant anywhere in the
+    # system is the skill builder's own web_search (D60, below), never a
+    # seed default.
+    - id: skl_refactor_discipline
+      file: seed/skills/refactor-discipline/SKILL.md
+    - id: skl_orchestration
+      file: seed/skills/orchestration/SKILL.md
+    - id: skl_shell_scripting
+      file: seed/skills/shell-scripting/SKILL.md
+    - id: skl_yaml_hooks
+      file: seed/skills/yaml-hooks/SKILL.md
+    - id: skl_installer_hygiene
+      file: seed/skills/installer-hygiene/SKILL.md
+
+skill_builder:
+  web_search: true
+  # D60 — the system's FIRST elevated grant (owner ruling, R1-S20). Declared
+  # in the skill builder's own skill-module frontmatter (grants: [web_search],
+  # per A-2) — never an ambient role-level default; it reaches a dispatch
+  # only via that declaration. Surfaces on every roster whose assembly
+  # includes the builder path (003's own workforce gate is the first human
+  # approval of it), and is recorded on the dispatch trace as
+  # elevated_grants: ["web_search"] when the builder actually searched
+  # (D43). A builder that authors a module without searching stamps
+  # provenance.stale_risk: true instead (S17) — the honest complement to
+  # granting search. Every seed skill above is grants: []; this is the
+  # one, deliberate exception.
