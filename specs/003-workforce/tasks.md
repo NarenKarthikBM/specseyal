@@ -17,7 +17,7 @@
 
 **Purpose**: Stand up the single `extensions/workforce/` tree (the `extensions/<name>/` sibling pattern, mirroring `extensions/council/`).
 
-- [ ] T001 Scaffold the `extensions/workforce/` source tree: `extension/{commands,scripts,templates}/`, `seed/{agents,skills}/`, `skills/`, `test/`, and the top-level `README.md` placeholder. Per plan § Project Structure.
+- [X] T001 Scaffold the `extensions/workforce/` source tree: `extension/{commands,scripts,templates}/`, `seed/{agents,skills}/`, `skills/`, `test/`, and the top-level `README.md` placeholder. Per plan § Project Structure.
 - [ ] T002 [P] Author `extensions/workforce/extension/extension.yml` — registers the **3 commands** (`speckit.categorize`, `speckit.agent-assign`, `speckit.workforce-approve`) and declares the `after_categorize` / `after_agent-assign` / `after_workforce_approve` **fire-points** dispatched by the installed registry (S25).
 - [ ] T003 [P] Author `extensions/workforce/extension/workforce-config.yml` — `general_cap: 0.20`, `assembly_cap: 3`, `model: sonnet`, `taxonomy: docs/contracts/taxonomy-v0.md`, the `seed_library` manifest (7 bases + 5 skills), and **`skill_builder.web_search: true`** (D60 — the first elevated grant).
 
