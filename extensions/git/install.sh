@@ -5,13 +5,13 @@
 # repo already initialized with GitHub spec-kit (`specify init`). Mechanical git, zero AI.
 #
 # Packaging = council's (payload + skills copy) PLUS graphify's hook-merge variant, but with
-# git's richer registry merge: 9 hooks across 3 shapes — 7 new keys (after_specify/clarify/
-# plan/analyze/tasks/implement + after_council_approve) and 2 APPEND targets (before_tasks/
-# before_implement) where git's verify-gate MUST run AHEAD of graphify (R1-S07). Ordering is
-# implemented by sorting each hook list on `priority` (verify-gate=1 < graphify=5), so the
-# `priority` field is LIVE, not a zombie schema (R1-S07). Append-only: graphify's entries are
-# never overwritten. Idempotent. The hook set is READ from git's own extension.yml manifest
-# (single source of truth), never hardcoded here.
+# git's richer registry merge: 10 hooks across 3 shapes — 8 new keys (after_specify/clarify/
+# plan/analyze/tasks/implement + after_council_approve/after_workforce_approve) and 2 APPEND
+# targets (before_tasks/before_implement) where git's verify-gate MUST run AHEAD of graphify
+# (R1-S07). Ordering is implemented by sorting each hook list on `priority` (verify-gate=1 <
+# graphify=5), so the `priority` field is LIVE, not a zombie schema (R1-S07). Append-only:
+# graphify's entries are never overwritten. Idempotent. The hook set is READ from git's own
+# extension.yml manifest (single source of truth), never hardcoded here.
 #
 # Usage:  ./install.sh [TARGET_REPO]      (default: current directory)
 #
@@ -168,6 +168,7 @@ print_manual_block() {
       after_tasks:     [ {extension: git, command: speckit.git.commit,      optional: false, phase: tasks,   priority: 5} ]
       after_implement: [ {extension: git, command: speckit.git.commit,      optional: false, phase: impl,    priority: 5} ]
       after_council_approve: [ {extension: git, command: speckit.git.record-gate, optional: false, gate: council, priority: 5} ]
+      after_workforce_approve: [ {extension: git, command: speckit.git.record-gate, optional: false, gate: workforce, priority: 5} ]
       before_tasks:     # verify-gate FIRST (priority 1), then graphify's existing row (priority 5)
         - {extension: git, command: speckit.git.verify-gate, optional: false, gate: council,   priority: 1}
       before_implement:

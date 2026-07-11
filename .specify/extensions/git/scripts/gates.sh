@@ -13,7 +13,7 @@
 #
 # Bindings recorded (contracts/commands.md):
 #   council   -> plan.md @ <sha>
-#   workforce -> tasks.md @ <sha>, assignment.md @ <sha>
+#   workforce -> tasks.md @ <sha>, agents/assignment.md @ <sha>
 #
 # <sha> is never computed here — every SHA comes from the sibling
 # `speckit.git.sha` primitive (./sha.sh), composed as a subprocess, so
@@ -26,7 +26,7 @@
 #     plan.md: <sha>
 #   workforce:
 #     tasks.md: <sha>
-#     assignment.md: <sha>
+#     agents/assignment.md: <sha>
 #
 # The `version` field exists so a consumer (verify-gate.sh, a later
 # task) can fail closed on a format it can't parse rather than fail
@@ -42,7 +42,7 @@
 # Usage:
 #   gates.sh write <council|workforce> [artifact...]
 #       Record a binding for <gate>: for each artifact (default —
-#       council: plan.md; workforce: tasks.md assignment.md — override
+#       council: plan.md; workforce: tasks.md agents/assignment.md — override
 #       by passing an explicit list), resolve specs/<spec-id>/<artifact>
 #       via sha.sh and (re)write that gate's block in gates.yml,
 #       replacing it wholesale (idempotent — re-recording a gate
@@ -187,13 +187,13 @@ sha_script="$script_dir/sha.sh"
 cmd_write() {
     # "$@" = optional explicit artifact list; falls back to the per-gate
     # default (contracts/commands.md: council -> plan.md; workforce ->
-    # tasks.md + assignment.md) when none is given.
+    # tasks.md + agents/assignment.md) when none is given.
     if [ "$#" -gt 0 ]; then
         artifact_list="$*"
     else
         case "$gate" in
             council)   artifact_list="plan.md" ;;
-            workforce) artifact_list="tasks.md assignment.md" ;;
+            workforce) artifact_list="tasks.md agents/assignment.md" ;;
         esac
     fi
 

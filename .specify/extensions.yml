@@ -125,3 +125,15 @@ hooks:
       on an auto-written gate.'
     condition: null
     gate: council
+  after_workforce_approve:
+  - extension: git
+    command: speckit.git.record-gate
+    enabled: true
+    optional: false
+    priority: 5
+    prompt: null
+    description: 'Write tasks.md @ <sha> + assignment.md @ <sha> into git-ext-owned
+      gates.yml; ## Workforce Gate carries a one-line reference (FR-008). Signer-agnostic
+      (FR-010/W4): must also fire on an auto-written gate.'
+    condition: null
+    gate: workforce
