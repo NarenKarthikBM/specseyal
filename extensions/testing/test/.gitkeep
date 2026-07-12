@@ -1,0 +1,4 @@
+# Placeholder so this directory tracks in git ahead of T016, which adds
+# run.sh — the testing extension's harness (contract validation of two
+# completion-report goldens + one testing.md golden, plus the install/
+# uninstall round-trip). Safe to delete once real content lands.

@@ -24,3 +24,6 @@ T008 reports both survival regressions green** (SC-010 provisioning).
 
 ## Wave loop (the testing-extension build)
 
+- `2026-07-12T20:33Z` | Wave 1 gate re-verify | `verify-gate workforce` on pristine tasks.md @ 9601bcd → **exit 0, silent** (exact-match fast path — the fix leaves the clean case unperturbed; correctly NO audit line yet).
+- `2026-07-12T20:49Z` | wave 1 | tasks: T001 | agents: 1 | outcome: success — scaffolded `extensions/testing/` (install.sh + uninstall.sh + README + extension/ & test/ tree roots; agt_devtools_cli). Ledger: marked **T001 [X]** and folded in the pre-flight **T003–T008 [X]** (7 forward checkbox advances now committed) — this is the first `[X]`-marking event, so the NEXT gate check (Wave 2) is the first to face a drifted tasks.md.
+
