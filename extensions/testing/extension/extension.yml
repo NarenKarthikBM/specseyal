@@ -1,0 +1,41 @@
+schema_version: "1.0"
+
+extension:
+  id: testing
+  name: "Completion & Doc-Only Testing"
+  version: "1.0.0"
+  description: "The 4th pipeline extension, closing out a run: the `complete` phase (main-thread /speckit-complete, no new model role — FR-001) authors completion-report.md in its finalized, contract-validated format (frontmatter status ∈ {success, partial, failed} + fixed core sections) that IS the future D19 phase.completed artifact.body, no reshaping; the doc-only `testing` phase (/speckit-testing) dispatches one Sonnet `tester` subagent (D18) that maps every spec.md Success Criterion and Functional Requirement to a verification approach in testing.md — `executed: none` always, since running tests is testing-agent v2 (out of scope, FR-009)."
+  author: narenkarthikbm
+  license: MIT
+
+requires:
+  speckit_version: ">=0.2.0"
+
+provides:
+  commands:
+    - name: speckit.complete
+      file: commands/speckit.complete.md
+      description: "Main-thread command, no new model role (FR-001) — re-reads tasks.md + implement.log.md from disk on every invocation and authors completion-report.md, the sole artifact out (a malformed/absent report leaves `complete` incomplete); the finalized format IS the future D19 phase.completed artifact.body, no reshaping (FR-005)"
+    - name: speckit.testing
+      file: commands/speckit.testing.md
+      description: "Dispatches exactly one Sonnet `tester` subagent — the separate session (context-in = completion-report.md + spec.md only, FR-006) — that maps every spec.md Success Criterion and Functional Requirement to a verification approach and writes testing.md, the sole artifact out; `executed: none` always, doc-only, no test runs (FR-009); returns status-only to main (FR-011)"
+
+# ── Hooks ────────────────────────────────────────────────────────────────────
+# Deliberately NO `hooks:` key on this manifest (mirrors council/extension.yml,
+# which likewise declares none). The complete(<id>) / testing(<id>) phase-tagged
+# commits are git-ext's OWN `after_complete` / `after_testing` hooks, registered
+# in extensions/git/extension/extension.yml — owned-source there, never here
+# (D57 §9 / artifact-layout.md §9 "Cross-extension seams"; the 002 seam pattern:
+# contracts/commands.md "Git-ext hooks added"). This extension provides the two
+# command BOUNDARIES those hooks fire on (speckit.complete / speckit.testing
+# above); it does not itself declare or own any hook row, and none should be
+# added here to attach the commit — that would duplicate the seam. install.sh
+# still runs the standard manifest-driven hook merge against whatever this key
+# holds (none today), so a genuinely testing-ext-owned hook, if one is ever
+# needed, would register with zero installer changes.
+
+tags:
+  - "testing"
+  - "completion"
+  - "coverage"
+  - "doc-only"

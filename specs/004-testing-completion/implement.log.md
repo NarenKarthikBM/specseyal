@@ -25,5 +25,15 @@ T008 reports both survival regressions green** (SC-010 provisioning).
 ## Wave loop (the testing-extension build)
 
 - `2026-07-12T20:33Z` | Wave 1 gate re-verify | `verify-gate workforce` on pristine tasks.md @ 9601bcd → **exit 0, silent** (exact-match fast path — the fix leaves the clean case unperturbed; correctly NO audit line yet).
-- `2026-07-12T20:49Z` | wave 1 | tasks: T001 | agents: 1 | outcome: success — scaffolded `extensions/testing/` (install.sh + uninstall.sh + README + extension/ & test/ tree roots; agt_devtools_cli). Ledger: marked **T001 [X]** and folded in the pre-flight **T003–T008 [X]** (7 forward checkbox advances now committed) — this is the first `[X]`-marking event, so the NEXT gate check (Wave 2) is the first to face a drifted tasks.md.
+- `2026-07-12T20:49Z` | wave 1 | tasks: T001 | agents: 1 | outcome: success — scaffolded `extensions/testing/` (install.sh + uninstall.sh + README + extension/ & test/ tree roots; agt_devtools_cli). Ledger: marked **T001 [X]** and folded in the pre-flight **T003–T008 [X]** (7 forward checkbox advances now committed) — this is the first `[X]`-marking event, so the NEXT gate check (Wave 2) is the first to face a drifted tasks.md. Wave 1 commit `6ebc0c5`.
+
+### 🎯 SC-010 — the zero-hand-assistance moment (durable evidence)
+
+- `2026-07-12T20:51Z` | **Wave 2 gate re-verify** | tasks.md committed SHA `6ebc0c5` **≠** bound `9601bcd` → the strict SHA check would BLOCK. The installed (post-fix) `verify-gate workforce` instead **PASSED, exit 0, unassisted**, via the checkbox-delta branch. The S09 durable audit line (verbatim):
+
+  > `verify-gate.sh: workforce gate PASS via checkbox-delta — tasks.md: 7 forward GFM checkbox advance(s) since approved SHA 9601bcdb44433957e55651008cbe2c297985d9dd, no other change (R1-S09)`
+
+  This is SC-010's zero-hand claim becoming true on M4's own run: a wave-2+ freshness check clearing a drifted (but checkbox-only) tasks.md with no human re-gate, leaving independently-auditable evidence (the audit line distinguishes the fix from a human workaround). The refuse-then-release pair is now closed end to end: **REFUSE** (pre-flight, Wave 1 blocked until T008) → **RELEASE** (T008 green) → **PASS-unassisted** (this line). Every subsequent wave's gate check re-exercises the same branch.
+
+- `2026-07-12T20:55Z` | wave 2 | tasks: T002 | agents: 1 | outcome: success — testing-ext manifest (`extension.yml`: provides.commands speckit.complete + speckit.testing, no hooks — D57 §9) + `testing-config.yml` (tester.model: sonnet D18, executed: none guard); agt_devtools_cli. Gate check (pre-dispatch) had passed via checkbox-delta (7 advances, audit line above). T002 [X].
 

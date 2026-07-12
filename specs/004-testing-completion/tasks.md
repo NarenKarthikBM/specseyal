@@ -23,7 +23,7 @@ description: "Dependency-ordered tasks for 004-testing-completion (graph-verifie
 **Purpose**: scaffold the 4th pipeline extension. Serial barrier.
 
 - [X] T001 Scaffold `extensions/testing/` — the 4th pipeline extension tree + `install.sh` + `uninstall.sh` + `README.md`, mirroring graphify/council/workforce packaging (install: extension tree → `.specify/extensions/testing/`, skills → `.claude/skills/`, hook rows merged into `.specify/extensions.yml`; uninstall: deregister-first, byte-identical round-trip — the 002 FR-014 pattern).
-- [ ] T002 Author `extensions/testing/extension/extension.yml` (`provides.commands: speckit.complete, speckit.testing`) + `extensions/testing/extension/testing-config.yml` (`tester.model: sonnet` [D18], doc-only guard `executed: none`). (depends on T001)
+- [X] T002 Author `extensions/testing/extension/extension.yml` (`provides.commands: speckit.complete, speckit.testing`) + `extensions/testing/extension/testing-config.yml` (`tester.model: sonnet` [D18], doc-only guard `executed: none`). (depends on T001)
 
 **Checkpoint**: the extension shell exists and declares its two commands.
 
