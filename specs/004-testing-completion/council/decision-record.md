@@ -53,6 +53,22 @@
 
 ---
 
+## Human Gate — 2026-07-12T17:43:52Z
+
+| Field | Value |
+|---|---|
+| reviewer | Naren Karthik B M |
+| decision | `approved` |
+| reviewed | `defense-deck/overview.md`, `round-1/suggestions.md`, this record |
+
+**Notes:** none.
+
+**Overrides:** none.
+
+**Binding:** plan↔SHA binding recorded at `specs/004-testing-completion/gates.yml` (git-ext-owned; FR-008/D55).
+
+---
+
 ## Carried Constraints
 
 > `/speckit-tasks` reads this section and nothing else from this file. One bullet per accepted suggestion — the constraints tasks.md must honor.
