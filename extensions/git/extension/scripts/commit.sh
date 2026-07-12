@@ -11,7 +11,7 @@
 #   commit.sh <phase> <summary> [extra-path...]
 #
 #   <phase>       one of: spec plan council gate tasks categorize analyze
-#                 agents impl complete (data-model.md #PhaseCommit).
+#                 agents impl complete testing (data-model.md #PhaseCommit).
 #   <summary>     short human-readable description. If <phase> is "impl"
 #                 and <summary> begins with "wave " (e.g. "wave 2/5: ..."),
 #                 the WaveCommit grammar is used instead of PhaseCommit
@@ -87,8 +87,8 @@ shift 2
 # untouched until the pathspec build below.
 
 case "$phase" in
-    spec|plan|council|gate|tasks|categorize|analyze|agents|impl|complete) ;;
-    *) die "phase '$phase' is not one of: spec plan council gate tasks categorize analyze agents impl complete" ;;
+    spec|plan|council|gate|tasks|categorize|analyze|agents|impl|complete|testing) ;;
+    *) die "phase '$phase' is not one of: spec plan council gate tasks categorize analyze agents impl complete testing" ;;
 esac
 
 [ -n "$summary" ] || die "<summary> must not be empty"

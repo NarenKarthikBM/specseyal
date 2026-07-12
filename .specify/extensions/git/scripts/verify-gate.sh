@@ -31,6 +31,29 @@
 #      exists to close — this check is not optional or best-effort, and it
 #      always runs in addition to (never instead of) check 1.
 #
+# EXCEPTION — checkbox-delta admissible staleness (I-17), scoped
+# EXCLUSIVELY to gate=workforce, artifact=tasks.md: in place of checks 1
+# and 2 above, this one binding is classified by content-diffing the
+# recorded <sha> straight against the current working tree
+# (`git diff <sha> -- specs/<spec-id>/tasks.md`, not sha.sh, not
+# `--quiet`). An empty diff is fresh (byte-identical to what was
+# approved). A non-empty diff is STILL fresh iff every changed line is a
+# pure forward GFM checkbox advance — "- [ ]..." becoming "- [x]..." or
+# "- [X]...", with the line otherwise byte-identical — because this is
+# exactly what /speckit-implement-parallel does to tasks.md wave over
+# wave, and SC-010 ("zero hand assistance") requires that not to
+# hard-block the next wave. This is still fail-closed, not a general
+# exemption: an unreachable <sha>, an unpaired insertion/deletion, an
+# edited task line, or — load-bearing, not incidental (R1-S14/S18) — a
+# REVERSE flip ("[x]"/"[X]" back to "[ ]") all still block exactly like a
+# SHA-mismatch or dirty tree would elsewhere in this script. Unlike an
+# ordinary fresh artifact, a PASS through this branch is not silent: it
+# emits one greppable line to stderr (R1-S09) naming the artifact, the
+# gate, and the forward-advance count, while still exiting 0. Every OTHER
+# binding — agents/assignment.md under workforce, and everything under
+# council/plan.md — is untouched by this and still governed solely by
+# checks 1 and 2.
+#
 # Fail-closed, never fail-open — this script never guesses its way to
 # exit 0. Treated as stale (block), specifically citing R1-S10 where the
 # source docs do:
@@ -53,7 +76,11 @@
 # or writes gates.yml directly, matching gates.yml's sole-owner ruling,
 # R1-S09/S20) and sha.sh (to resolve a current SHA — this script never
 # computes a SHA itself), plus plain read-only `git diff --quiet` calls for
-# the working-tree check. No git state is ever changed by this script.
+# the working-tree check and, for the workforce/tasks.md checkbox-delta
+# exception above, a plain read-only `git diff <sha> -- <path>` content
+# diff. No git state is ever changed by this script — checkbox-delta
+# classification only ever READS the diff; it never runs `git apply`,
+# `git add`, `git commit`, or anything else that writes.
 #
 # Spec ID resolution (D45 — .specify/feature.json is the sole spec-ID
 # resolver, same as every other script in this extension): basename of
@@ -67,7 +94,10 @@
 # otherwise, with a human-readable line on stderr per stale/unverifiable
 # artifact naming it and why (SHA mismatch vs. dirty tree vs. missing/
 # malformed binding vs. unreadable gates.yml). Silent on stdout and stderr
-# when fresh (exit 0) — the exit code IS the contract on the happy path.
+# when fresh (exit 0) — the exit code IS the contract on the happy path —
+# with exactly one exception: a workforce/tasks.md checkbox-delta PASS
+# (see above) is exit 0 but still emits its one audit line to stderr by
+# design (R1-S09).
 
 set -eu
 
@@ -197,6 +227,22 @@ $1"
     fi
 }
 
+# count_lines <text> — POSIX-safe line count of a newline-joined string, 0
+# for an empty string. Deliberately NOT implemented as a bare `grep -c`:
+# under `set -e`, `x=$(... | grep -c pattern)` aborts the script the
+# instant grep finds zero matches (grep's own exit status for "no match"
+# still counts as a failing command for errexit purposes) — the same trap
+# this script elsewhere avoids by wrapping SHA/diff lookups in an `if`.
+# Guarding the zero-line case first means `grep -c` is only ever invoked
+# once we already know it must find at least one line.
+count_lines() {
+    if [ -z "$1" ]; then
+        printf '0'
+    else
+        printf '%s\n' "$1" | grep -c ''
+    fi
+}
+
 for line in "$@"; do
     [ -n "$line" ] || continue
     checked_count=$((checked_count + 1))
@@ -218,6 +264,120 @@ for line in "$@"; do
     fi
 
     artifact_path="specs/$spec_id/$artifact"
+
+    # -----------------------------------------------------------------
+    # Checkbox-delta admissible-staleness branch (I-17), scoped
+    # EXCLUSIVELY to gate=workforce, artifact=tasks.md — see the header
+    # comment's "EXCEPTION" paragraph for the full rationale. Every
+    # other binding (agents/assignment.md under workforce; anything
+    # under council/plan.md) falls through untouched to the strict
+    # checks 1 and 2 below — this guard condition is the only thing
+    # that ever routes into this branch.
+    #
+    # DIRECTION ASYMMETRY IS LOAD-BEARING (R1-S14/S18) — do not
+    # "simplify" this away: a forward flip "- [ ]..." -> "- [x]..."/
+    # "- [X]..." must PASS; the reverse, "- [x]..."/"- [X]..." back to
+    # "- [ ]...", must BLOCK. A canonicalized-checkbox-hash comparison
+    # (which would treat both directions identically) was proposed and
+    # REJECTED by council for exactly this reason (R1-S18) — it is
+    # direction-blind, and direction is the entire point.
+    # -----------------------------------------------------------------
+    if [ "$gate" = "workforce" ] && [ "$artifact" = "tasks.md" ]; then
+        if delta=$(git diff "$recorded_sha" -- "$artifact_path" 2>/dev/null); then
+            :
+        else
+            mark_stale "$artifact: could not diff recorded SHA ($recorded_sha) against the working tree for checkbox-delta classification — treating as stale (fail-closed)"
+            continue
+        fi
+
+        if [ -z "$delta" ]; then
+            # Byte-identical to the approved content — fresh. Silent:
+            # no report entry, no audit line (silence is the contract
+            # on the exact-match fast path, same as any other fresh
+            # artifact).
+            continue
+        fi
+
+        # A trailing-newline change is never a checkbox advance —
+        # fail-closed regardless of what the rest of the diff looks
+        # like.
+        if printf '%s\n' "$delta" | grep -qF '\ No newline at end of file'; then
+            mark_stale "$artifact: working tree differs from approved SHA ($recorded_sha) by a trailing-newline change — not a pure checkbox advance, blocked (fail-closed)"
+            continue
+        fi
+
+        # Only start collecting +/- body lines AFTER the first hunk
+        # header ("@@ ... @@") has been seen, so the "--- a/..." /
+        # "+++ b/..." file-header lines (which also start with '-'/'+')
+        # can never be misread as removed/added content.
+        body=$(printf '%s\n' "$delta" | sed -n '/^@@/,$p')
+
+        removed_lines=$(printf '%s\n' "$body" | grep '^-' | cut -c2-)
+        added_lines=$(printf '%s\n' "$body" | grep '^+' | cut -c2-)
+
+        removed_count=$(count_lines "$removed_lines")
+        added_count=$(count_lines "$added_lines")
+
+        if [ "$removed_count" -ne "$added_count" ]; then
+            mark_stale "$artifact: working tree differs from approved SHA ($recorded_sha) by an unpaired insertion/deletion ($removed_count removed line(s) vs. $added_count added line(s)) — not a pure 1:1 checkbox advance, blocked (fail-closed, R1-S04)"
+            continue
+        fi
+
+        if [ "$removed_count" -eq 0 ]; then
+            mark_stale "$artifact: working tree differs from approved SHA ($recorded_sha) but the diff has no +/- body lines to classify — blocked (fail-closed)"
+            continue
+        fi
+
+        # Pair removed[i] with added[i] in order; every pair must be a
+        # pure forward GFM checkbox advance with prefix and suffix
+        # byte-identical — the box character is the ONLY thing allowed
+        # to change.
+        checkbox_ok=1
+        i=1
+        while [ "$i" -le "$removed_count" ]; do
+            rline=$(printf '%s\n' "$removed_lines" | sed -n "${i}p")
+            aline=$(printf '%s\n' "$added_lines" | sed -n "${i}p")
+
+            # removed MUST be an UNCHECKED box ("- [ ]<suffix>") — this
+            # is the half of the asymmetry that blocks a reverse flip:
+            # a removed "- [x]<suffix>"/"- [X]<suffix>" fails this
+            # match outright and falls straight to checkbox_ok=0 below.
+            rprefix=$(printf '%s\n' "$rline" | sed -nE 's/^([[:space:]]*- )\[ \](.*)$/\1/p')
+            if [ -z "$rprefix" ]; then
+                checkbox_ok=0
+                break
+            fi
+            rsuffix=$(printf '%s\n' "$rline" | sed -nE 's/^([[:space:]]*- )\[ \](.*)$/\2/p')
+
+            # added MUST be the CHECKED box ("- [x]<suffix>"/
+            # "- [X]<suffix>").
+            aprefix=$(printf '%s\n' "$aline" | sed -nE 's/^([[:space:]]*- )\[[xX]\](.*)$/\1/p')
+            if [ -z "$aprefix" ]; then
+                checkbox_ok=0
+                break
+            fi
+            asuffix=$(printf '%s\n' "$aline" | sed -nE 's/^([[:space:]]*- )\[[xX]\](.*)$/\2/p')
+
+            if [ "$rprefix" != "$aprefix" ] || [ "$rsuffix" != "$asuffix" ]; then
+                checkbox_ok=0
+                break
+            fi
+
+            i=$((i + 1))
+        done
+
+        if [ "$checkbox_ok" -eq 0 ]; then
+            mark_stale "$artifact: working tree differs from approved SHA ($recorded_sha) by a change that is not a pure forward GFM checkbox advance (an edited task line, a reversed [x]/[X]->[ ] flip, or a non-checkbox line) — blocked (fail-closed, R1-S14/S18)"
+            continue
+        fi
+
+        # Every pair was a pure forward advance: still fresh, but this
+        # PASS is not silent like an ordinary fresh artifact — emit the
+        # durable, greppable audit line (R1-S09) that is SC-010's
+        # independently-auditable evidence a wave passed unassisted.
+        printf 'verify-gate.sh: workforce gate PASS via checkbox-delta — tasks.md: %s forward GFM checkbox advance(s) since approved SHA %s, no other change (R1-S09)\n' "$removed_count" "$recorded_sha" >&2
+        continue
+    fi
 
     # 1. Current committed SHA vs. recorded SHA (sha.sh is the sole SHA
     #    authority — see header; this script never computes one itself).

@@ -70,6 +70,16 @@ hooks:
     phase: impl
     optional: false
     description: "commit impl(<id>): … — backstops the phase boundary (per-wave commits are called directly by implement-parallel, R1-S06)"
+  after_complete:                     # FR-012 — the completion-report boundary; the M5 after_complete push hook attaches here (R1-S17)
+    command: speckit.git.commit
+    phase: complete
+    optional: false
+    description: "commit complete(<id>): … — an errored/empty invocation halts the phase, no silent no-op (R1-S07)"
+  after_testing:                      # FR-013 — the doc-only testing-phase boundary
+    command: speckit.git.commit
+    phase: testing
+    optional: false
+    description: "commit testing(<id>): … — an errored/empty invocation halts the phase, no silent no-op (R1-S07)"
   after_council_approve:              # R1-S04/S09 — reinstall-surviving gate binding (no council-source edit)
     command: speckit.git.record-gate  # hook-internal action: scripts/on-gate-approve.sh council (composes sha.sh + gates.sh); not a reusable primitive, so not in provides.commands
     gate: council

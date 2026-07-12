@@ -158,3 +158,25 @@ hooks:
     description: "commit agents(<id>): \u2026"
     condition: null
     phase: agents
+  after_complete:
+  - extension: git
+    command: speckit.git.commit
+    enabled: true
+    optional: false
+    priority: 5
+    prompt: null
+    description: "commit complete(<id>): \u2026 \u2014 an errored/empty invocation\
+      \ halts the phase, no silent no-op (R1-S07)"
+    condition: null
+    phase: complete
+  after_testing:
+  - extension: git
+    command: speckit.git.commit
+    enabled: true
+    optional: false
+    priority: 5
+    prompt: null
+    description: "commit testing(<id>): \u2026 \u2014 an errored/empty invocation\
+      \ halts the phase, no silent no-op (R1-S07)"
+    condition: null
+    phase: testing

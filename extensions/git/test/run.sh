@@ -186,5 +186,368 @@ if grep -q 'after_specify' "$SPECIFY_SKILL" 2>/dev/null; then ok "ratified after
 if grep -q 'after_specify' "$GCTX" 2>/dev/null; then ok "ratified after_specify marker present in graphify-context"; else bad "ratified marker missing from graphify-context"; fi
 
 # ---------------------------------------------------------------------------
+bold "6. I-17 checkbox-delta survival regression (FR-015)"
+# Regresses the checkbox-delta admissible-staleness branch verify-gate.sh
+# grew for gate=workforce, artifact=tasks.md ONLY (I-17 — see that script's
+# own header "EXCEPTION" paragraph) by invoking the INSTALLED copy the way
+# a real before_implement hook would, never the source tree directly — so
+# this doubles as the FR-015/R1-S15 survival property: after a git-ext
+# reinstall (the fix lives in extensions/git/extension/scripts/
+# verify-gate.sh, redeployed wholesale by install.sh's rm -rf + cp -R) and
+# after an unrelated foreign extension's reinstall, the same forward-flip
+# PASS and reverse-flip BLOCK must still hold. agents/assignment.md and
+# the council/plan.md binding are deliberately OUT of this branch's scope
+# and keep the pre-I-17 strict SHA+dirty-tree check — case 6g is the
+# regression proving that boundary holds (the tolerance must not leak).
+
+W6="$TMP/cbdelta"; W6_SPEC="092-checkbox-delta"
+mk_repo "$W6" "$W6_SPEC"
+mkdir -p "$W6/.claude/skills"   # defensive, mirrors §3 before any install
+
+W6_SPEC_DIR="$W6/specs/$W6_SPEC"
+W6_TASKS="$W6_SPEC_DIR/tasks.md";              W6_TASKS_REL="specs/$W6_SPEC/tasks.md"
+W6_ASSIGN_DIR="$W6_SPEC_DIR/agents"
+W6_ASSIGN="$W6_ASSIGN_DIR/assignment.md";      W6_ASSIGN_REL="specs/$W6_SPEC/agents/assignment.md"
+W6_PLAN="$W6_SPEC_DIR/plan.md";                W6_PLAN_REL="specs/$W6_SPEC/plan.md"
+W6_GATES="$W6_SPEC_DIR/gates.yml"
+VG="$W6/.specify/extensions/git/scripts/verify-gate.sh"
+
+# ---- fixture-content generators — each does a full rewrite of $W6_TASKS
+# rather than an in-place sed edit: under set -eu a full rewrite makes
+# every case's diff-against-HEAD obvious straight off its printf block,
+# with nothing left over from a previous case to account for. ------------
+w6_write_base() {
+  printf '%s\n' \
+    '# Tasks' \
+    '' \
+    '- [ ] T001 implement widget loader' \
+    '- [ ] T002 wire up the thing' \
+    '  - [ ] T002a sub-item for T002' \
+    'This is prose, not a task line.' \
+    > "$W6_TASKS"
+}
+w6_write_t001_checked() {                     # case 6a AND the 6f "approved" commit
+  printf '%s\n' \
+    '# Tasks' \
+    '' \
+    '- [X] T001 implement widget loader' \
+    '- [ ] T002 wire up the thing' \
+    '  - [ ] T002a sub-item for T002' \
+    'This is prose, not a task line.' \
+    > "$W6_TASKS"
+}
+w6_write_t002_and_t002a_checked() {            # case 6b — 2 flips, one indented, one lowercase
+  printf '%s\n' \
+    '# Tasks' \
+    '' \
+    '- [ ] T001 implement widget loader' \
+    '- [X] T002 wire up the thing' \
+    '  - [x] T002a sub-item for T002' \
+    'This is prose, not a task line.' \
+    > "$W6_TASKS"
+}
+w6_write_edited_text() {                       # case 6c — flip + reworded task
+  printf '%s\n' \
+    '# Tasks' \
+    '' \
+    '- [x] T001 implement the WIDGET loader (renamed)' \
+    '- [ ] T002 wire up the thing' \
+    '  - [ ] T002a sub-item for T002' \
+    'This is prose, not a task line.' \
+    > "$W6_TASKS"
+}
+w6_write_unpaired_insert() {                   # case 6d — flip + brand-new task line
+  printf '%s\n' \
+    '# Tasks' \
+    '' \
+    '- [X] T001 implement widget loader' \
+    '- [ ] T002 wire up the thing' \
+    '  - [ ] T002a sub-item for T002' \
+    'This is prose, not a task line.' \
+    '- [ ] T099 unexpectedly inserted task' \
+    > "$W6_TASKS"
+}
+w6_write_unpaired_delete() {                   # case 6e — whole task line removed
+  printf '%s\n' \
+    '# Tasks' \
+    '' \
+    '- [ ] T001 implement widget loader' \
+    '- [ ] T002 wire up the thing' \
+    'This is prose, not a task line.' \
+    > "$W6_TASKS"
+}
+w6_write_survival_fwd() {                      # post-6f baseline (T001 already [X]) + T002 flip
+  printf '%s\n' \
+    '# Tasks' \
+    '' \
+    '- [X] T001 implement widget loader' \
+    '- [x] T002 wire up the thing' \
+    '  - [ ] T002a sub-item for T002' \
+    'This is prose, not a task line.' \
+    > "$W6_TASKS"
+}
+
+w6_write_gates() {   # $1=tasks_sha $2=assign_sha $3=plan_sha
+  {
+    printf '# gates.yml -- test fixture GateSHABinding record (mirrors\n'
+    printf '# specs/004-testing-completion/gates.yml shape).\n'
+    printf 'version: 1\n'
+    printf 'council:\n'
+    printf '  plan.md: %s\n' "$3"
+    printf 'workforce:\n'
+    printf '  tasks.md: %s\n' "$1"
+    printf '  agents/assignment.md: %s\n' "$2"
+  } > "$W6_GATES"
+}
+
+# w6_run — invoke the INSTALLED verify-gate (never the source tree) for
+# gate=workforce from inside the fixture repo; sets w6_rc (exit code) and
+# w6_out (combined stdout+stderr, which is where the checkbox-delta audit
+# line and every block reason land). The "A && B || C" shape keeps the
+# assignment itself out of set -eu's errexit net (verify-gate legitimately
+# exits 1 on most of the cases below) without toggling set +e/-e globally.
+w6_run() {
+  w6_out=$( ( cd "$W6" && sh "$VG" workforce ) 2>&1 ) && w6_rc=0 || w6_rc=$?
+}
+w6_reset_tasks()  { ( cd "$W6" && git checkout -- "$W6_TASKS_REL" ) >/dev/null 2>&1; }
+w6_reset_assign() { ( cd "$W6" && git checkout -- "$W6_ASSIGN_REL" ) >/dev/null 2>&1; }
+
+w6_assert_pass() {   # $1 = label, $2 = optional additional required substring
+  if [ "$w6_rc" -eq 0 ]; then
+    case "$w6_out" in
+      *'PASS via checkbox-delta'*)
+        if [ -n "${2:-}" ]; then
+          case "$w6_out" in
+            *"$2"*) ok "$1 (audit: PASS via checkbox-delta, $2)" ;;
+            *)      bad "$1 — audit line present but missing '$2' — got: $w6_out" ;;
+          esac
+        else
+          ok "$1 (audit: PASS via checkbox-delta)"
+        fi
+        ;;
+      *) bad "$1 — exit 0 but no 'PASS via checkbox-delta' audit line (R1-S09) — got: $w6_out" ;;
+    esac
+  else
+    bad "$1 — expected exit 0 (PASS), got exit $w6_rc — $w6_out"
+  fi
+}
+w6_assert_block() {  # $1 = label, $2 = optional required substring in the block reason
+  if [ "$w6_rc" -ne 0 ]; then
+    if [ -n "${2:-}" ]; then
+      case "$w6_out" in
+        *"$2"*) ok "$1 (blocked, citing $2)" ;;
+        *)      bad "$1 — blocked but message did not cite '$2' — got: $w6_out" ;;
+      esac
+    else
+      ok "$1 (blocked as expected, exit $w6_rc)"
+    fi
+  else
+    bad "$1 — expected a BLOCK (non-zero exit), got exit 0 — $w6_out"
+  fi
+}
+
+# ---- fixture: base commit — three unchecked GFM task lines (one an
+# indented sub-item) + one prose line, plus agents/assignment.md and
+# plan.md so the workforce AND council bindings both resolve to real
+# committed SHAs. -----------------------------------------------------
+w6_write_base
+mkdir -p "$W6_ASSIGN_DIR"
+printf '# assignment\n\nroster placeholder.\n' > "$W6_ASSIGN"
+printf '# plan\n' > "$W6_PLAN"
+( cd "$W6" && git add -A && git commit -qm 'w6 artifacts' )
+
+W6_TASKS_SHA1=$( cd "$W6" && git log -1 --format=%H -- "$W6_TASKS_REL" )
+W6_ASSIGN_SHA1=$( cd "$W6" && git log -1 --format=%H -- "$W6_ASSIGN_REL" )
+W6_PLAN_SHA1=$( cd "$W6" && git log -1 --format=%H -- "$W6_PLAN_REL" )
+
+# ---- install git-ext, then bind the workforce gate straight to the SHAs
+# above — exactly what the real sha.sh prints for these paths (verified
+# independently in §1/§4). ------------------------------------------------
+sh "$GIT_EXT/install.sh" "$W6" >/dev/null 2>&1
+w6_write_gates "$W6_TASKS_SHA1" "$W6_ASSIGN_SHA1" "$W6_PLAN_SHA1"
+
+# (a) forward flip — single box, uppercase X: PASS via checkbox-delta.
+w6_write_t001_checked
+w6_run
+w6_assert_pass "6a forward flip (tasks.md T001 [ ]->[X])" "1 forward GFM checkbox advance(s)"
+w6_reset_tasks
+
+# (b) multiple forward flips, including the indented sub-item, mixed case.
+w6_write_t002_and_t002a_checked
+w6_run
+w6_assert_pass "6b multiple forward flips (T002 [X] + indented T002a [x])" "2 forward GFM checkbox advance(s)"
+w6_reset_tasks
+
+# (c) a flip riding along with an edited task line — must BLOCK, not PASS.
+w6_write_edited_text
+w6_run
+w6_assert_block "6c edited task text alongside a flip"
+w6_reset_tasks
+
+# (d) unpaired insertion — a flip plus a brand-new task line — BLOCK (R1-S04).
+w6_write_unpaired_insert
+w6_run
+w6_assert_block "6d unpaired insertion (flip + new T099 line)" "R1-S04"
+w6_reset_tasks
+
+# (e) unpaired deletion — a whole task line removed, nothing else — BLOCK (R1-S04).
+w6_write_unpaired_delete
+w6_run
+w6_assert_block "6e unpaired deletion (T002a line removed)" "R1-S04"
+w6_reset_tasks
+
+# (f) REVERSE flip — the load-bearing case (R1-S14/S18 direction
+# asymmetry). First establish an APPROVED state where the box is
+# CHECKED: commit it (scoped to tasks.md only, so this stays a clean,
+# minimal history) and rebind gates.yml's workforce/tasks.md entry to
+# that new SHA.
+w6_write_t001_checked
+( cd "$W6" && git add "$W6_TASKS_REL" && git commit -qm 'w6 T001 approved-checked' )
+W6_TASKS_SHA2=$( cd "$W6" && git log -1 --format=%H -- "$W6_TASKS_REL" )
+w6_write_gates "$W6_TASKS_SHA2" "$W6_ASSIGN_SHA1" "$W6_PLAN_SHA1"
+# Flip that same box back to unchecked. w6_write_base is, not by
+# coincidence, exactly "T001 unchecked, everything else identical to the
+# SHA2 commit" — SHA2 only ever touched T001 — so reusing it here
+# produces a minimal single-line REVERSE diff against the new baseline.
+w6_write_base
+w6_run
+w6_assert_block "6f REVERSE flip (T001 [X]->[ ] vs. an approved-checked SHA)" "R1-S14/S18"
+w6_reset_tasks
+
+# (g) scope guard — the checkbox tolerance is scoped EXCLUSIVELY to
+# gate=workforce, artifact=tasks.md (I-17). It must not leak to
+# agents/assignment.md, which keeps the pre-I-17 strict SHA +
+# working-tree-dirty check. tasks.md is clean here (just reset to
+# HEAD/SHA2, matching gates.yml's current tasks.md binding); only
+# assignment.md is dirtied.
+printf '# assignment\n\nroster placeholder.\nhand-edited, uncommitted.\n' > "$W6_ASSIGN"
+w6_run
+w6_assert_block "6g scope guard (dirty agents/assignment.md, tasks.md clean)" "R1-S05"
+w6_reset_assign
+
+# ---- THE survival property (FR-015 / R1-S15): the fix lives in the
+# extension's SOURCE tree, redeployed wholesale (rm -rf + cp -R) by
+# install.sh on every install. Reinstalling git-ext, then reinstalling an
+# unrelated foreign extension, must not regress either the forward-flip
+# PASS or the reverse-flip BLOCK. Baseline entering this round: HEAD =
+# SHA2 (T001 checked), gates.yml tasks.md @ SHA2 — set by case (f) above.
+sh "$GIT_EXT/install.sh" "$W6" >/dev/null 2>&1
+
+w6_write_survival_fwd
+w6_run
+w6_assert_pass "6a forward flip SURVIVED git-ext reinstall" "1 forward GFM checkbox advance(s)"
+w6_reset_tasks
+
+w6_write_base
+w6_run
+w6_assert_block "6f reverse flip SURVIVED git-ext reinstall" "R1-S14/S18"
+w6_reset_tasks
+
+sh "$REPO/extensions/graphify/install.sh" "$W6" >/dev/null 2>&1 || true
+
+w6_write_survival_fwd
+w6_run
+w6_assert_pass "6a forward flip SURVIVED foreign (graphify) reinstall" "1 forward GFM checkbox advance(s)"
+w6_reset_tasks
+
+w6_write_base
+w6_run
+w6_assert_block "6f reverse flip SURVIVED foreign (graphify) reinstall" "R1-S14/S18"
+w6_reset_tasks
+
+# ---------------------------------------------------------------------------
+bold "7. testing/complete commit-seam survival regression (SC-006/008)"
+# Regresses the after_complete / after_testing hook pair layered onto git-ext's
+# manifest: commit.sh's phase enum now also accepts "complete" and "testing"
+# (ordinary PhaseCommit grammar, <phase>(<spec-id>): <summary>), and
+# extension.yml declares both hooks routed to speckit.git.commit with
+# phase: complete / phase: testing respectively. There is still no
+# HookExecutor in v1 (D53) — hooks are prose-level, run by the invoking
+# phase-skill — so this regression does NOT auto-fire either hook. Instead it
+# proves the seam two ways: (a) DECLARATION — both hooks are registered in
+# .specify/extensions.yml and routed to the right command + phase after
+# install; (b) FUNCTION — invoking the INSTALLED commit.sh directly with
+# phase complete/testing (exactly what the after_complete / after_testing
+# hooks do once their phase-skill fires them) produces the correctly-tagged
+# commit; a rejected phase would die non-zero and leave no commit, so this
+# doubles as proof the enum change landed. Then, per R1-S08/SC-008, BOTH
+# sides must SURVIVE a git-ext reinstall and a foreign extension's reinstall
+# — the same S04-class hazard sections 3/4/6 regress for other git-ext
+# seams, extended here to the complete/testing pair.
+
+S7="$TMP/seam"; S7_SPEC="093-seam"
+mk_repo "$S7" "$S7_SPEC"
+S7_SPEC_DIR="$S7/specs/$S7_SPEC"
+printf '# report\n' > "$S7_SPEC_DIR/completion-report.md"
+
+sh "$GIT_EXT/install.sh" "$S7" >/dev/null 2>&1
+
+s7_ext_yml="$S7/.specify/extensions.yml"
+s7_commit_sh="$S7/.specify/extensions/git/scripts/commit.sh"
+
+# hook_routed <hooks-key> <phase-value> — like §4's gate_routed, but for the
+# phase: field the commit-seam hooks carry instead of gate:. Reuses §4's
+# hook_block to extract the hook's registry block, then asserts it both
+# dispatches through speckit.git.commit AND carries the expected phase.
+hook_routed() {
+  block="$(hook_block "$s7_ext_yml" "$1")"
+  printf '%s\n' "$block" | grep -q 'command: speckit.git.commit' \
+    && printf '%s\n' "$block" | grep -q "phase: $2"
+}
+
+# ---- (a) declaration side: both hooks registered + routed after install ---
+hook_routed after_complete complete && ok "after_complete routed to speckit.git.commit, phase: complete" || bad "after_complete not routed to speckit.git.commit / phase: complete"
+hook_routed after_testing  testing  && ok "after_testing routed to speckit.git.commit, phase: testing"   || bad "after_testing not routed to speckit.git.commit / phase: testing"
+
+# ---- (b) function side: the installed commit.sh primitive produces the
+# tagged commit for each phase — the seam's other half, simulating exactly
+# what the after_complete / after_testing hooks do when their phase-skill
+# fires them. -----------------------------------------------------------
+if ( cd "$S7" && sh "$s7_commit_sh" complete "finalized report" >/dev/null 2>&1 ); then
+  if git -C "$S7" log --format=%s | grep -qx "complete($S7_SPEC): finalized report"; then
+    ok "commit.sh complete → complete($S7_SPEC): finalized report"
+  else
+    bad "commit.sh complete exited 0 but no matching commit subject found"
+  fi
+else
+  bad "commit.sh complete exited non-zero (phase enum rejected 'complete'?)"
+fi
+
+printf '# testing\n' > "$S7_SPEC_DIR/testing.md"
+if ( cd "$S7" && sh "$s7_commit_sh" testing "coverage mapped" >/dev/null 2>&1 ); then
+  if git -C "$S7" log --format=%s | grep -qx "testing($S7_SPEC): coverage mapped"; then
+    ok "commit.sh testing → testing($S7_SPEC): coverage mapped"
+  else
+    bad "commit.sh testing exited 0 but no matching commit subject found"
+  fi
+else
+  bad "commit.sh testing exited non-zero (phase enum rejected 'testing'?)"
+fi
+
+# ---- THE survival property (R1-S08/SC-008): reinstall git-ext, then
+# re-assert BOTH the declaration side and the function side. ----------------
+sh "$GIT_EXT/install.sh" "$S7" >/dev/null 2>&1
+
+hook_routed after_complete complete && ok "after_complete routing SURVIVED git-ext reinstall" || bad "after_complete routing lost after git-ext reinstall"
+hook_routed after_testing  testing  && ok "after_testing routing SURVIVED git-ext reinstall"  || bad "after_testing routing lost after git-ext reinstall"
+
+printf '# report v2\n' > "$S7_SPEC_DIR/completion-report.md"
+if ( cd "$S7" && sh "$s7_commit_sh" complete "post-reinstall" >/dev/null 2>&1 ); then
+  if git -C "$S7" log --format=%s | grep -qx "complete($S7_SPEC): post-reinstall"; then
+    ok "commit.sh complete SURVIVED git-ext reinstall → complete($S7_SPEC): post-reinstall"
+  else
+    bad "commit.sh complete SURVIVED reinstall but no matching commit subject found"
+  fi
+else
+  bad "commit.sh complete broken after git-ext reinstall"
+fi
+
+# ---- a foreign extension's reinstall must not deregister git-ext's seam ---
+sh "$REPO/extensions/graphify/install.sh" "$S7" >/dev/null 2>&1 || true
+
+hook_routed after_complete complete && ok "after_complete routing SURVIVED foreign (graphify) reinstall" || bad "after_complete routing lost after foreign (graphify) reinstall"
+hook_routed after_testing  testing  && ok "after_testing routing SURVIVED foreign (graphify) reinstall"  || bad "after_testing routing lost after foreign (graphify) reinstall"
+
+# ---------------------------------------------------------------------------
 bold "Result: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] || exit 1
