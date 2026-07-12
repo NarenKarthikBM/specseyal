@@ -1,6 +1,7 @@
 installed:
 - graphify
 - git
+- workforce
 settings:
   auto_execute_hooks: true
 hooks:
@@ -137,3 +138,23 @@ hooks:
       (FR-010/W4): must also fire on an auto-written gate.'
     condition: null
     gate: workforce
+  after_categorize:
+  - extension: workforce
+    command: speckit.git.commit
+    enabled: true
+    optional: false
+    priority: 5
+    prompt: null
+    description: "commit categorize(<id>): \u2026"
+    condition: null
+    phase: categorize
+  after_agent-assign:
+  - extension: workforce
+    command: speckit.git.commit
+    enabled: true
+    optional: false
+    priority: 5
+    prompt: null
+    description: "commit agents(<id>): \u2026"
+    condition: null
+    phase: agents

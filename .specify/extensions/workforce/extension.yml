@@ -1,0 +1,62 @@
+schema_version: "1.0"
+
+extension:
+  id: workforce
+  name: "The Workforce Pair"
+  version: "0.1.0"
+  description: "Task categorization and specialist assembly for the implementation pipeline: /speckit-categorize tags every task against taxonomy v0 (a Sonnet inference session, code-validated against the general-cap), /speckit-agent-assign matches tasks to a seed library of 7 base specialists and 5 skills via a deterministic assemble.py script — escalating to a Sonnet skill-builder session only on a ∅-match gap — and /speckit-workforce-approve records the human gate signature that unlocks implementation. Categorization and skill-building are Sonnet inference; assembly is deterministic code, which is what makes the roster byte-reproducible on a gap-free run."
+  author: narenkarthikbm
+  license: MIT
+
+requires:
+  speckit_version: ">=0.2.0"
+
+provides:
+  commands:
+    - name: speckit.categorize
+      file: commands/speckit.categorize.md
+      description: "Sonnet categorizer tags every task with taxonomy v0 (type, specialization, preserves_behavior, tags), code-validated against the general-cap before writing categorization.md"
+    - name: speckit.agent-assign
+      file: commands/speckit.agent-assign.md
+      description: "Deterministic assemble.py matches tasks to the seed library of base specialists and skills, escalating to a Sonnet skill-builder only on a ∅-match gap, and writes agents/assignment.md's roster"
+    - name: speckit.workforce-approve
+      file: commands/speckit.workforce-approve.md
+      description: "Record the human's decision on the Workforce Gate and unlock /speckit-implement-parallel"
+
+# ── Hooks ────────────────────────────────────────────────────────────────────
+# Both hooks below target the GIT extension's OWN command (speckit.git.commit)
+# through the shared hook registry — no edit to git-ext source (research R7 /
+# D57 S1). optional:false marks each as auto-invoked / hard-block; enforcement
+# is prose-level in v1 (no HookExecutor yet — the invoking phase-skill runs the
+# hook and honors its exit code), per git-ext's own hooks: header note. These
+# after_* fire-points are declared here and dispatched by the installed
+# registry, not assumed to "just work" by analogy (S25).
+hooks:
+  after_categorize:
+    command: speckit.git.commit
+    phase: categorize
+    optional: false
+    description: "commit categorize(<id>): …"
+  after_agent-assign:
+    command: speckit.git.commit
+    phase: agents
+    optional: false
+    description: "commit agents(<id>): …"
+
+  # after_workforce_approve — NOT registered here (S25: name where it lives,
+  # don't assume it "just works"). /speckit-workforce-approve EMITS this
+  # event; the HANDLER is git-ext's generalized on-gate-approve.sh workforce
+  # action, registered as the speckit.git.record-gate hook (gate: workforce)
+  # in git/extension.yml — D57 S2, since git owns gates.yml, the one
+  # unavoidable source edit lives in git's own source, not here. That handler
+  # binds tasks.md + agents/assignment.md @ sha into gates.yml (S02/S13).
+  # Registering a second handler for the same event here would double-fire
+  # the gate write. Mirrors the council precedent: /speckit-council-approve
+  # emits after_council_approve, and git/extension.yml — not
+  # council/extension.yml — is the sole place that hook is handled.
+
+tags:
+  - "workforce"
+  - "categorize"
+  - "agent-assembly"
+  - "governance"
