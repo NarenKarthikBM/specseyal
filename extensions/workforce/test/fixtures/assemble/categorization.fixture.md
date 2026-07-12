@@ -12,10 +12,10 @@
 
 ## Categorization table
 
-| task_id | type | specialization | preserves_behavior | tags |
-|---|---|---|---|---|
-| T001 | `service` | `qa-automation` | false | alpha, beta |
-| T002 | `test` | `qa-automation` | false | cap-test |
+| task_id | type | specialization | preserves_behavior | runtime_consumed | tags |
+|---|---|---|---|---|---|
+| T001 | `service` | `qa-automation` | false | false | alpha, beta |
+| T002 | `test` | `qa-automation` | false | false | cap-test |
 
 ## Fixture design notes
 
@@ -26,6 +26,10 @@
 - **T002** matches all four `cap-test`-tagged skills (`skl_fx_{delta,epsilon,gamma,zeta}`)
   -- 4 candidates, more than the assembly cap of 3. `skl_fx_zeta` (last by the `id`
   tie-break) MUST be dropped and logged: SC-004's cap-trim case.
-- Neither task carries a `prompt` tag, and both resolve to the ordinary Sonnet fixture
-  base (`agt_fx_sonnet`) -- this fixture is deliberately D48-clean; the guard's
-  hard-error branch is exercised separately by `categorization.d48.fixture.md`.
+- Both tasks are `runtime_consumed: false` and resolve to the ordinary Sonnet fixture
+  base (`agt_fx_sonnet`) -- this fixture is deliberately guard-clean; the runtime_consumed
+  guard's hard-error branch (the re-homed D48 guard, D65) is exercised separately by
+  `categorization.d48.fixture.md`.
+- **T001 carries elevated grants (`web_search` et al.)**, so this fixture also exercises
+  the D67 grant tripwire: `assemble.py` stamps `GRANT_TRIPWIRE: …` (engaged) on stdout and
+  the roster's grant-tripwire notice. It is gap-free, so `GAP_CLUSTERS:` is empty.

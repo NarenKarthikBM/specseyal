@@ -21,12 +21,16 @@
 #      documents. A positive control (a PASSING run DOES write) runs first, so the
 #      negative assertions aren't vacuously true because the write path is simply
 #      broken/unreachable.
-#   3. SC-001: five independent malformed fixtures, each isolating exactly one
+#   3. SC-001: six independent malformed fixtures, each isolating exactly one
 #      breach -- (a) a field present in shape but empty, (b) an out-of-enum `type`
 #      and `specialization`, (c) a non-boolean `preserves_behavior`, (d) a
-#      non-kebab tag, (e) a duplicate `task_id` -- each -> exit non-zero.
+#      non-kebab tag, (e) a duplicate `task_id`, (f) a non-boolean
+#      `runtime_consumed` (the v1 modifier, D65) -- each -> exit non-zero.
 #   4. The cap boundary: `general == floor(0.20 x N)` exactly -> exit 0 (the cap
 #      is validate_cap()'s `>`, never `>=`).
+#   5. The v1 one-task floor (D65 verdict 9): `max(1, floor(0.2n))`. A 4-task
+#      feature (n<5) with 1 general -> exit 0 (v0's literal cap would have FAILED
+#      it); the same with 2 general -> exit non-zero (the floor is 1, not unbounded).
 #
 # Usage:  sh extensions/workforce/test/test_categorize.sh
 #
@@ -57,7 +61,7 @@ bold "1. Valid fixture -> exit 0"
 rc=0
 "$PY" "$VALIDATE" "$FIX/valid.fixture.md" >"$TMP/valid.stdout" 2>"$TMP/valid.stderr" || rc=$?
 if [ "$rc" -eq 0 ]; then
-  ok "valid fixture (10 tasks, all four fields, closed-enum, general 1/10 under cap) exits 0"
+  ok "valid fixture (10 tasks, all FIVE fields incl. runtime_consumed, closed-enum, general 1/10 under cap) exits 0"
 else
   bad "valid fixture exited $rc, expected 0: $(cat "$TMP/valid.stderr")"
 fi
@@ -154,6 +158,7 @@ check_fails "$FIX/sc001-bad-enum.fixture.md"         "(b) out-of-enum type/speci
 check_fails "$FIX/sc001-non-boolean.fixture.md"      "(c) non-boolean preserves_behavior"        "is not a boolean"
 check_fails "$FIX/sc001-non-kebab-tag.fixture.md"    "(d) non-kebab tag"                         "not lowercase-kebab"
 check_fails "$FIX/sc001-duplicate-task-id.fixture.md" "(e) duplicate task_id"                    "duplicate task_id"
+check_fails "$FIX/sc001-non-boolean-runtime.fixture.md" "(f) non-boolean runtime_consumed (v1, D65)" "runtime_consumed 'maybe' is not a boolean"
 
 # ===========================================================================
 bold "4. Cap boundary -- general == floor(0.20 x N) exactly -> exit 0 (> not >=)"
@@ -164,6 +169,35 @@ if [ "$rc" -eq 0 ]; then
   ok "cap-boundary fixture (general 2/10 == floor(0.20*10)=2) exits 0 -- the cap is '>', not '>='"
 else
   bad "cap-boundary fixture exited $rc, expected 0: $(cat "$TMP/boundary.stderr")"
+fi
+
+# ===========================================================================
+bold "5. v1 one-task floor (D65 verdict 9) -- max(1, floor(0.2n)) for n<5"
+
+# 5a. A 4-task feature with ONE general task: under v0's literal 20% cap this FAILED
+#     (floor(0.2*4)=0 -> zero allowed); under the v1 floor max(1,0)=1 -> PASS. This is
+#     the whole point of adopting the floor -- it deletes the n<5 "zero general" absurdity.
+rc=0
+"$PY" "$VALIDATE" "$FIX/cap-floor-pass.fixture.md" >"$TMP/floorpass.stdout" 2>"$TMP/floorpass.stderr" || rc=$?
+if [ "$rc" -eq 0 ]; then
+  ok "cap-floor-pass (general 1/4, n<5) exits 0 -- the floor admits exactly one general (v0 would have FAILED this)"
+else
+  bad "cap-floor-pass exited $rc, expected 0: $(cat "$TMP/floorpass.stderr")"
+fi
+
+# 5b. The SAME 4-task feature with TWO general tasks: the floor is exactly 1, so 2>1 -> FAIL.
+#     Proves the floor lifts the ceiling to 1, not to "unbounded for small n".
+rc=0
+"$PY" "$VALIDATE" "$FIX/cap-floor-fail.fixture.md" >"$TMP/floorfail.stdout" 2>"$TMP/floorfail.stderr" || rc=$?
+if [ "$rc" -ne 0 ]; then
+  ok "cap-floor-fail (general 2/4, n<5) exits non-zero -- the floor is 1, not unbounded"
+else
+  bad "cap-floor-fail exited 0, expected non-zero"
+fi
+if grep -qF -- 'general cap breach' "$TMP/floorfail.stderr" && grep -qF -- 'max(1, floor' "$TMP/floorfail.stderr"; then
+  ok "cap-floor-fail stderr names the floor'd cap breach (max(1, floor(...)))"
+else
+  bad "cap-floor-fail stderr missing the floor'd-cap breach message: $(cat "$TMP/floorfail.stderr")"
 fi
 
 # ===========================================================================

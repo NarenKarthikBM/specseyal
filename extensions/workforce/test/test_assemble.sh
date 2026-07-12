@@ -11,10 +11,12 @@
 #                  a byte-for-byte diff of two runs over the same categorization+library,
 #                  with PYTHONHASHSEED varied between them, plus a diff against a frozen
 #                  golden roster.
-#   2. SC-006/S03  D48 guard: a `prompt`-tagged task whose (type, specialization) resolves
-#                  to the frozen SYNTHETIC non-Sonnet base (agt_fx_nonsonnet, model: haiku)
-#                  -- assert assemble.py hard-errors (exit 2) and writes nothing (the guard's
-#                  `else: hard-error` branch actually executing, not just existing in source).
+#   2. SC-006/S03  runtime_consumed guard (v1, D65 -- the re-homed D48 guard): a
+#                  `runtime_consumed: true` task whose (type, specialization) resolves to the
+#                  frozen SYNTHETIC non-Sonnet base (agt_fx_nonsonnet, model: haiku) -- assert
+#                  assemble.py hard-errors (exit 2) and writes nothing. PLUS the tag-retirement
+#                  negative control: the same base pairing with the `prompt` tag but
+#                  runtime_consumed:false must NOT trip the guard (the check moved off the tag).
 #   3. SC-004      a task with >3 tag-matching skills -- exactly 3 injected, the 4th logged
 #                  in the roster's Dropped-skill notes, never silently discarded.
 #   4. SC-003/S09  a task assembling >=2 grant-declaring skills -- the Elevated-grants column
@@ -22,6 +24,12 @@
 #   5. S15         a 2-task/1-gap fixture, re-run after a simulated skill-builder closes the
 #                  gap (--built-skill) -- the non-gap task's roster row is byte-identical
 #                  across both runs; only the gap task's row changes.
+#   6. D66 vd 11   gap-batching: 3 gap tasks, 2 sharing a tag -> connected-components
+#                  clustering (GAP_CLUSTERS: [T001,T002] [T003]) emitted on stdout AND recorded
+#                  in the roster; deterministic across PYTHONHASHSEED (S01).
+#   7. D67 vd 12   grant tripwire: any elevated grant in the roster stamps GRANT_TRIPWIRE (the
+#                  total-ordered union) + an ENGAGED roster notice (main fixture); a grant-free
+#                  roster stamps GRANT_TRIPWIRE: none + a CLEAR notice (gap fixture).
 #
 # Runs entirely against the frozen fixtures + a throwaway TMP dir; never touches the frozen
 # fixtures, the live .claude/ library, or any file outside extensions/workforce/test/.
@@ -39,6 +47,8 @@ AGENTS_DIR="$FIX/library/agents"
 SKILLS_DIR="$FIX/library/skills"
 MAIN_CATEG="$FIX/categorization.fixture.md"
 D48_CATEG="$FIX/categorization.d48.fixture.md"
+RETIRED_CATEG="$FIX/categorization.prompt-retired.fixture.md"
+GAPCLUSTER_CATEG="$FIX/categorization.gapcluster.fixture.md"
 GAP_CATEG="$FIX/gap/categorization.fixture.md"
 GAP_SKILLS_OPEN="$FIX/gap/skills-open"
 GAP_SKILLS_CLOSED="$FIX/gap/skills-closed"
@@ -117,7 +127,7 @@ else
 fi
 
 # ===========================================================================
-bold "2. SC-006/S03 -- D48 guard hard-errors: prompt-tagged task -> non-Sonnet base"
+bold "2. SC-006/S03 -- runtime_consumed guard hard-errors: runtime_consumed:true -> non-Sonnet base (D65)"
 
 D48_OUT="$TMP/d48/assignment.md"
 mkdir -p "$TMP/d48"
@@ -126,11 +136,24 @@ rc=0
   --agents-dir "$AGENTS_DIR" --skills-dir "$SKILLS_DIR" \
   --output "$D48_OUT" >"$TMP/d48.stdout" 2>"$TMP/d48.stderr" || rc=$?
 
-if [ "$rc" -eq 2 ]; then ok "D48 fixture exits 2 (D48GuardError, assemble.py's documented exit-code contract)"; else bad "D48 fixture exited $rc, expected 2"; fi
-if grep -qF -- 'D48' "$TMP/d48.stderr"; then ok "stderr names the D48 guard"; else bad "stderr does not mention D48: $(cat "$TMP/d48.stderr")"; fi
+if [ "$rc" -eq 2 ]; then ok "runtime_consumed:true fixture exits 2 (D48GuardError, assemble.py's documented exit-code contract)"; else bad "runtime_consumed fixture exited $rc, expected 2"; fi
+if grep -qF -- 'runtime_consumed guard' "$TMP/d48.stderr"; then ok "stderr names the runtime_consumed guard (the re-homed D48 guard, D65)"; else bad "stderr does not mention the runtime_consumed guard: $(cat "$TMP/d48.stderr")"; fi
+if grep -qF -- 'D48' "$TMP/d48.stderr"; then ok "stderr still names D48 (continuity of the exit-code contract)"; else bad "stderr does not mention D48: $(cat "$TMP/d48.stderr")"; fi
 if grep -qF -- 'agt_fx_nonsonnet' "$TMP/d48.stderr"; then ok "stderr names the offending non-Sonnet base (agt_fx_nonsonnet)"; else bad "stderr does not name agt_fx_nonsonnet: $(cat "$TMP/d48.stderr")"; fi
 if grep -qF -- "model='haiku'" "$TMP/d48.stderr"; then ok "stderr names the offending model (haiku)"; else bad "stderr does not name the haiku model: $(cat "$TMP/d48.stderr")"; fi
-if [ -f "$D48_OUT" ]; then bad "D48 guard should write NOTHING, but $D48_OUT exists"; else ok "D48 guard wrote nothing (the else: hard-error branch actually executed, not just declared)"; fi
+if [ -f "$D48_OUT" ]; then bad "guard should write NOTHING, but $D48_OUT exists"; else ok "guard wrote nothing (the else: hard-error branch actually executed, not just declared)"; fi
+
+# 2b. Tag-retirement negative control (D65 verdict 10): the SAME (docs, security) ->
+#     non-Sonnet base pairing, but with the `prompt` free tag and runtime_consumed:FALSE,
+#     must NOT trip the guard -- the check moved off the tag and onto the modifier.
+RETIRED_OUT="$TMP/retired/assignment.md"
+mkdir -p "$TMP/retired"
+rc=0
+"$PY" "$ASSEMBLE" "$RETIRED_CATEG" \
+  --agents-dir "$AGENTS_DIR" --skills-dir "$SKILLS_DIR" \
+  --output "$RETIRED_OUT" >"$TMP/retired.stdout" 2>"$TMP/retired.stderr" || rc=$?
+if [ "$rc" -eq 0 ]; then ok "prompt-tagged + runtime_consumed:false exits 0 -- the tag-convention check is RETIRED (D65 verdict 10)"; else bad "prompt-retired fixture exited $rc, expected 0: $(cat "$TMP/retired.stderr")"; fi
+if [ -f "$RETIRED_OUT" ] && grep -qF -- 'agt_fx_nonsonnet' "$RETIRED_OUT"; then ok "the docs/haiku base was accepted (roster written to a non-Sonnet base -- the tag alone no longer forces the floor)"; else bad "prompt-retired roster not written or not on agt_fx_nonsonnet: $(cat "$TMP/retired.stdout" "$TMP/retired.stderr" 2>/dev/null)"; fi
 
 # ===========================================================================
 bold "3. SC-004 -- >3 candidate skills -> exactly 3 injected, remainder logged"
@@ -238,6 +261,87 @@ if [ -n "$OPEN_T002" ] && [ -n "$CLOSED_T002" ] && [ "$OPEN_T002" != "$CLOSED_T0
   ok "T002's row DID change once the gap closed (as it must -- only the gap row changes)"
 else
   bad "T002's row did NOT change across the gap rerun"
+fi
+
+# ===========================================================================
+bold "6. D66 verdict 11 -- gap-batching: connected-components clustering of gap tasks"
+
+# Three ∅-match gap tasks against the main library; T001+T002 share the tag
+# `gapcluster-shared`, T003 shares nothing -> exactly TWO clusters. assemble.py must
+# BATCH them (one skill-builder dispatch per cluster), emit GAP_CLUSTERS on stdout, and
+# record the clusters in the roster -- the gap-batching the v1 review moved out of the
+# /speckit-agent-assign command's prose and into the assembler's deterministic output.
+GC_OUT="$TMP/gapcluster/assignment.md"
+mkdir -p "$TMP/gapcluster"
+rc=0
+"$PY" "$ASSEMBLE" "$GAPCLUSTER_CATEG" \
+  --agents-dir "$AGENTS_DIR" --skills-dir "$SKILLS_DIR" \
+  --output "$GC_OUT" >"$TMP/gapcluster.stdout" 2>"$TMP/gapcluster.stderr" || rc=$?
+if [ "$rc" -eq 0 ]; then ok "gap-cluster fixture exits 0 (gaps are reported, not an error)"; else bad "gap-cluster fixture exited $rc: $(cat "$TMP/gapcluster.stderr")"; fi
+
+GC_TASKS_LINE="$(grep -F -- 'GAP_TASKS:' "$TMP/gapcluster.stdout" || true)"
+if [ "$GC_TASKS_LINE" = "GAP_TASKS: T001,T002,T003" ]; then
+  ok "all three tasks are gaps (GAP_TASKS: T001,T002,T003)"
+else
+  bad "GAP_TASKS line wrong: got [$GC_TASKS_LINE]"
+fi
+
+GC_CLUSTERS_LINE="$(grep -F -- 'GAP_CLUSTERS:' "$TMP/gapcluster.stdout" || true)"
+if [ "$GC_CLUSTERS_LINE" = "GAP_CLUSTERS: [T001,T002] [T003]" ]; then
+  ok "GAP_CLUSTERS batches the shared-tag pair: [T001,T002] [T003] -- 3 gap tasks, 2 dispatches, not 3"
+else
+  bad "GAP_CLUSTERS line wrong, expected '[T001,T002] [T003]': got [$GC_CLUSTERS_LINE]"
+fi
+
+if grep -qF -- 'cluster 1: T001, T002' "$GC_OUT" && grep -qF -- 'cluster 2: T003' "$GC_OUT"; then
+  ok "the roster itself records cluster membership (FR-006/SC-007, D66) -- not just stdout"
+else
+  bad "roster gap-cluster notes missing/wrong: $(grep -A4 -F 'Gap clusters' "$GC_OUT" || echo '<no Gap clusters section>')"
+fi
+
+# Determinism (S01) also holds for clustering: a second run under a different
+# PYTHONHASHSEED must produce the byte-identical GAP_CLUSTERS ordering.
+GC_OUT2="$TMP/gapcluster2/assignment.md"; mkdir -p "$TMP/gapcluster2"
+PYTHONHASHSEED=4294967295 "$PY" "$ASSEMBLE" "$GAPCLUSTER_CATEG" \
+  --agents-dir "$AGENTS_DIR" --skills-dir "$SKILLS_DIR" \
+  --output "$GC_OUT2" >"$TMP/gapcluster2.stdout" 2>&1 || true
+GC_CLUSTERS_LINE2="$(grep -F -- 'GAP_CLUSTERS:' "$TMP/gapcluster2.stdout" || true)"
+if [ "$GC_CLUSTERS_LINE" = "$GC_CLUSTERS_LINE2" ] && diff -q "$GC_OUT" "$GC_OUT2" >/dev/null 2>&1; then
+  ok "gap-cluster output is byte-identical across PYTHONHASHSEED (clustering is deterministic, S01)"
+else
+  bad "gap-cluster output differs across PYTHONHASHSEED -- nondeterminism in clustering"
+fi
+
+# ===========================================================================
+bold "7. D67 verdict 12 -- grant tripwire: any elevated grant forces the gate to human"
+
+# 7a. ENGAGED: the main fixture's T001 carries elevated grants (web_search et al.), so
+#     assemble.py must stamp GRANT_TRIPWIRE with the total-ordered union (reusing section
+#     1's run1) and write the ENGAGED notice into the roster.
+MAIN_TRIPWIRE_LINE="$(grep -F -- 'GRANT_TRIPWIRE:' "$TMP/run1.stdout" || true)"
+if [ "$MAIN_TRIPWIRE_LINE" = "GRANT_TRIPWIRE: aa_beta_only, web_search, zz_alpha_only" ]; then
+  ok "GRANT_TRIPWIRE stdout is the total-ordered roster-wide grant union (aa_beta_only, web_search, zz_alpha_only)"
+else
+  bad "GRANT_TRIPWIRE line wrong on the grant-bearing main fixture: got [$MAIN_TRIPWIRE_LINE]"
+fi
+if grep -qF -- 'Grant tripwire (D67): ENGAGED' "$OUT1"; then
+  ok "the roster records the ENGAGED tripwire -- the gate needs a human regardless of profile (D67)"
+else
+  bad "roster missing the ENGAGED grant-tripwire notice: $(grep -F 'Grant tripwire' "$OUT1" || echo '<none>')"
+fi
+
+# 7b. CLEAR: the gap-open fixture (section 5) has no grant-declaring skill injected ->
+#     GRANT_TRIPWIRE: none, and the roster says the tripwire is clear (auto may approve).
+GAP_TRIPWIRE_LINE="$(grep -F -- 'GRANT_TRIPWIRE:' "$TMP/gap-open.stdout" || true)"
+if [ "$GAP_TRIPWIRE_LINE" = "GRANT_TRIPWIRE: none" ]; then
+  ok "a grant-free roster stamps GRANT_TRIPWIRE: none (auto-approve is permitted, profile-schema.md P4)"
+else
+  bad "GRANT_TRIPWIRE line wrong on the grant-free gap fixture, expected 'none': got [$GAP_TRIPWIRE_LINE]"
+fi
+if grep -qF -- 'Grant tripwire (D67):** clear' "$GAP_OUT_OPEN"; then
+  ok "the grant-free roster records the CLEAR tripwire"
+else
+  bad "grant-free roster missing the CLEAR grant-tripwire notice: $(grep -F 'Grant tripwire' "$GAP_OUT_OPEN" || echo '<none>')"
 fi
 
 # ===========================================================================

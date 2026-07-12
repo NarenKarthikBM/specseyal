@@ -1,5 +1,13 @@
 # Taxonomy v0 → v1 — Evidence Dossier
 
+> **⛔ CONSUMED — 2026-07-12.** This dossier was the *input* to the v0→v1 review; that review is now
+> complete and blessed (`docs/reviews/2026-07-12-taxonomy-v1-review.md`), applied as **D65** (verdicts
+> 1–10), **D66** (gap-batching economics, verdict 11), and **D67** (workforce auto-mode + grant tripwire,
+> verdict 12). Every booked item below now carries a verdict there and in `taxonomy.md` §7/§8 — this file
+> is retained as the evidence record of what was carried into the review, **not an open worklist**. (Its
+> `taxonomy-v0.md` citations are historical: the contract was renamed to `taxonomy.md` at v1 blessing;
+> this frozen dossier keeps the name it was written against.)
+
 > **What this is.** The v0→v1 review trigger (`taxonomy-v0.md` §8: *"three real dogfood features
 > categorized"*) is **met** — `001-council-extension`, `002-speckit-ext-git`, `003-workforce` have all
 > been categorized and assembled. This file bundles **every booked item** carried to that review, each with

@@ -16,7 +16,7 @@
 
 ## Categorization table
 
-| task_id | type | specialization | preserves_behavior | tags |
-|---|---|---|---|---|
-| T001 | `service` | `qa-automation` | false | known-tag |
-| T002 | `test` | `qa-automation` | false | novel-tag |
+| task_id | type | specialization | preserves_behavior | runtime_consumed | tags |
+|---|---|---|---|---|---|
+| T001 | `service` | `qa-automation` | false | false | known-tag |
+| T002 | `test` | `qa-automation` | false | false | novel-tag |

@@ -2,7 +2,7 @@
 
 > **Status:** 2.0 (M0, amended 2026-07-09). Normative.
 > **Implements:** D2 (hybrid creator), D16 (taxonomy keys), D17 (per-repo now, central library later), D18 (model policy), D24/I-1 (flywheel), D34, **D40** (composability), **D41** (tool grants), **D43** (stats rekeyed on skill `id@version`), **D44** (curated-static bases; core-vs-elevated terms).
-> **Amended by:** `docs/reviews/2026-07-09-taxonomy-v0-review.md` §3 (A-1) and §4 (A-2); flag adjudications D43–D44.
+> **Amended by:** `docs/reviews/2026-07-09-taxonomy-v0-review.md` §3 (A-1) and §4 (A-2); flag adjudications D43–D44. **v1 (D65):** taxonomy cross-references re-pathed `taxonomy-v0.md` → `taxonomy.md`; §4 gains the `runtime_consumed` routing guard (below), the D48 guard re-homed on the modifier that superseded the `prompt` tag (`taxonomy.md` §2.4).
 > **Consumed by:** the categorizer and skill builder (M3), Claude Code's own subagent and skill loaders, the central skill registry (I-10, later).
 
 **The library's unit of storage is the skill, not the agent (D40).** An agent is not a file; it is an *assembly* performed at dispatch time:
@@ -124,7 +124,7 @@ base = the b ∈ bases with  t.type ∈ b.taxonomy.type
 candidates = { s ∈ skills : s.taxonomy.tags ∩ t.tags ≠ ∅ }
 
 if t.preserves_behavior:
-    force-inject skl_refactor_discipline          # taxonomy-v0.md §2.3 — counts against the cap
+    force-inject skl_refactor_discipline          # taxonomy.md §2.3 — counts against the cap
 
 rank candidates by, in order:
     1. |t.tags ∩ s.taxonomy.tags| / |t.tags ∪ s.taxonomy.tags|   (Jaccard, descending)
@@ -149,7 +149,7 @@ Step 4 of the ranking exists so assignment is **deterministic**: the same `categ
 - **Assembly cap: base + 3 injected skills, maximum.** The assignment step trims by tag-rank; it never exceeds. What it trims, it logs.
 - **Additive only.** Skills extend the base. A skill MUST NOT override or contradict base-agent behavior. `skill-module.md` encodes this as a hard constraint on the module format, not as advice.
 
-The fixed core selects the base; free tags select, rank, and brief the skills. That is the division of labour D16 asked for, with D40's third job (`taxonomy-v0.md` §6) added.
+The fixed core selects the base; free tags select, rank, and brief the skills. That is the division of labour D16 asked for, with D40's third job (`taxonomy.md` §6) added.
 
 ## 4. Model policy is validated, not suggested (D18)
 
@@ -157,12 +157,14 @@ The fixed core selects the base; free tags select, rank, and brief the skills. T
 
 | Role | Model | Rule |
 |---|---|---|
-| Implementation work (every base specialist accepting an implementation type) | `sonnet` | **Enforced.** A base whose `taxonomy.type` contains any of the 7 implementation types (`taxonomy-v0.md` §3) and whose `model ≠ sonnet` is invalid. |
+| Implementation work (every base specialist accepting an implementation type) | `sonnet` | **Enforced.** A base whose `taxonomy.type` contains any of the 7 implementation types (`taxonomy.md` §3) and whose `model ≠ sonnet` is invalid. |
 | Judgment roles — council chairman, analyze/triage | `opus` | Not library entries; see `trace-schema.md` `role`. |
 | Mechanical roles — deck prep, categorizer, skill builder, council members | `sonnet` | as above |
 | `haiku` | — | Unused in v1 (D18). A validator **warns**; it does not fail. |
 
-`preserves_behavior: true` does not change the model. It injects a skill (`taxonomy-v0.md` §2.3), and skills have no model to change.
+`preserves_behavior: true` does not change the model. It injects a skill (`taxonomy.md` §2.3), and skills have no model to change.
+
+**`runtime_consumed: true` pins the Sonnet floor at routing time (v1, D65 — `taxonomy.md` §2.4).** The rule above validates a *base* (a base accepting an implementation type must be `sonnet`). The `runtime_consumed` modifier adds the complementary *task-routing* guard: a task delivering a file consumed by an agent at runtime — mechanically `type: docs`, but implementation work — MUST NOT assemble onto a non-Sonnet `docs`-exempt base. The assembler (`assemble.py`) hard-errors on a `runtime_consumed: true` task whose selected base's `model ≠ sonnet`. This is the former D48 `prompt`-tag guard, re-homed on the modifier that superseded the tag (`taxonomy.md` §2.4, verdict 10); the `docs`-model exemption now applies only to `runtime_consumed: false` documentation.
 
 A specialist wanting Opus is not a config edit. It is an argument that D18's two-plane policy is wrong for this role, made in docs/90, decided, then applied. The validator's job is to make sure that argument actually happens.
 
@@ -203,13 +205,13 @@ An entry conforms iff:
 2. `id` matches `^agt_[a-z0-9]+(_[a-z0-9]+)*$` (bases) or `^skl_[a-z0-9]+(_[a-z0-9]+)*$` (skills), and is unique across the library.
 3. `version` is valid semver.
 4. Skills: `origin ∈ {seed, generated, promoted}`; `origin ∈ {generated, promoted}` ⟹ `source_feature` non-null; `origin == promoted` ⟹ `promoted_at` non-null. Bases have no `origin`.
-5. **Bases:** `taxonomy.type` is a non-empty subset of `taxonomy-v0.md`'s **8** types; `taxonomy.specialization` is exactly one of its **11** specializations; the `(type, specialization)` lane is unique across bases. **Skills:** `taxonomy.tags` is non-empty; bases carry no `tags`.
+5. **Bases:** `taxonomy.type` is a non-empty subset of `taxonomy.md`'s **8** types; `taxonomy.specialization` is exactly one of its **11** specializations; the `(type, specialization)` lane is unique across bases. **Skills:** `taxonomy.tags` is non-empty; bases carry no `tags`.
 6. §4's model rule holds (bases only). §4.1's core toolset is present and unmodified.
 7. `body_sha256` equals the SHA-256 of the prompt body.
 8. The prompt body is non-empty.
 9. Skills: `grants` is a (possibly empty) list; no skill grants a tool the base's core already provides.
 
-Rule 5 is why `taxonomy-v0.md` had to be blessed before M3: it is a closed enum, and closed enums are load-bearing for rules 5 and §3. It now is (2026-07-09).
+Rule 5 is why `taxonomy.md` had to be blessed before M3: it is a closed enum, and closed enums are load-bearing for rules 5 and §3. It now is (2026-07-09).
 
 ## 7. Non-goals (v1)
 

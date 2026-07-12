@@ -2,10 +2,11 @@
 """validate-categorization.py -- zero-AI gate for /speckit-categorize (T011).
 
 Contracts implemented:
-  - docs/contracts/taxonomy-v0.md SS2   (8 types, closed enum)
-  - docs/contracts/taxonomy-v0.md SS4   (11 specializations incl. `general`,
-    the 20% cap, D44's small-feature edge case)
-  - docs/contracts/taxonomy-v0.md SS2.3 (`preserves_behavior` boolean modifier)
+  - docs/contracts/taxonomy.md SS2   (8 types, closed enum)
+  - docs/contracts/taxonomy.md SS4   (11 specializations incl. `general`,
+    the max(1, floor(0.2n)) cap -- v1's floor'd form, D65 verdict 9)
+  - docs/contracts/taxonomy.md SS2.3 (`preserves_behavior` boolean modifier)
+  - docs/contracts/taxonomy.md SS2.4 (`runtime_consumed` boolean modifier -- v1, D65)
   - specs/003-workforce/data-model.md SS1 (the categorization record + its
     "File-level validation (validate-categorization.py, code)" row)
   - specs/003-workforce/spec.md FR-002, FR-004, SC-001, SC-002
@@ -37,18 +38,20 @@ scalar-parsing logic:
 WHAT IS CHECKED (both are hard FAILs, never a warning):
 
   1. Coverage (SC-001). Every task row under "## Categorization table"
-     carries all four fields -- type, specialization, preserves_behavior,
-     tags -- and:
+     carries all five fields -- type, specialization, preserves_behavior,
+     runtime_consumed, tags -- and:
        - `type`             is one of the closed 8 (taxonomy SS2)
        - `specialization`   is one of the closed 11 (taxonomy SS4: 10 lanes
                              + the `general` escape hatch)
        - `preserves_behavior` parses as an actual boolean (via the shared
                              scalar parser, not a bespoke check)
+       - `runtime_consumed` parses as an actual boolean (v1 modifier,
+                             taxonomy SS2.4/D65 -- same shared scalar parser)
        - `tags`             is an accepted "empty" marker, or a list of
                              lowercase-kebab tokens (`^[a-z0-9]+(-[a-z0-9]+)*$`)
      An un-enumerable `type`/`specialization` value is ALWAYS a FAIL -- this
      script never invents or coerces a value into one it recognizes
-     (taxonomy-v0.md SS8: a new value is a docs/90 D-row, never a validator
+     (taxonomy.md SS8: a new value is a docs/90 D-row, never a validator
      special-case). `task_id` must additionally match `T\\d+` and be unique
      within the file (data-model.md SS1: "present, unique").
 
@@ -63,15 +66,18 @@ WHAT IS CHECKED (both are hard FAILs, never a warning):
      script's row-internal validation.
 
   2. The general cap (FR-004/SC-002, taxonomy SS4): count(general) must not
-     exceed 0.20 x count(tasks). Computed by EXACT integer arithmetic
-     (`general * 5 > total * 1`, since 0.20 == 1/5), never a float, so the
-     boundary can never drift on a binary floating-point rounding edge (the
-     D44 small-feature edge case -- n<5 tasks admits ZERO `general` -- falls
-     out correctly for the same reason). This script recomputes the cap
-     independently from the table rows; it never trusts the categorizer's own
-     prose "## Cap Check" line (categorizer-prompt.md Step 2: "if its count
-     and yours ever disagree, its count governs, not yours" -- "its" is this
-     validator's).
+     exceed max(1, floor(0.20 x count(tasks))) -- the v1 floor'd cap (D65
+     verdict 9). Computed by EXACT integer arithmetic (`limit = max(1, total
+     // 5)`, breach iff `general > limit`, since 0.20 == 1/5), never a float,
+     so the boundary can never drift on a binary floating-point rounding edge.
+     The `max(1, .)` floor is the ONLY change from v0: a feature with n<5
+     tasks now admits exactly ONE `general` task (v0's literal 20% cap admitted
+     ZERO -- D44's formal absurdity, deleted by D65); for n>=5 the floor is
+     inert and the cap is the same 20% it always was. This script recomputes
+     the cap independently from the table rows; it never trusts the
+     categorizer's own prose "## Cap Check" line (categorizer-prompt.md Step 2:
+     "if its count and yours ever disagree, its count governs, not yours" --
+     "its" is this validator's).
 
 EXIT CONTRACT (S22 -- read this before wiring a command around this script):
 
@@ -154,6 +160,7 @@ __all__ = [
     "parse_categorization_table",
     "validate_record",
     "validate_cap",
+    "general_cap_limit",
     "validate_categorization_text",
     "validate_categorization_file",
     "main",
@@ -161,7 +168,7 @@ __all__ = [
 
 
 # ---------------------------------------------------------------------------
-# Closed taxonomy enums -- docs/contracts/taxonomy-v0.md SS2 / SS4 (BLESSED,
+# Closed taxonomy enums -- docs/contracts/taxonomy.md SS2 / SS4 (BLESSED,
 # 2026-07-09). Adding a value here is a docs/90 D-row (taxonomy SS8), never a
 # code fix -- these two sets are the enforcement of "closed enum", not a
 # convenience default.
@@ -196,19 +203,27 @@ CATEGORIZATION_SPECIALIZATIONS = frozenset(
     }
 )
 
-assert len(CATEGORIZATION_TYPES) == 8, "taxonomy-v0.md SS2: exactly 8 types"
+assert len(CATEGORIZATION_TYPES) == 8, "taxonomy.md SS2: exactly 8 types"
 assert len(CATEGORIZATION_SPECIALIZATIONS) == 11, (
-    "taxonomy-v0.md SS4: exactly 11 specializations (10 lanes + general)"
+    "taxonomy.md SS4: exactly 11 specializations (10 lanes + general)"
 )
 
-# FR-004/SC-002: count(general) <= 0.20 * count(tasks). Kept as an exact
-# integer fraction (1/5) rather than the float 0.20 so the boundary (e.g.
-# exactly 1/5 of the tasks) never drifts on a binary floating-point rounding
-# edge; see validate_cap().
+# FR-004/SC-002: count(general) <= max(1, floor(0.20 * count(tasks))) -- the v1
+# one-task floor (D65 verdict 9; taxonomy.md SS4). Kept as an exact integer
+# fraction (1/5) rather than the float 0.20 so the boundary (e.g. exactly 1/5 of
+# the tasks) never drifts on a binary floating-point rounding edge, and the
+# max(1, .) floor is exact integer arithmetic too; see validate_cap().
 GENERAL_CAP_NUMERATOR = 1
 GENERAL_CAP_DENOMINATOR = 5
 
-EXPECTED_HEADER = ["task_id", "type", "specialization", "preserves_behavior", "tags"]
+EXPECTED_HEADER = [
+    "task_id",
+    "type",
+    "specialization",
+    "preserves_behavior",
+    "runtime_consumed",  # v1, D65 -- taxonomy.md S2.4
+    "tags",
+]
 
 _TASK_ID_RE = re.compile(r"^T\d+$")
 _KEBAB_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
@@ -258,6 +273,7 @@ class CategorizationRecord:
     type_raw: str
     specialization_raw: str
     preserves_behavior_raw: str
+    runtime_consumed_raw: str  # v1, D65 -- taxonomy.md S2.4
     tags_raw: str
     line_no: int
 
@@ -349,7 +365,7 @@ def _validate_tags(cell: str) -> str | None:
     if bad:
         return (
             f"tags {bad!r} are not lowercase-kebab "
-            f"(^[a-z0-9]+(-[a-z0-9]+)*$, taxonomy-v0.md SS6)"
+            f"(^[a-z0-9]+(-[a-z0-9]+)*$, taxonomy.md SS6)"
         )
     return None
 
@@ -430,13 +446,14 @@ def parse_categorization_table(
             )
             i += 1
             continue
-        task_id, type_raw, spec_raw, pb_raw, tags_raw = (c.strip() for c in cells)
+        task_id, type_raw, spec_raw, pb_raw, rc_raw, tags_raw = (c.strip() for c in cells)
         records.append(
             CategorizationRecord(
                 task_id=task_id,
                 type_raw=type_raw,
                 specialization_raw=spec_raw,
                 preserves_behavior_raw=pb_raw,
+                runtime_consumed_raw=rc_raw,
                 tags_raw=tags_raw,
                 line_no=i + 1,
             )
@@ -469,8 +486,8 @@ def validate_record(rec: CategorizationRecord) -> list[str]:
     elif type_token not in CATEGORIZATION_TYPES:
         errs.append(
             f"{where}: type {type_token!r} is not a member of the closed "
-            f"taxonomy v0 type enum {sorted(CATEGORIZATION_TYPES)} (never "
-            f"invented -- taxonomy-v0.md SS2/SS8)"
+            f"taxonomy v1 type enum {sorted(CATEGORIZATION_TYPES)} (never "
+            f"invented -- taxonomy.md SS2/SS8)"
         )
 
     spec_token = _clean_token(rec.specialization_raw)
@@ -479,9 +496,9 @@ def validate_record(rec: CategorizationRecord) -> list[str]:
     elif spec_token not in CATEGORIZATION_SPECIALIZATIONS:
         errs.append(
             f"{where}: specialization {spec_token!r} is not a member of the "
-            f"closed taxonomy v0 specialization enum "
+            f"closed taxonomy v1 specialization enum "
             f"{sorted(CATEGORIZATION_SPECIALIZATIONS)} (never invented -- "
-            f"taxonomy-v0.md SS4/SS8)"
+            f"taxonomy.md SS4/SS8)"
         )
 
     pb_token = _clean_token(rec.preserves_behavior_raw)
@@ -494,7 +511,21 @@ def validate_record(rec: CategorizationRecord) -> list[str]:
         if not isinstance(parsed, bool):
             errs.append(
                 f"{where}: preserves_behavior {pb_token!r} is not a boolean "
-                f"true/false (taxonomy-v0.md SS2.3)"
+                f"true/false (taxonomy.md SS2.3)"
+            )
+
+    # runtime_consumed -- the v1 modifier (taxonomy.md SS2.4, D65), validated
+    # exactly like preserves_behavior: a real boolean via the same shared scalar
+    # parser, never a bespoke string check.
+    rc_token = _clean_token(rec.runtime_consumed_raw)
+    if not rc_token:
+        errs.append(f"{where}: missing 'runtime_consumed'")
+    else:
+        parsed_rc = _parse_scalar_token(rc_token)
+        if not isinstance(parsed_rc, bool):
+            errs.append(
+                f"{where}: runtime_consumed {rc_token!r} is not a boolean "
+                f"true/false (taxonomy.md SS2.4, D65)"
             )
 
     tags_error = _validate_tags(rec.tags_raw)
@@ -509,29 +540,42 @@ def validate_record(rec: CategorizationRecord) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+def general_cap_limit(total_count: int) -> int:
+    """The v1 floor'd cap ceiling for `total_count` tasks (D65 verdict 9):
+    `max(1, floor(0.2 * total))`, computed by EXACT integer arithmetic
+    (`floor(0.2 * n) == n // 5`, since 0.20 == 1/5). One source of truth for
+    both `validate_cap`'s breach test and `main`'s reported ceiling.
+    """
+    return max(1, (total_count * GENERAL_CAP_NUMERATOR) // GENERAL_CAP_DENOMINATOR)
+
+
 def validate_cap(general_count: int, total_count: int) -> str | None:
     """Return a violation message, or `None` if `general_count` is within
     the FR-004/SC-002 cap of `total_count`.
 
-    `count(general) > 0.20 * count(tasks)` is evaluated as the EXACT
-    integer inequality `general * 5 > total * 1` (0.20 == 1/5) -- never as
-    a float comparison -- so there is no binary floating-point rounding
-    edge at an exact-fraction boundary (e.g. exactly 1 general task out of
-    5 total: 1*5 == 5*1, not a breach; taxonomy-v0.md SS4's D44 note on the
-    n<5 edge case falls out correctly for the same reason: 1*5 > 4*1 is a
-    breach, so a 4-task feature admits zero `general` tasks, exactly as
-    D44 rules).
+    v1 cap (D65 verdict 9, taxonomy.md SS4): `count(general) <= max(1,
+    floor(0.20 * count(tasks)))`. Evaluated as EXACT integer arithmetic --
+    `floor(0.20 * n) == n // 5` (0.20 == 1/5), then a `max(1, .)` one-task
+    floor -- never a float comparison, so there is no binary floating-point
+    rounding edge at an exact-fraction boundary (e.g. exactly 2 general out of
+    10: limit == 2, `2 > 2` is False, not a breach; the cap is `>`, not `>=`).
+
+    The floor changes exactly the n<5 case vs. v0: `floor(0.2 * 4) == 0`, but
+    `max(1, 0) == 1`, so a <5-task feature now admits exactly ONE `general`
+    task (v0's literal cap admitted zero -- D44's formal absurdity, deleted by
+    D65). For n>=5 the `max(1, .)` is inert and the cap is the same 20% it
+    always was.
     """
     if total_count <= 0:
         return None  # the zero-rows case is already reported as its own error
-    if general_count * GENERAL_CAP_DENOMINATOR > total_count * GENERAL_CAP_NUMERATOR:
-        limit = (GENERAL_CAP_NUMERATOR * total_count) / GENERAL_CAP_DENOMINATOR
+    limit = general_cap_limit(total_count)
+    if general_count > limit:
         return (
             f"general cap breach: count(general)={general_count} exceeds "
-            f"{GENERAL_CAP_NUMERATOR}/{GENERAL_CAP_DENOMINATOR} x "
-            f"count(tasks)={total_count} (limit {limit:.2f}; taxonomy-v0.md "
-            f"SS4, FR-004/SC-002) -- redo with better evidence; never widen "
-            f"the cap or retag a task to dodge it"
+            f"max(1, floor({GENERAL_CAP_NUMERATOR}/{GENERAL_CAP_DENOMINATOR} x "
+            f"count(tasks)={total_count})) = {limit} (taxonomy.md SS4, "
+            f"FR-004/SC-002, D65 verdict 9) -- redo with better evidence; never "
+            f"widen the cap or retag a task to dodge it"
         )
     return None
 
@@ -683,11 +727,11 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 1
 
-    limit = (GENERAL_CAP_NUMERATOR * result.total_count) / GENERAL_CAP_DENOMINATOR
+    limit = general_cap_limit(result.total_count)
     print(
         f"validate-categorization.py: OK -- {result.total_count} task(s), "
         f"general {result.general_count}/{result.total_count} "
-        f"(cap {limit:.2f})."
+        f"(cap {limit})."
     )
     return 0
 

@@ -91,7 +91,7 @@ Grants are **declared, not inherited**: a skill may not grant a tool the base al
 
 ## 5. Seed module — `refactor-discipline`
 
-**The first skill module, and the reason OQ1 could be overruled** (`taxonomy-v0.md` §2.3). It carries the discipline that `refactor`-as-a-type existed to supply, without costing a type.
+**The first skill module, and the reason OQ1 could be overruled** (`taxonomy.md` §2.3). It carries the discipline that `refactor`-as-a-type existed to supply, without costing a type.
 
 Auto-injected — not tag-matched — whenever `preserves_behavior: true`. It counts against the assembly cap of 3, so a behavior-preserving task with many tags gets two tag-selected skills, not three.
 

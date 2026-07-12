@@ -12,7 +12,7 @@
 
 ## Categorization table
 
-| task_id | type | specialization | preserves_behavior | tags |
-|---|---|---|---|---|
-| T001 | `scaffold` | `devtools-cli` | false | test |
-| T001 | `service` | `qa-automation` | false | test |
+| task_id | type | specialization | preserves_behavior | runtime_consumed | tags |
+|---|---|---|---|---|---|
+| T001 | `scaffold` | `devtools-cli` | false | false | test |
+| T001 | `service` | `qa-automation` | false | false | test |

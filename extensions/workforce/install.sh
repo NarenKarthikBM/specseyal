@@ -349,7 +349,7 @@ fi
 # --- done -------------------------------------------------------------------
 echo
 bold "Done. The workforce pair now runs itself:"
-echo "  1. /speckit-categorize        → Sonnet tags every task (taxonomy v0), code-capped at general ≤ 20%"
+echo "  1. /speckit-categorize        → Sonnet tags every task (taxonomy v1), code-capped at general ≤ max(1, ⌊0.2n⌋)"
 echo "  2. /speckit-agent-assign      → assemble.py matches the roster deterministically (skill-builder on a ∅-match gap)"
 echo "  3. /speckit-workforce-approve → records the human gate signature, unlocks /speckit-implement-parallel"
 echo

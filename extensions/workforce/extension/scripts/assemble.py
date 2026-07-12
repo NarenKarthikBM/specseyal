@@ -4,13 +4,17 @@
 Implements, verbatim, the matching/assembly algorithm at
 `docs/contracts/agent-library-schema.md` S3 (base lookup by
 `(type, specialization)`; tag-ranked skill injection; grant union; the
-D48 Sonnet-floor guard) plus the surrounding contracts it depends on:
+runtime_consumed Sonnet-floor guard -- the re-homed D48 guard, D65) plus the
+surrounding contracts it depends on:
 
   - docs/contracts/agent-library-schema.md S3   the matching/assembly algorithm
-  - docs/contracts/agent-library-schema.md S4   model policy / the D48 guard
+  - docs/contracts/agent-library-schema.md S4   model policy / the runtime_consumed guard
   - docs/contracts/agent-library-schema.md S4.1 tool grants (core vs. elevated)
-  - docs/contracts/taxonomy-v0.md S2.3          preserves_behavior -> force-inject
+  - docs/contracts/taxonomy.md S2.3             preserves_behavior -> force-inject
                                                  skl_refactor_discipline
+  - docs/contracts/taxonomy.md S2.4             runtime_consumed -> pin the Sonnet
+                                                 floor (v1, D65; supersedes the D48
+                                                 `prompt`-tag convention)
   - docs/contracts/skill-module.md              skill fields (tags, grants, stats)
   - docs/contracts/artifact-layout.md S8        the '## Workforce Gate' / roster
                                                  format (columns, rules W1-W4)
@@ -20,7 +24,8 @@ D48 Sonnet-floor guard) plus the surrounding contracts it depends on:
                                                  script writes the roster itself),
                                                  S18 (library-snapshot hash),
                                                  FR-022 (library|built marks),
-                                                 D48 (the Sonnet-floor guard)
+                                                 D48/D65 (the runtime_consumed
+                                                 Sonnet-floor guard)
 
 This module is imported by the shared `frontmatter.py` (S21) for all
 frontmatter parsing -- it does not re-implement that closed-shape parser.
@@ -38,7 +43,8 @@ safe despite the rule.
 Write boundary (S08). `main()` writes exactly one file: the rendered
 `agents/assignment.md`, filling only the template's `{{UPPER_SNAKE}}`
 tokens (FEATURE, TASK_COUNT, TASKS_SHA, LIBRARY_SNAPSHOT_HASH,
-ROSTER_ROWS, EMPTY_LANE_NOTES, DROPPED_SKILL_NOTES). Every
+ROSTER_ROWS, EMPTY_LANE_NOTES, DROPPED_SKILL_NOTES, and -- v1, D65/D66/D67 --
+GAP_CLUSTER_NOTES and GRANT_TRIPWIRE_NOTES). Every
 `[PENDING ...]` bracket marker in the template -- the Workforce Gate's
 timestamp, reviewer, decision, reviewed, Notes, and Overrides fields --
 is copied through unchanged, because this script only ever `.replace()`s
@@ -55,10 +61,25 @@ Scope note (S3 step 4 / the skill-builder gap). A task whose tag-based
 skill candidates are empty (but whose own tags are non-empty) is a
 "gap": something the Sonnet skill-builder should author a new SKILL.md
 for (D2, D40.2) -- out of this zero-AI script's scope. This script only
-detects and reports it: each `Assembly.skill_gap` flag, and a
-`GAP_TASKS: T005,T012` line on stdout for the calling command
-(`/speckit-agent-assign`, T016) to act on. The gap is never written into
-the roster artifact itself -- the template has no slot for it.
+detects, BATCHES, and reports it: each `Assembly.skill_gap` flag; a
+`GAP_TASKS: T005,T012` line on stdout; and -- v1, D66 verdict 11 -- the
+gap tasks grouped into shared-tag clusters (`compute_gap_clusters`,
+connected components by tag intersection), emitted as a `GAP_CLUSTERS:
+[T005,T012] [T020]` stdout line AND recorded in the roster artifact itself
+(the `{{GAP_CLUSTER_NOTES}}` slot). The skill-builder authors exactly one
+module per cluster; the gap-batching that was formerly the
+`/speckit-agent-assign` command's own prose is now this assembler's
+deterministic output. Authoring the modules stays out of scope (an LLM
+session, T025).
+
+Scope note (grant tripwire, S3 step 3 grants / D67 verdict 12). The
+roster-wide elevated-grant union is emitted as a `GRANT_TRIPWIRE:` stdout
+line and recorded in the roster (`{{GRANT_TRIPWIRE_NOTES}}`). A non-empty
+union forces the workforce gate to a human regardless of
+`gates.workforce.mode: auto` (approving a grant-bearing roster is
+approving network/tool access, A-2/D41). This script only stamps the
+signal; honoring it is the two gate-resolution paths' job
+(`/speckit-agent-assign` S3, `/speckit-workforce-approve`).
 
 CLI
 ---
@@ -76,8 +97,11 @@ skills at `<library-dir>/skills`, both overridable independently);
 Exit codes
 ----------
   0  success -- the roster was written.
-  2  D48 guard violated (FR-014/SC-006): a `prompt`-tagged task assembled
-     onto a non-Sonnet base. Hard error. Nothing was written.
+  2  runtime_consumed guard violated (FR-014/SC-006): a `runtime_consumed:
+     true` task assembled onto a non-Sonnet base. Hard error. Nothing was
+     written. (The former D48 `prompt`-tag guard, re-homed on the modifier
+     that superseded the tag -- D65 verdict 10; still exit 2, still names
+     D48 in its message for continuity.)
   3  malformed input or a library invariant violation: categorization.md
      did not parse, a duplicate id, a non-unique `(type, specialization)`
      lane, a missing FR-016 generic fallback base, a missing
@@ -126,11 +150,14 @@ __all__ = [
     "load_skills",
     "assemble_task",
     "assemble_all",
+    "compute_gap_clusters",
     "compute_library_snapshot_hash",
     "group_into_rows",
     "render_roster_table",
     "render_empty_lane_notes",
     "render_dropped_notes",
+    "render_gap_cluster_notes",
+    "render_grant_tripwire_notes",
     "render_assignment_md",
     "main",
 ]
@@ -141,8 +168,8 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 ASSEMBLY_CAP = 3  # D40: base + at most 3 injected skills, no exceptions.
-REFACTOR_DISCIPLINE_ID = "skl_refactor_discipline"  # taxonomy-v0.md S2.3
-GENERAL_SPECIALIZATION = "general"  # taxonomy-v0.md S4 -- the FR-016 fallback lane
+REFACTOR_DISCIPLINE_ID = "skl_refactor_discipline"  # taxonomy.md S2.3
+GENERAL_SPECIALIZATION = "general"  # taxonomy.md S4 -- the FR-016 fallback lane
 
 
 # ---------------------------------------------------------------------------
@@ -160,8 +187,12 @@ class AssembleError(Exception):
 
 
 class D48GuardError(AssembleError):
-    """FR-014/SC-006: at least one `prompt`-tagged task assembled onto a
-    non-Sonnet base. Hard error, non-zero exit, nothing written (D48).
+    """FR-014/SC-006: at least one `runtime_consumed: true` task assembled
+    onto a non-Sonnet base. Hard error, non-zero exit, nothing written. This is
+    the former D48 `prompt`-tag guard, re-homed on the `runtime_consumed`
+    modifier that superseded the tag (taxonomy.md S2.4, D65 verdict 10); the
+    class keeps its D48 name for continuity with the exit-code contract and the
+    tests that grep the message for `D48`.
     """
 
 
@@ -175,10 +206,11 @@ class Task:
     """One row of categorization.md's table (data-model.md S1)."""
 
     task_id: str
-    type: str  # taxonomy-v0.md S2 -- one of 8
-    specialization: str  # taxonomy-v0.md S4 -- one of 11 (incl. `general`)
-    preserves_behavior: bool  # taxonomy-v0.md S2.3
-    tags: list[str]  # taxonomy-v0.md S6 -- free, lowercase kebab-case
+    type: str  # taxonomy.md S2 -- one of 8
+    specialization: str  # taxonomy.md S4 -- one of 11 (incl. `general`)
+    preserves_behavior: bool  # taxonomy.md S2.3
+    runtime_consumed: bool  # taxonomy.md S2.4 (v1, D65) -- pins the Sonnet floor
+    tags: list[str]  # taxonomy.md S6 -- free, lowercase kebab-case
 
 
 @dataclass
@@ -255,7 +287,7 @@ class Library:
 @dataclass
 class InjectedSkill:
     skill: Skill
-    forced: bool  # True iff force-injected via preserves_behavior (taxonomy-v0.md S2.3)
+    forced: bool  # True iff force-injected via preserves_behavior (taxonomy.md S2.3)
     mark: str  # "library" | "built" (FR-022)
 
 
@@ -367,16 +399,24 @@ def _parse_tags(cell: str) -> list[str]:
     return [_strip_decoration(tok) for tok in cell.split(",") if tok.strip() != ""]
 
 
-def _task_sort_key(task: Task) -> tuple[int, int, str]:
+def _task_id_sort_key(task_id: str) -> tuple[int, int, str]:
     """Ascending, numeric-aware task-id order (T2 before T10), falling
     back to plain string order for any id that doesn't match `T<digits>`
     -- so the sort is still total (no crash, no ambiguity) even on an
-    unexpected id shape.
+    unexpected id shape. Keyed on the bare id string so gap-cluster ordering
+    (compute_gap_clusters, D66) can reuse it without a Task in hand.
     """
-    m = _TASK_ID_RE.match(task.task_id)
+    m = _TASK_ID_RE.match(task_id)
     if m:
-        return (0, int(m.group(1)), task.task_id)
-    return (1, 0, task.task_id)
+        return (0, int(m.group(1)), task_id)
+    return (1, 0, task_id)
+
+
+def _task_sort_key(task: Task) -> tuple[int, int, str]:
+    """`_task_id_sort_key` for a whole Task -- the numeric-aware order the
+    parser and every roster/notes renderer sort by.
+    """
+    return _task_id_sort_key(task.task_id)
 
 
 def parse_categorization(path: str | Path) -> Categorization:
@@ -430,11 +470,12 @@ def parse_categorization(path: str | Path) -> Categorization:
         if not stripped.startswith("|"):
             break
         cells = _split_row(stripped)
-        if len(cells) < 5:
+        if len(cells) < 6:
             raise AssembleError(
-                f"{p}: line {i + 1}: expected 5 columns "
-                f"(task_id, type, specialization, preserves_behavior, tags), "
-                f"got {len(cells)}: {raw!r}"
+                f"{p}: line {i + 1}: expected 6 columns "
+                f"(task_id, type, specialization, preserves_behavior, runtime_consumed, tags), "
+                f"got {len(cells)}: {raw!r} -- the runtime_consumed modifier column is v1 "
+                f"(taxonomy.md S2.4, D65)"
             )
         task_id = _strip_decoration(cells[0])
         type_ = _strip_decoration(cells[1])
@@ -445,7 +486,13 @@ def parse_categorization(path: str | Path) -> Categorization:
                 f"{p}: line {i + 1}: preserves_behavior must be 'true' or 'false', "
                 f"got {cells[3]!r}"
             )
-        tags = _parse_tags(cells[4])
+        rc_raw = _strip_decoration(cells[4]).lower()
+        if rc_raw not in ("true", "false"):
+            raise AssembleError(
+                f"{p}: line {i + 1}: runtime_consumed must be 'true' or 'false', "
+                f"got {cells[4]!r} (taxonomy.md S2.4, D65)"
+            )
+        tags = _parse_tags(cells[5])
         if not task_id or not type_ or not specialization:
             raise AssembleError(
                 f"{p}: line {i + 1}: task_id, type, and specialization must all be "
@@ -456,7 +503,9 @@ def parse_categorization(path: str | Path) -> Categorization:
                 f"{p}: duplicate task_id {task_id!r} (line {seen[task_id] + 1} and line {i + 1})"
             )
         seen[task_id] = i
-        tasks.append(Task(task_id, type_, specialization, pb_raw == "true", tags))
+        tasks.append(
+            Task(task_id, type_, specialization, pb_raw == "true", rc_raw == "true", tags)
+        )
         i += 1
 
     if not tasks:
@@ -694,7 +743,7 @@ def assemble_task(task: Task, library: Library, built_skill_ids: frozenset[str])
             raise AssembleError(
                 f"task {task.task_id}: preserves_behavior=true requires "
                 f"{REFACTOR_DISCIPLINE_ID!r} in the skill library, but it is not present "
-                f"(taxonomy-v0.md S2.3)"
+                f"(taxonomy.md S2.3)"
             )
         forced.append(InjectedSkill(skill=rd, forced=True, mark=_mark(rd.id, built_skill_ids)))
         forced_ids.add(rd.id)  # membership test only -- never iterated for output (S01)
@@ -741,20 +790,75 @@ def assemble_all(
     """
     assemblies = [assemble_task(t, library, built_skill_ids) for t in tasks]
 
-    violations = [a for a in assemblies if "prompt" in a.task.tags and a.base.model != "sonnet"]
+    violations = [a for a in assemblies if a.task.runtime_consumed and a.base.model != "sonnet"]
     if violations:
         detail = "; ".join(
             f"{a.task.task_id} -> base {a.base.id!r} (model={a.base.model!r})"
             for a in violations
         )
         raise D48GuardError(
-            f"D48 guard violated (FR-014/SC-006) on {len(violations)} task(s): {detail}. "
-            f"A `prompt`-tagged task MUST assemble onto a Sonnet implementation specialist, "
-            f"never a docs-exempt non-Sonnet base (agent-library-schema.md S4, "
-            f"taxonomy-v0.md S3, D48). Nothing was written."
+            f"runtime_consumed guard violated (FR-014/SC-006) on {len(violations)} task(s): "
+            f"{detail}. A `runtime_consumed: true` task MUST assemble onto a Sonnet "
+            f"implementation specialist, never a docs-exempt non-Sonnet base "
+            f"(agent-library-schema.md S4, taxonomy.md S2.4/S3). This is the former D48 "
+            f"`prompt`-tag guard, re-homed on the modifier that superseded the tag "
+            f"(D65 verdict 10); the tag-convention check is retired. Nothing was written."
         )
 
     return assemblies
+
+
+# ---------------------------------------------------------------------------
+# 5b. Gap-batching -- connected components over the gap tasks (D66 verdict 11)
+# ---------------------------------------------------------------------------
+
+
+def compute_gap_clusters(assemblies: list[Assembly]) -> list[list[str]]:
+    """Group the gap tasks (`skill_gap == True`) into shared-tag clusters --
+    the connected components of the graph whose nodes are gap tasks and whose
+    edges join any two gap tasks whose tag lists intersect (FR-006/SC-007).
+
+    The skill-builder authors exactly ONE module per cluster: a shared tag across
+    several gapped tasks is one well-scoped module's job, never one-per-task. This
+    is the gap-batching the v1 review (D66 verdict 11) moved OUT of the
+    /speckit-agent-assign command's prose and INTO the assembler's own output, so
+    cluster membership is a deterministic, recorded artifact (rendered into the
+    roster by render_gap_cluster_notes, emitted on stdout as GAP_CLUSTERS) rather
+    than a graph the command re-derives by hand each run.
+
+    Determinism (S01). Gap tasks are taken in task_id-ascending order; union-find
+    always roots a merged component at its LOWEST member index; each cluster's
+    members come out task_id-ascending (the input was pre-sorted); and the clusters
+    are ordered by their lowest member. No Python `set` is ever iterated into the
+    result -- the `set()` calls test tag intersection for truthiness (`&`) only,
+    never for order (the same discipline as `_jaccard`/`_find_candidates`).
+    """
+    gaps = sorted((a for a in assemblies if a.skill_gap), key=lambda a: _task_sort_key(a.task))
+    n = len(gaps)
+    parent = list(range(n))
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]  # path halving
+            x = parent[x]
+        return x
+
+    def union(a: int, b: int) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[max(ra, rb)] = min(ra, rb)  # lowest index stays root (S01)
+
+    for i in range(n):
+        ti = set(gaps[i].task.tags)  # membership/`&` only -- never iterated (S01)
+        for j in range(i + 1, n):
+            if ti & set(gaps[j].task.tags):
+                union(i, j)
+
+    clusters: dict[int, list[str]] = {}
+    for i in range(n):
+        clusters.setdefault(find(i), []).append(gaps[i].task.task_id)
+    # members are already task_id-ascending; order clusters by their lowest member.
+    return sorted(clusters.values(), key=lambda ids: _task_id_sort_key(ids[0]))
 
 
 # ---------------------------------------------------------------------------
@@ -901,6 +1005,56 @@ def render_dropped_notes(assemblies: list[Assembly]) -> str:
     return "\n".join(lines)
 
 
+def render_gap_cluster_notes(clusters: list[list[str]]) -> str:
+    """FR-006/SC-007 (D66 verdict 11): record the gap-batching clusters in the
+    roster itself. One bullet per shared-tag cluster of gap tasks; the
+    skill-builder authors exactly one module per bullet, never one per task. The
+    v1 review moved this from /speckit-agent-assign's prose into the assembler's
+    output so cluster membership is a deterministic, committed artifact.
+    """
+    if not clusters:
+        return (
+            "**Gap clusters (FR-006/SC-007, D66):** none — every task matched at "
+            "least one skill (or carries no tags). Gap-free; nothing for the "
+            "skill-builder to author."
+        )
+    total_gaps = sum(len(ids) for ids in clusters)
+    lines = [
+        f"**Gap clusters (FR-006/SC-007, D66):** {total_gaps} gap task(s) in "
+        f"{len(clusters)} shared-tag cluster(s) — the skill-builder authors exactly "
+        f"one module per cluster (dedup), never one per gap task.",
+        "",
+    ]
+    lines += [f"- cluster {k}: {', '.join(ids)}" for k, ids in enumerate(clusters, 1)]
+    return "\n".join(lines)
+
+
+def render_grant_tripwire_notes(grants: list[str]) -> str:
+    """D67 verdict 12: any elevated grant anywhere in the roster forces the
+    workforce gate to a human, regardless of `profile.yaml`. `gates.workforce.mode:
+    auto` is otherwise valid standalone (economic guard, profile-schema.md P4) --
+    but approving a grant-bearing roster is approving network/tool access, which
+    A-2 (D41) demands a human see. The assembler stamps this tripwire so both the
+    auto-write path (/speckit-agent-assign S3) and the human gate
+    (/speckit-workforce-approve) honor it mechanically off one signal.
+
+    `grants` is the roster-wide elevated-grant union, already total-ordered (S01).
+    """
+    if not grants:
+        return (
+            "**Grant tripwire (D67):** clear — no elevated grants in this roster. "
+            "`gates.workforce.mode: auto` may auto-approve (profile-schema.md P4)."
+        )
+    listed = ", ".join(f"`{g}`" for g in grants)
+    return (
+        f"**Grant tripwire (D67): ENGAGED** — this roster carries elevated grant(s) "
+        f"{listed}. The workforce gate REQUIRES a human signature regardless of "
+        f"`profile.yaml`: `gates.workforce.mode: auto` does not auto-approve here "
+        f"(approving the roster is approving that network/tool access — profile-schema.md "
+        f"P4 + D67 verdict 12)."
+    )
+
+
 _COMMENT_RE = re.compile(r"<!--.*?-->\n?", re.DOTALL)
 _TOKEN_RE = re.compile(r"\{\{[A-Z_]+\}\}")
 
@@ -1032,6 +1186,8 @@ def main(argv: list[str] | None = None) -> int:
 
     snapshot_hash = compute_library_snapshot_hash(library)
     rows = group_into_rows(assemblies)
+    clusters = compute_gap_clusters(assemblies)  # D66 -- gap-batching
+    roster_grants = total_order([g for r in rows for g in r.grants])  # D67 tripwire input
 
     substitutions = {
         "FEATURE": categorization.feature,
@@ -1041,6 +1197,8 @@ def main(argv: list[str] | None = None) -> int:
         "ROSTER_ROWS": render_roster_table(rows),
         "EMPTY_LANE_NOTES": render_empty_lane_notes(assemblies),
         "DROPPED_SKILL_NOTES": render_dropped_notes(assemblies),
+        "GAP_CLUSTER_NOTES": render_gap_cluster_notes(clusters),
+        "GRANT_TRIPWIRE_NOTES": render_grant_tripwire_notes(roster_grants),
     }
 
     try:
@@ -1065,6 +1223,12 @@ def main(argv: list[str] | None = None) -> int:
         f"({len(rows)} roster row(s) over {len(categorization.tasks)} task(s))"
     )
     print(f"GAP_TASKS: {','.join(gap_ids)}")
+    # GAP_CLUSTERS: the shared-tag batching /speckit-agent-assign dispatches on (D66) --
+    # one bracketed, comma-joined member list per cluster, space-separated; empty when gap-free.
+    print(f"GAP_CLUSTERS: {' '.join('[' + ','.join(ids) + ']' for ids in clusters)}")
+    # GRANT_TRIPWIRE: the D67 signal the gate-resolution paths read -- the total-ordered
+    # roster-wide elevated-grant union, or `none`. Non-`none` forces the gate to human.
+    print(f"GRANT_TRIPWIRE: {', '.join(roster_grants) if roster_grants else 'none'}")
     if empty_lane_ids:
         print(f"assemble.py: empty lane (FR-016) on: {', '.join(empty_lane_ids)}")
     if dropped_count:

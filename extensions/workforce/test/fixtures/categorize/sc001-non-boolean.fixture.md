@@ -4,7 +4,7 @@
 > `extensions/workforce/test/test_categorize.sh`'s SC-001 case (c): T002's
 > `preserves_behavior` cell is `maybe` — not a boolean `true`/`false` token per the
 > shared scalar parser (`frontmatter.py`'s `_parse_scalar_token`, reused verbatim by
-> `validate-categorization.py` rather than a bespoke string check, taxonomy-v0.md
+> `validate-categorization.py` rather than a bespoke string check, taxonomy.md
 > §2.3). T001 is fully valid, isolating the breach to one row/field. Hand-authored,
 > not categorizer output.
 >
@@ -13,7 +13,7 @@
 
 ## Categorization table
 
-| task_id | type | specialization | preserves_behavior | tags |
-|---|---|---|---|---|
-| T001 | `scaffold` | `devtools-cli` | false | test |
-| T002 | `service` | `qa-automation` | maybe | test |
+| task_id | type | specialization | preserves_behavior | runtime_consumed | tags |
+|---|---|---|---|---|---|
+| T001 | `scaffold` | `devtools-cli` | false | false | test |
+| T002 | `service` | `qa-automation` | maybe | false | test |

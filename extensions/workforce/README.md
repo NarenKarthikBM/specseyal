@@ -4,7 +4,7 @@ The M3 **workforce pair** as **one** pipeline extension — the packaging echo o
 
 | Command | Role | Writes |
 |---|---|---|
-| `/speckit-categorize` | Sonnet `categorizer` + a code validator | `categorization.md` (taxonomy v0; 20% `general` cap enforced in code) |
+| `/speckit-categorize` | Sonnet `categorizer` + a code validator | `categorization.md` (taxonomy v1; `general` cap `max(1, ⌊0.2n⌋)` enforced in code) |
 | `/speckit-agent-assign` | deterministic `assemble.py` + (on a ∅-match) a Sonnet `skill-builder` | `agents/assignment.md` — the roster + `## Workforce Gate` |
 | `/speckit-workforce-approve` | mechanical gate signature (mirrors `/speckit-council-approve`) | the `## Workforce Gate` decision fields; fires `after_workforce_approve` |
 

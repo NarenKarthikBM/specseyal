@@ -13,18 +13,18 @@
 
 ## Categorization table
 
-| task_id | type | specialization | preserves_behavior | tags |
-|---|---|---|---|---|
-| T001 | `scaffold` | `devtools-cli` | false | scaffold |
-| T002 | `service` | `general` | false | misc |
-| T003 | `endpoint` | `general` | false | misc |
-| T004 | `data-model` | `data-persistence` | false | schema |
-| T005 | `ui` | `frontend-web` | false | component |
-| T006 | `test` | `qa-automation` | false | test |
-| T007 | `docs` | `ai-agents` | false | docs |
-| T008 | `infra` | `infra-platform` | false | infra |
-| T009 | `service` | `backend-service` | false | api |
-| T010 | `test` | `security` | false | test |
+| task_id | type | specialization | preserves_behavior | runtime_consumed | tags |
+|---|---|---|---|---|---|
+| T001 | `scaffold` | `devtools-cli` | false | false | scaffold |
+| T002 | `service` | `general` | false | false | misc |
+| T003 | `endpoint` | `general` | false | false | misc |
+| T004 | `data-model` | `data-persistence` | false | false | schema |
+| T005 | `ui` | `frontend-web` | false | false | component |
+| T006 | `test` | `qa-automation` | false | false | test |
+| T007 | `docs` | `ai-agents` | false | false | docs |
+| T008 | `infra` | `infra-platform` | false | false | infra |
+| T009 | `service` | `backend-service` | false | false | api |
+| T010 | `test` | `security` | false | false | test |
 
 ## Cap Check
 

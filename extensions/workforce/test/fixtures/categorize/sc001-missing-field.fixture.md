@@ -13,7 +13,7 @@
 
 ## Categorization table
 
-| task_id | type | specialization | preserves_behavior | tags |
-|---|---|---|---|---|
-| T001 | `scaffold` | `devtools-cli` | false | scaffold, tree |
-| T002 |  | `devtools-cli` | false | test |
+| task_id | type | specialization | preserves_behavior | runtime_consumed | tags |
+|---|---|---|---|---|---|
+| T001 | `scaffold` | `devtools-cli` | false | false | scaffold, tree |
+| T002 |  | `devtools-cli` | false | false | test |

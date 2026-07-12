@@ -33,7 +33,7 @@ specs/NNN-feature-slug/
 │   └── decision-record.md    ← append-per-round; permanent audit trail
 │
 ├── tasks.md                  ← /speckit-tasks-graph (stock format + `## Execution Waves`)
-├── categorization.md         ← speckit-ext-categorize    [taxonomy-v0.md]  (M3)
+├── categorization.md         ← speckit-ext-categorize    [taxonomy.md]  (M3)
 ├── agents/
 │   └── assignment.md         ← speckit-ext-agents; roster + workforce-gate decision (M3)  [§8]
 │

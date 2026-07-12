@@ -32,7 +32,8 @@ Frozen T021 test fixture. `type: [docs]` alone does not violate the D18 model
 policy (agent-library-schema.md §4 only forces `model: sonnet` on bases
 accepting one of the 7 IMPLEMENTATION types -- `docs` is not among them), so
 this base's `model: haiku` is otherwise unremarkable. That is exactly why it
-is the right synthetic fixture for SC-006/S03: a `prompt`-tagged task is
+is the right synthetic fixture for SC-006/S03: a `runtime_consumed: true` task is
 mechanically `type: docs` yet is real implementation prompt-authoring
-(taxonomy-v0.md §3, D48), so assembling it onto THIS base must be caught by
-the D48 guard's hard-error branch, not by the general model-policy validator.
+(taxonomy.md §2.4/§3; the re-homed D48 guard, D65 verdict 10), so assembling it
+onto THIS base must be caught by the guard's hard-error branch, not by the
+general model-policy validator.

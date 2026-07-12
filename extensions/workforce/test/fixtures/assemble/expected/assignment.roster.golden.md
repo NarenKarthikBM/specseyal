@@ -8,17 +8,20 @@
 >
 > **Inputs:** `categorization.md` (2 tasks) ⇐ `tasks.md @ deadbeef` (S14 freshness
 > binding — a stale SHA hard-warns and routes back to re-categorize rather than assembling against it).
-> **Library snapshot (S18):** content-hash `358a7aba25df9eada5c08c79b530694cd336f845134cbd3f81a21c0e251eebbd` — the base+skill set on disk when
+> **Library snapshot (S18):** content-hash `c13ce45b1b7b41b32a94d1be0a80875532a70837f682ffd27096ffe7813a9bc2` — the base+skill set on disk when
 > this run started, stamped so SC-005 ("gap-free ⇒ byte-identical roster") is checkable in one line.
 >
 > **Write boundary within this one file (principle 1):** `assemble.py` writes everything from here down
 > through the `### Roster approved` table — base/skill selection, the `library`/`built` marks (FR-022),
-> the elevated-grant union (FR-013, total-ordered per S01), and the empty-lane / dropped-skill notes
-> (FR-016 / FR-011). It never writes the gate timestamp or the `reviewer` / `decision` / `reviewed` /
-> `Notes:` / `Overrides:` fields below — those five are **`/speckit-workforce-approve`'s alone** (S13),
-> and hold the literal `[PENDING — …]` marker until a human signs (or, under `gates.workforce.mode: auto`
-> within `full_auto` only, the assigner resolves them itself in the same write — FR-020/W4; the pending
-> state shown here is the `human`-mode default).
+> the elevated-grant union (FR-013, total-ordered per S01), the empty-lane / dropped-skill notes
+> (FR-016 / FR-011), and (v1) the gap-cluster notes (FR-006/SC-007, D66) and the grant-tripwire notice
+> (D67). It never writes the gate timestamp or the `reviewer` / `decision` / `reviewed` / `Notes:` /
+> `Overrides:` fields below — those five are **`/speckit-workforce-approve`'s alone** (S13), and hold the
+> literal `[PENDING — …]` marker until a human signs (or, under `gates.workforce.mode: auto` — **valid
+> standalone**, `profile-schema.md` P4 / D67 verdict 12, no longer only within `full_auto` — the assigner
+> resolves them itself in the same write, **unless the grant tripwire below is ENGAGED**, which forces a
+> human signature regardless of profile — FR-020/W4; the pending state shown here is the `human`-mode
+> default).
 
 ## Workforce Gate — [PENDING — timestamp, set by `/speckit-workforce-approve`]
 
@@ -50,6 +53,10 @@
 **Dropped skills (cap=3, FR-011/SC-004):**
 
 - T002 — 4 candidate(s) ranked by tag-Jaccard (agent-library-schema.md S3 step 4); cap is 3; dropped `skl_fx_zeta@1.0.0`.
+
+**Gap clusters (FR-006/SC-007, D66):** none — every task matched at least one skill (or carries no tags). Gap-free; nothing for the skill-builder to author.
+
+**Grant tripwire (D67): ENGAGED** — this roster carries elevated grant(s) `aa_beta_only`, `web_search`, `zz_alpha_only`. The workforce gate REQUIRES a human signature regardless of `profile.yaml`: `gates.workforce.mode: auto` does not auto-approve here (approving the roster is approving that network/tool access — profile-schema.md P4 + D67 verdict 12).
 
 **Notes:** [PENDING — the reviewer's notes, or `none.` if there are none]
 

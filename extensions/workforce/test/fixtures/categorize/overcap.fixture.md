@@ -3,8 +3,8 @@
 > **Frozen test fixture.** Committed input for
 > `extensions/workforce/test/test_categorize.sh`'s case 2: `count(general) = 3` out
 > of `total = 10` — strictly above the `0.20 × 10 = 2` cap (FR-004/SC-002,
-> taxonomy-v0.md § The `general` cap). Every row is otherwise well-formed (all four
-> fields present, closed-enum, boolean, kebab tags) so the ONLY breach this fixture
+> taxonomy.md § The `general` cap). Every row is otherwise well-formed (all five
+> fields present, closed-enum, both booleans, kebab tags) so the ONLY breach this fixture
 > triggers is the cap — isolating the S22 no-write assertion from any coverage/enum
 > noise. Hand-authored, not categorizer output.
 >
@@ -13,18 +13,18 @@
 
 ## Categorization table
 
-| task_id | type | specialization | preserves_behavior | tags |
-|---|---|---|---|---|
-| T001 | `scaffold` | `devtools-cli` | false | scaffold |
-| T002 | `service` | `general` | false | misc |
-| T003 | `endpoint` | `general` | false | misc |
-| T004 | `data-model` | `general` | false | misc |
-| T005 | `ui` | `frontend-web` | false | component |
-| T006 | `test` | `qa-automation` | false | test |
-| T007 | `docs` | `ai-agents` | false | docs |
-| T008 | `infra` | `infra-platform` | false | infra |
-| T009 | `service` | `backend-service` | false | api |
-| T010 | `test` | `security` | false | test |
+| task_id | type | specialization | preserves_behavior | runtime_consumed | tags |
+|---|---|---|---|---|---|
+| T001 | `scaffold` | `devtools-cli` | false | false | scaffold |
+| T002 | `service` | `general` | false | false | misc |
+| T003 | `endpoint` | `general` | false | false | misc |
+| T004 | `data-model` | `general` | false | false | misc |
+| T005 | `ui` | `frontend-web` | false | false | component |
+| T006 | `test` | `qa-automation` | false | false | test |
+| T007 | `docs` | `ai-agents` | false | false | docs |
+| T008 | `infra` | `infra-platform` | false | false | infra |
+| T009 | `service` | `backend-service` | false | false | api |
+| T010 | `test` | `security` | false | false | test |
 
 ## Cap Check
 

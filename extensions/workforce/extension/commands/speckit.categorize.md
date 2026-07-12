@@ -1,10 +1,10 @@
 ---
-description: "Dispatch one Sonnet categorizer session over tasks.md + plan.md; code-validate against taxonomy v0 and the general-cap; write categorization.md only on a pass"
+description: "Dispatch one Sonnet categorizer session over tasks.md + plan.md; code-validate against taxonomy v1 and the general-cap; write categorization.md only on a pass"
 ---
 
 # Categorize
 
-Tag every task in `tasks.md` with `(type, specialization, preserves_behavior, tags)` per taxonomy v0 (`docs/contracts/taxonomy-v0.md`). Runs **after** `analyze` (D58), so `tasks.md` is assumed stable by the time this runs. `tasks.md` is never mutated (D37) — `categorization.md` is the only artifact out, and it is written **only** when the validator passes (S22).
+Tag every task in `tasks.md` with `(type, specialization, preserves_behavior, runtime_consumed, tags)` per taxonomy v1 (`docs/contracts/taxonomy.md`; `runtime_consumed` is the v1 modifier, D65 §2.4). Runs **after** `analyze` (D58), so `tasks.md` is assumed stable by the time this runs. `tasks.md` is never mutated (D37) — `categorization.md` is the only artifact out, and it is written **only** when the validator passes (S22).
 
 ## Behavior
 

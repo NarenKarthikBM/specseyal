@@ -139,7 +139,7 @@ agent = base model (Sonnet, per D18)
 - **Flywheel (D24):** good generated **skills** get persisted back into the library with their stats. Still the only self-evolving component in year one.
 - **Model policy (D18):** two-plane — **Sonnet default for implementation agents; Opus (xhigh effort) for the main thread.** Judgment roles (chairman, analyze/triage) take Opus; mechanical/generative roles (deck prep, categorizer, skill builder, members) take Sonnet; Haiku unused in v1. Only base specialists declare a model — a skill is not a dispatch target. Graph-scored assignment deferred until observability (principle 7) produces real data — Q6 revisits then.
 
-Contracts: `docs/contracts/agent-library-schema.md`, `docs/contracts/skill-module.md`, `docs/contracts/taxonomy-v0.md`.
+Contracts: `docs/contracts/agent-library-schema.md`, `docs/contracts/skill-module.md`, `docs/contracts/taxonomy.md`.
 
 ---
 
