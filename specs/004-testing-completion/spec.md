@@ -16,6 +16,13 @@
 >
 > **The testing agent PRODUCES a document; it does not EXECUTE tests** (docs/00 line 37: "a testing agent produces the doc now; runs tests later"). Running tests, pass/fail results, and a remediation feedback loop are **testing-agent v2** (I-3), explicitly out of scope. That boundary is a first-class requirement, not a limitation to hide.
 
+## Clarifications
+
+### Session 2026-07-12
+
+- Q: Which items in `spec.md` does `testing.md`'s coverage map cover — Success Criteria only, or also Functional Requirements? → A: **Success Criteria + Functional Requirements.** Both the measurable outcomes (SCs) and the testable behaviors (FRs) are mapped; together they define "done" and match how `/speckit-analyze` reasons about FR↔SC coverage. (Applied to FR-008, SC-004, US2, Key Entities.)
+- Q: At what depth does `testing.md` describe HOW to verify each mapped item, bounded by the doc-only boundary (I-3, no execution in v1)? → A: **A verification approach per item** — the kind of check + how to perform it + what evidence confirms it (including manual steps and citations to existing automated tests). Actionable but not executable; concrete test cases (inputs/expected) are deferred to v2. (Applied to FR-008, SC-004.)
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Every pipeline run ends with a completion report in a finalized, validated format (Priority: P1)
@@ -36,15 +43,15 @@ After `/speckit-implement-parallel` finishes the last wave, the `complete` phase
 
 ### User Story 2 - The doc-only testing agent produces a testing doc from the completion report + spec (Priority: P1)
 
-The engineer runs the testing agent. It runs in a **separate session** (context hygiene), reads `completion-report.md` + `spec.md`, and writes `testing.md`: a test plan / coverage assessment / manual-verification steps that **maps every Success Criterion in `spec.md` to how it would be verified**, grounded in the completion report's Integration-status claims, and surfaces any SC with no evident coverage as a **gap**. It **asserts** what should be tested and how; it **does not execute** anything — `testing.md` records `executed: none`, and the doc-only boundary is legible in the document itself.
+The engineer runs the testing agent. It runs in a **separate session** (context hygiene), reads `completion-report.md` + `spec.md`, and writes `testing.md`: a test plan / coverage assessment / manual-verification steps that **maps every Success Criterion AND every Functional Requirement in `spec.md` to a verification approach** — for each, the kind of check + how to perform it + what evidence confirms it (manual steps and citations to any existing automated tests) — grounded in the completion report's Integration-status claims, and surfaces any SC/FR with no evident coverage as a **gap**. It **asserts** what should be tested and how; it **does not execute** anything — `testing.md` records `executed: none`, and the doc-only boundary is legible in the document itself.
 
 **Why this priority**: This is the headline deliverable — the extension is named for it (`speckit-ext-testing`) — and it completes the pipeline through to a testing doc, the last step before Checkpoint α. It is independently viable against any conforming completion report.
 
-**Independent Test**: With a validated `completion-report.md` + a `spec.md`, run the testing phase → a `testing.md` that validates against its contract, maps 100% of the spec's SCs to a verification approach, marks `executed: none`, and returns only `testing.md` to the main thread.
+**Independent Test**: With a validated `completion-report.md` + a `spec.md`, run the testing phase → a `testing.md` that validates against its contract, maps 100% of the spec's SCs **and** FRs to a verification approach, marks `executed: none`, and returns only `testing.md` to the main thread.
 
 **Acceptance Scenarios**:
 
-1. **Given** a `completion-report.md` + a `spec.md` with N Success Criteria, **When** the testing agent runs, **Then** `testing.md` contains a verification approach for each of the N SCs and flags any SC the completion report does not evidence as a coverage gap.
+1. **Given** a `completion-report.md` + a `spec.md` with N Success Criteria and M Functional Requirements, **When** the testing agent runs, **Then** `testing.md` contains a verification approach for each of the N SCs and M FRs and flags any SC/FR the completion report does not evidence as a coverage gap.
 2. **Given** the testing agent runs, **When** it produces `testing.md`, **Then** the document states `executed: none` and legibly separates what it verified-by-reading from what a future v2 would execute — it runs no test and reports no pass/fail of its own (I-3).
 3. **Given** the testing phase is a separate session, **When** it completes, **Then** only `testing.md` crosses back to the main thread (no completion-report or spec body is re-imported — context hygiene) and exactly one trace record (`role: tester`, model Sonnet) is appended.
 4. **Given** a completion report that already evidences tests run during implement, **When** the testing agent writes `testing.md`, **Then** it cites those as **existing** evidence, never as its own execution.
@@ -92,7 +99,7 @@ Each new phase boundary produces a phase-tagged git commit, exactly as every ear
 
 - **FR-006**: The `testing` phase MUST run as a **separate session** (session-boundary rule / context hygiene), read `completion-report.md` + `spec.md`, and write `testing.md` and no other artifact (artifact-layout §2, principle 1/2).
 - **FR-007**: `testing.md` MUST conform to a **normative contract** (a `docs/contracts/` schema, this feature's deliverable) so that it *validates* under the resumability rule.
-- **FR-008**: `testing.md` MUST map **every** Success Criterion in `spec.md` to a verification approach (how it would be checked), grounded in the completion report's Integration-status claims, and MUST surface any SC with no evident coverage as an explicit **gap** — never a fabricated "covered".
+- **FR-008**: `testing.md` MUST map **every** Success Criterion **and every** Functional Requirement in `spec.md` to a **verification approach** (Clarifications 2026-07-12): for each item, the kind of check + how to perform it + what evidence confirms it (including manual steps and citations to any existing automated tests) — grounded in the completion report's Integration-status claims, and MUST surface any SC/FR with no evident coverage as an explicit **gap**, never a fabricated "covered". Concrete test cases (inputs/expected outputs) are a v2 concern, not required here (I-3).
 - **FR-009**: The testing agent MUST NOT **execute** tests — no test runs, no pass/fail results of its own, no remediation feedback loop (that is v2, I-3). It records `executed: none`; where the completion report already evidences tests run during implement, it cites them as **existing** evidence.
 - **FR-010**: The doc-only boundary MUST be **legible in `testing.md`** — the document states what it verified-by-reading versus what a future v2 would execute (the honesty ethos of 001-FR-019 and I-13).
 - **FR-011**: The `testing` session MUST run at `role: tester`, model **Sonnet** (D18; `trace-schema.md` §2), append exactly one trace record (principle 4), and return only `testing.md` to the main thread (status-only, principle 2).
@@ -105,7 +112,7 @@ Each new phase boundary produces a phase-tagged git commit, exactly as every ear
 ### Key Entities
 
 - **Completion report (`completion-report.md`)** — the `complete` phase's sole output; the finalized-format record of the implement phase's outcome and the D19 `complete`-event body. Carries a machine-readable status + the fixed core sections; an optional dogfood appendix rides outside the validated core.
-- **Testing doc (`testing.md`)** — the `testing` phase's sole output; a **doc-only** test plan / coverage assessment / manual-verification steps mapping every spec Success Criterion to a verification approach; records `executed: none`.
+- **Testing doc (`testing.md`)** — the `testing` phase's sole output; a **doc-only** test plan / coverage assessment / manual-verification steps mapping every spec Success Criterion **and** Functional Requirement to a verification approach; records `executed: none`.
 - **Completion-report contract / Testing-doc contract** (`docs/contracts/`) — the normative section schemas the two artifacts validate against (resumability). Whether these are two files or one combined contract is a **plan-level format choice** (D46 rule 3); both artifacts MUST have a contract they validate against.
 - **D19 `phase.completed` envelope** (`trace-schema.md` §6) — the already-defined generic event whose `complete`-phase `artifact.body` is the completion report. M4 makes the body conform; it does **not** build the M5 push.
 
@@ -116,7 +123,7 @@ Each new phase boundary produces a phase-tagged git commit, exactly as every ear
 - **SC-001**: `completion-report.md` validates against its contract — a valid machine-readable status ∈ {success, partial, failed} plus 100% of the required core sections present.
 - **SC-002**: `testing.md` validates against its contract.
 - **SC-003**: The `testing` phase runs in a **separate session** and returns only `testing.md` to the main thread — no completion-report or spec body is re-imported (context hygiene held).
-- **SC-004**: `testing.md` maps **100%** of the spec's Success Criteria to a verification approach; every SC lacking evident coverage is flagged as a gap; `executed: none` is recorded.
+- **SC-004**: `testing.md` maps **100%** of the spec's Success Criteria **and** Functional Requirements to a verification approach (the kind of check + how + confirming evidence); every SC/FR lacking evident coverage is flagged as a gap; `executed: none` is recorded.
 - **SC-005**: The completion report carries a machine-readable status and **exactly** the core section set the D19 `complete`-event body needs; a dogfood overlay, if present, is outside the validated core (the contract passes with or without it).
 - **SC-006**: Both the `complete` and `testing` phases leave a phase-tagged commit (`git log` shows the `complete(<id>)` and `testing(<id>)` boundaries).
 - **SC-007**: The extension adds **exactly one** net-new AI role (the Sonnet `tester`); the `complete` phase adds no model call beyond the main orchestrator; no `ANTHROPIC_API_KEY` is set or relied on anywhere (D28).
