@@ -51,3 +51,11 @@ The gaps are real (genuine zero-overlap), and every gapped task already sits on 
 - **(d) Tune batching only** — not indicated: the batching is downstream of the (correct) zero-overlap gate and doesn't change *whether* tasks gap.
 
 **Recommendation:** (b) or (c) over (a) for the *first* firing — the value is in the **finding** (seed breadth is the lever, now twice-confirmed), and reactive per-gap authoring is exactly the speculative-curation risk D66 warned against. Whichever is chosen becomes a `docs/90` D-row resolving **I-20**.
+
+---
+
+## F2 — The workforce-gate binding requires commit-BEFORE-bind (the gate decision lives inside the bound file)
+
+**Station:** `workforce-gate` (`/speckit-workforce-approve` + `on-gate-approve.sh`). **Status:** handled correctly this run (two gate commits); flagged for the M6 HookExecutor → **I-22**.
+
+The **council** gate binds `plan.md`, whose decision section lives in a *separate* file (`decision-record.md`) — so approval + binding commit as one (as `de0e62d` did). The **workforce** gate binds `agents/assignment.md`, whose `## Workforce Gate` decision section lives **inside that same bound file**. `on-gate-approve.sh workforce` records `assignment.md @ sha.sh(assignment.md)` = the last *committed* sha. **Empirically confirmed this run:** with the gate resolution edited-but-uncommitted, `sha.sh(assignment.md) = 092b17e` (pre-resolution) — firing the hook then would have bound `092b17e`, which goes stale the instant the gate commit re-touches `assignment.md`, hard-blocking wave 1. Correct sequence (used): **resolve → commit gate (`5a7f705`) → fire `on-gate-approve` (binds `5a7f705`) → commit `gates.yml` (`a1a1366`) → `verify-gate workforce` = 0**. The `/speckit-workforce-approve` skill's prose ("write fields → fire hook") under-specifies this ordering; a naive write→fire→commit-together binds a stale sha. **Load-bearing for the M6 HookExecutor**, which must fire `after_workforce_approve` *after* the gate-resolution commit — not as one write→fire→commit step. Not a defect (the machinery is correct when sequenced right); a documentation/automation gap the first live machine binding (D68) surfaced.
