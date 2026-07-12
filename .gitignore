@@ -13,3 +13,7 @@ node_modules/
 # The active feature is resolved from this at runtime; durable phase state lives
 # only under specs/NNN/ (D32), so this is never committed.
 .specify/feature.json
+
+# workforce installer flock target (install.sh S06): a persistent, empty lock
+# handle re-flocked by every reinstall — a runtime artifact, never meaningful state.
+.specify/extensions.yml.lock

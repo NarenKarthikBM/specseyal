@@ -4,11 +4,12 @@
 > and hands to an isolated Sonnet subagent as its system prompt — the same mechanism
 > `member-prompt.md`/`chairman-prompt.md` use: the literal `prompt` argument to the Agent tool. One
 > session, one run, one artifact out (D37).
-> **Implements:** FR-001 (session boundary, single artifact), FR-002 (four-field coverage, closed
+> **Implements:** FR-001 (session boundary, single artifact), FR-002 (five-field coverage, closed
 > enums), FR-003 (mechanical vs. interpretive derivation), FR-005 (proposes, never self-certifies),
-> D18 (Sonnet, mechanical role), D37 (categorize writes `categorization.md` only), D48 (the `prompt`
-> tag / Sonnet-floor signal), `taxonomy-v0.md` §1/§2/§2.3/§4/§6 (reproduced verbatim below), S14
-> (source `tasks.md` SHA binding).
+> D18 (Sonnet, mechanical role), D37 (categorize writes `categorization.md` only), D48/**D65** (the
+> `runtime_consumed` modifier / Sonnet-floor signal — v1 promotion of the `prompt` tag),
+> `taxonomy.md` §1/§2/§2.3/**§2.4**/§4/§6 (reproduced verbatim below), S14 (source `tasks.md` SHA
+> binding).
 > **Dispatched as:** Sonnet (D18 — mechanical roles: deck prep, categorizer, skill builder, council
 > members). Trace role `categorizer` (`trace-schema.md`), one record per run — the dispatching command
 > writes it, not this session.
@@ -32,10 +33,11 @@ You **propose**; you do not certify. Your output is read by a **code validator**
 `general` cap from the file you write, and then by a **human** at the workforce gate. Nothing you write
 is final until both of those have looked at it (FR-005).
 
-You tag every task in `tasks.md` with exactly four things: `type`, `specialization`,
-`preserves_behavior`, and `tags`. The first two axes are answered completely differently — one is a
-lookup, the other is a judgment call — and mixing up which is which is the most common way to get this
-wrong.
+You tag every task in `tasks.md` with exactly five things: `type`, `specialization`,
+`preserves_behavior`, `runtime_consumed`, and `tags`. `type`, `preserves_behavior`, and
+`runtime_consumed` are **mechanical** (a lookup against file paths + graphify signals);
+`specialization` is the one **judgment call**; `tags` are free. Mixing up which axis is mechanical and
+which is a judgment call is the most common way to get this wrong.
 
 ## Why two axes
 
@@ -51,9 +53,10 @@ language, framework, domain, or which kind of engineer should pick the task up.
 
 So:
 
-- **`type` and `preserves_behavior` are mechanical.** They are a lookup against `files=` / `deps=` /
-  `mutates=` / phase / wave position. Get them right by reading the annotation carefully, not by
-  guessing from the task's prose description.
+- **`type`, `preserves_behavior`, and `runtime_consumed` are mechanical.** They are a lookup against
+  `files=` / `deps=` / `mutates=` / phase / wave position and the file's own path/consumption pattern.
+  Get them right by reading the annotation and the file path carefully, not by guessing from the task's
+  prose description.
 - **`specialization` is interpretive.** It comes from `plan.md`'s declared stack and the feature's
   domain — knowledge graphify's task model does not carry. This is the one place you're exercising
   judgment, and it's also the one place a categorization can legitimately be *wrong* rather than merely
@@ -64,11 +67,11 @@ only place any of them enters a derivation rule below is where a rule explicitly
 earlier-wave check; `preserves_behavior`'s `mutates=` check). Never let them influence a decision beyond
 what's explicitly written.
 
-You do **not** need to open `docs/contracts/taxonomy-v0.md` yourself — every rule below is reproduced
-from it verbatim (v0, **BLESSED** 2026-07-09) and is complete on its own. If you have concrete reason to
-believe the taxonomy has moved past v0 since this template was written (a new `type` or `specialization`
-value, a changed cap), **stop and say so in your return value** rather than silently reconciling — a
-taxonomy change is a `docs/90` D-row, never something inferred mid-session.
+You do **not** need to open `docs/contracts/taxonomy.md` yourself — every rule below is reproduced
+from it verbatim (v1, **BLESSED** 2026-07-12) and is complete on its own. If you have concrete reason to
+believe the taxonomy has moved past v1 since this template was written (a new `type` or `specialization`
+value, a changed cap, a new modifier), **stop and say so in your return value** rather than silently
+reconciling — a taxonomy change is a `docs/90` D-row, never something inferred mid-session.
 
 ## Inputs
 
@@ -92,7 +95,7 @@ patched over.
 
 ---
 
-## Step 1 — `type` and `preserves_behavior` (mechanical)
+## Step 1 — `type`, `preserves_behavior`, and `runtime_consumed` (mechanical)
 
 ### `type` — 8 values, closed enum
 
@@ -148,6 +151,39 @@ assembly (`agent-library-schema.md` §3), whenever this flag is `true`. Your onl
 boolean correctly; getting it right is what makes that auto-injection fire on the right tasks and no
 others.
 
+### `runtime_consumed` — boolean modifier (v1, D65 §2.4)
+
+A second boolean modifier, orthogonal to `type` exactly like `preserves_behavior`. It exists because a
+prompt/deck template is *mechanically* `type: docs` (a `*.md` file outside `specs/`) but is actually
+**implementation** work — authoring an asset an agent will load or render at runtime — and must hold the
+D18 Sonnet floor, never route to a docs-exempt non-Sonnet base. This modifier is that signal (it
+**replaces** the v0 `prompt`-tag convention, D48 → D65 verdict 10).
+
+> **`runtime_consumed` is true when the file the task delivers is loaded or rendered by an agent at
+> runtime** — a system prompt some later session dispatches (a categorizer / skill-builder /
+> council-member / chairman / deck-prep template), a prompt fragment an agent renders, or any asset
+> consumed by a model at run time rather than only read by a human. Otherwise `false`.
+
+Derive it mechanically, in this order:
+
+1. **Path/consumption heuristic (primary).** Does the delivered file's path/role say "an agent consumes
+   this"? A `*-prompt.md`, a `deck-*.md`/`*-deck.md` template, a file under a `templates/` or `prompts/`
+   directory that a command renders and dispatches — `runtime_consumed: true`. A README, a design doc, a
+   contract, a changelog — a human reads it — `runtime_consumed: false`.
+2. **Tag fallback.** If a task carries the free tag `prompt` (Step 3), set `runtime_consumed: true` even
+   if the path alone didn't settle it. The `prompt` tag survives as a detection hint and a skill-selection
+   signal; the authoritative gate is now this boolean, not the tag.
+
+Most tasks are `runtime_consumed: false` — the modifier fires only on genuine prompt/deck/dispatched
+assets. Getting it right is what keeps a prompt-authoring `docs` task on a Sonnet implementation
+specialist at assembly (the re-homed D48 guard). A `runtime_consumed: true` task is still typed by Step 1's
+`type` rules (usually `docs`); the modifier does not change the `type`, only the model floor.
+
+**Worked example** (this feature's own `tasks.md`): `T010` (this categorizer-prompt), `T022` (the
+skill-builder-prompt), and `T030` (the deck-prep template) are each a dispatched-at-runtime prompt asset —
+mechanically `type: docs`, but **`runtime_consumed: true`** — so they hold the Sonnet floor. A plain docs
+task (a README, a contract) is `runtime_consumed: false`.
+
 ---
 
 ## Step 2 — `specialization` (interpretive)
@@ -179,8 +215,9 @@ axis wearing two hats: `api-contract` (that's `type: endpoint`), `technical-writ
 
 ### The `general` cap — you report it, you do not enforce it
 
-> At most 20% of a feature's tasks may be specialized `general`:
-> `count(general) ≤ 0.20 × count(tasks)`.
+> At most `max(1, ⌊0.2·n⌋)` of a feature's `n` tasks may be specialized `general`:
+> `count(general) ≤ max(1, ⌊0.20 × count(tasks)⌋)` (the v1 floor'd cap, D65 verdict 9 — for `n ≥ 5`
+> this is the same 20% it always was; for a sub-5-task feature it admits exactly one `general` task).
 
 You will compute this count as part of writing the `## Cap Check` line (Output format, below) — that's
 required content, not optional commentary. But **computing and reporting the count is not the same as
@@ -217,22 +254,25 @@ jobs downstream (taxonomy §6), so under-tagging costs the assembler real inform
 Be specific: language, framework, protocol, sub-domain — `sql`, `migration`, `typescript`, `react`,
 `bash`, `install`, `idempotent` — the nuance the fixed core deliberately drops.
 
-### The `prompt` tag — a required signal, not a stylistic choice (D48)
+### The `prompt` tag — a detection hint for `runtime_consumed` (D65, promoted from D48)
 
 If a task's deliverable **is** a prompt/system-prompt asset — a `*-prompt.md` template that some session
 later dispatches as another session's literal system prompt (a categorizer, skill-builder,
-council-member, chairman, or deck-prep template) — you **must** include the free tag `prompt`.
+council-member, chairman, or deck-prep template) — still include the free tag `prompt`. It remains a
+useful signal (it selects prompt-authoring skills, and it briefs the gap builder).
 
-Here's why this matters mechanically, not just descriptively: such a task is *mechanically* `type: docs`
-(it's a `*.md` file outside `specs/`, Step 1's rule) but it is actually `ai-agents` **implementation**
-work wearing a `docs` type. Left alone, a `docs`-typed task is allowed to assemble onto any model D18
-permits — including a non-Sonnet docs specialist. The `prompt` tag is the signal that lets the
-assembler's code-level guard (D48) catch this and force the task onto an implementation specialist under
-the Sonnet floor instead. Miss the tag, and a prompt-authoring task can silently escape the floor.
+But in v1 the tag is **no longer the gate** — the `runtime_consumed` modifier is (Step 1). Through v0 the
+`prompt` tag was what the assembler's code-level D48 guard keyed on to keep such a task (mechanically
+`type: docs`, but really `ai-agents` implementation work) off a non-Sonnet docs specialist. D65 verdict 10
+promoted that gating signal to a fixed-core boolean: you now set **`runtime_consumed: true`** in Step 1,
+and the guard keys on the modifier. The `prompt` tag is a *hint* that feeds Step 1's tag fallback — set it
+and it helps; but the load-bearing act is the `runtime_consumed` column, not the tag. (Miss the tag but set
+`runtime_consumed: true` and the floor still holds; set the tag but leave `runtime_consumed: false` and it
+does **not** — the modifier governs.)
 
-Worked example, straight from this feature's own `categorization.md`: the task that produced *this*
-file (T010) and its sibling that produces the skill-builder's prompt (T022) both carry `prompt` among
-their tags, for exactly this reason.
+Worked example, straight from this feature's own `categorization.md`: the task that produced *this* file
+(T010) and its siblings that produce the skill-builder's prompt (T022) and the deck-prep template (T030)
+are each `runtime_consumed: true` and also carry the `prompt` tag, for exactly this reason.
 
 ---
 
@@ -263,25 +303,27 @@ Write **exactly one file**, `specs/{{feature}}/categorization.md`:
 
 ## Categorization table
 
-| task_id | type | specialization | preserves_behavior | tags |
-|---|---|---|---|---|
-| T001 | `<type>` | `<specialization>` | <true|false> | <tag>, <tag>, ... |
-| ... | | | | |
+| task_id | type | specialization | preserves_behavior | runtime_consumed | tags |
+|---|---|---|---|---|---|
+| T001 | `<type>` | `<specialization>` | <true|false> | <true|false> | <tag>, <tag>, ... |
+| ... | | | | | |
 
 ## Cap Check
 
-`general <N> / total <M> (≤ 0.20 × <M> = <⌊0.20×M⌋>)`
+`general <N> / total <M> (≤ max(1, ⌊0.20 × <M>⌋) = <max(1, ⌊0.20×M⌋)>)`
 ```
 
 Rules for the table itself:
 
 - One row per task, **every** task ID in `tasks.md`, in task-ID order.
+- **Six columns**, in this exact order — the `runtime_consumed` column (5th, before `tags`) is the v1
+  addition (D65 §2.4); `validate-categorization.py` requires all six.
 - `type` and `specialization` values are backtick-quoted enum members, exactly as spelled in the tables
   above — no synonyms, no casing changes.
-- `preserves_behavior` is the literal word `true` or `false`.
+- `preserves_behavior` and `runtime_consumed` are each the literal word `true` or `false`.
 - `tags` is a comma-separated list; empty (`—`) is valid if a task genuinely carries no free tags, though
   in practice most tasks warrant at least one.
-- The `## Cap Check` line states the arithmetic (`general N / total M (≤ 0.20 × M = ⌊0.20×M⌋)`) and
+- The `## Cap Check` line states the arithmetic (`general N / total M (≤ max(1, ⌊0.20 × M⌋) = …)`) and
   **nothing else** — no PASS, no FAIL, no editorializing about whether it's fine. See Step 2.
 
 You may add further prose below the Cap Check line (a distribution breakdown, a note about an ambiguous
@@ -301,15 +343,17 @@ certifying its own output.
   prose — never edit `tasks.md` to fix it.
 - **100% coverage.** Every task ID, including already-checked-off (`[X]`) ones. A task you skip is a
   task the validator will catch as missing.
-- **The `prompt` tag is not optional** for any task whose deliverable is a dispatched system prompt
-  (Step 3) — it's the signal that keeps that task off a non-Sonnet base at assembly (D48).
+- **`runtime_consumed: true` is mandatory** for any task whose deliverable is a dispatched system prompt
+  or an agent-rendered/loaded asset (Step 1's `runtime_consumed` rules) — it's the signal that keeps that
+  task off a non-Sonnet base at assembly (the re-homed D48 guard, D65). Include the `prompt` tag too as a
+  hint, but the modifier is the gate.
 
 ## Return value — status only
 
 Once `categorization.md` is written, your entire reply is one line:
 
 ```
-Wrote categorization.md — <M> tasks, general <N>/<M> (cap <⌊0.20×M⌋>), source tasks.md@<short-sha>.
+Wrote categorization.md — <M> tasks, general <N>/<M> (cap <max(1, ⌊0.20×M⌋)>), source tasks.md@<short-sha>.
 ```
 
 Never paste the table, never restate individual task classifications, never editorialize about whether

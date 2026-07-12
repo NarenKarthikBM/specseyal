@@ -5,30 +5,35 @@
 # § "Config surface — workforce-config.yml" and plan.md § Seed Library.
 
 general_cap: 0.20
-# The FR-004 evidence floor (taxonomy-v0.md §4): count(general) must not
-# exceed 20% of a feature's tasks. validate-categorization.py enforces
-# this in code — over-cap ⇒ exit non-zero, categorization.md is NOT
-# written, the phase does not complete (FR-004/SC-002, asserted by
-# file-absence, S22). Not a style preference: it is a floor on evidence.
+# The FR-004 evidence floor (taxonomy.md §4): count(general) must not exceed
+# max(1, floor(0.20 x count(tasks))) — the v1 floor'd cap (D65 verdict 9): the
+# same 20% for a feature of >=5 tasks, and exactly one `general` task for a
+# sub-5-task feature (v0's literal cap admitted zero — a formal absurdity D65
+# deleted). validate-categorization.py enforces this in code — over-cap ⇒ exit
+# non-zero, categorization.md is NOT written, the phase does not complete
+# (FR-004/SC-002, asserted by file-absence, S22). Not a style preference: it is
+# a floor on evidence.
 
 assembly_cap: 3
 # The D40 injection cap (agent-library-schema.md §3): assemble.py injects
 # at most 3 skills onto a base. The force-injected `refactor-discipline`
-# (auto-injected whenever preserves_behavior: true, taxonomy-v0.md §2.3)
+# (auto-injected whenever preserves_behavior: true, taxonomy.md §2.3)
 # counts against this cap like any tag-ranked skill. Candidates trimmed
 # beyond the cap are logged, never silently discarded (FR-011/SC-004).
 
 model: sonnet
 # D18 role -> model policy. The categorizer, the skill builder, and every
-# seed base specialist run on Sonnet — the floor the D48 guard enforces
-# in code for `prompt`-tagged tasks (FR-014/SC-006). Global policy for
-# this extension; not a per-feature setting.
+# seed base specialist run on Sonnet — the floor the runtime_consumed guard
+# enforces in code for `runtime_consumed: true` tasks (FR-014/SC-006; the
+# re-homed D48 guard, taxonomy.md §2.4 / D65). Global policy for this
+# extension; not a per-feature setting.
 
-taxonomy: docs/contracts/taxonomy-v0.md
-# The blessed enum (BLESSED, 2026-07-09): 8 types x 11 specializations
-# (`general` capped, above). validate-categorization.py treats every
-# field's domain as closed (SC-001) — an un-enumerable value FAILs the
-# phase; it is never invented here (taxonomy §8 change process instead).
+taxonomy: docs/contracts/taxonomy.md
+# The blessed enum (v1 BLESSED, 2026-07-12, D65): 8 types x 11 specializations
+# + two boolean modifiers (preserves_behavior §2.3, runtime_consumed §2.4).
+# validate-categorization.py treats every field's domain as closed (SC-001) —
+# an un-enumerable value FAILs the phase; it is never invented here (taxonomy
+# §8 change process instead).
 
 seed_library:
   # The manifest install.sh reads to seed .claude/agents/ + .claude/skills/

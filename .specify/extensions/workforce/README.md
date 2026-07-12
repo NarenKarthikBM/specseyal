@@ -133,7 +133,7 @@ on any roster that assembles onto them, never silent.
 
 **5 seed skills**, every one `grants: []` (D41) — the sole elevated grant anywhere in this system is
 the skill-builder's own dispatch grant (below), never a seed default: `skl_refactor_discipline`
-(auto-injected whenever `preserves_behavior: true`, taxonomy-v0.md §2.3) · `skl_orchestration` ·
+(auto-injected whenever `preserves_behavior: true`, taxonomy.md §2.3) · `skl_orchestration` ·
 `skl_shell_scripting` · `skl_yaml_hooks` · `skl_installer_hygiene`.
 
 Bases are fixed; skills alone evolve (D24) — a skill the builder persists (`origin: generated`)
@@ -171,7 +171,7 @@ One config governs all three commands (S10 — replaces the drafted `categorize-
 | `general_cap` | `0.20` | `validate-categorization.py`, as the exact integer ratio `1/5` |
 | `assembly_cap` | `3` | `assemble.py`'s `ASSEMBLY_CAP` (D40) |
 | `model` | `sonnet` | D18 — the categorizer, the skill builder, and every seed base |
-| `taxonomy` | `docs/contracts/taxonomy-v0.md` | the closed 8-type × 11-specialization enum both validators check against |
+| `taxonomy` | `docs/contracts/taxonomy.md` | the closed 8-type × 11-specialization enum (+ the `preserves_behavior`/`runtime_consumed` modifiers) both validators check against |
 | `seed_library` | the bases/skills manifest | `install.sh`'s additive seed step |
 | `skill_builder.web_search` | `true` | the role grant, above |
 

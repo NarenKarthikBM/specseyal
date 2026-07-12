@@ -13,12 +13,15 @@
 >
 > **Write boundary within this one file (principle 1):** `assemble.py` writes everything from here down
 > through the `### Roster approved` table — base/skill selection, the `library`/`built` marks (FR-022),
-> the elevated-grant union (FR-013, total-ordered per S01), and the empty-lane / dropped-skill notes
-> (FR-016 / FR-011). It never writes the gate timestamp or the `reviewer` / `decision` / `reviewed` /
-> `Notes:` / `Overrides:` fields below — those five are **`/speckit-workforce-approve`'s alone** (S13),
-> and hold the literal `[PENDING — …]` marker until a human signs (or, under `gates.workforce.mode: auto`
-> within `full_auto` only, the assigner resolves them itself in the same write — FR-020/W4; the pending
-> state shown here is the `human`-mode default).
+> the elevated-grant union (FR-013, total-ordered per S01), the empty-lane / dropped-skill notes
+> (FR-016 / FR-011), and (v1) the gap-cluster notes (FR-006/SC-007, D66) and the grant-tripwire notice
+> (D67). It never writes the gate timestamp or the `reviewer` / `decision` / `reviewed` / `Notes:` /
+> `Overrides:` fields below — those five are **`/speckit-workforce-approve`'s alone** (S13), and hold the
+> literal `[PENDING — …]` marker until a human signs (or, under `gates.workforce.mode: auto` — **valid
+> standalone**, `profile-schema.md` P4 / D67 verdict 12, no longer only within `full_auto` — the assigner
+> resolves them itself in the same write, **unless the grant tripwire below is ENGAGED**, which forces a
+> human signature regardless of profile — FR-020/W4; the pending state shown here is the `human`-mode
+> default).
 
 <!--
   TEMPLATE SOURCE NOTE. Strip this comment when rendering; it documents the substitution mechanics
@@ -60,6 +63,10 @@
 {{EMPTY_LANE_NOTES}}
 
 {{DROPPED_SKILL_NOTES}}
+
+{{GAP_CLUSTER_NOTES}}
+
+{{GRANT_TRIPWIRE_NOTES}}
 
 **Notes:** [PENDING — the reviewer's notes, or `none.` if there are none]
 

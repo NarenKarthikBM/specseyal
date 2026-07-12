@@ -2,7 +2,7 @@
 name: devtools-cli
 description: Implements developer-facing tooling - CLIs, build systems, codegen,
   and editor/agent runtime extensions. Base specialist for the
-  (scaffold|service|endpoint|test|infra) x devtools-cli lane.
+  (scaffold|service|endpoint|test|infra|docs) x devtools-cli lane.
 tools: Read, Write, Edit, Bash, Glob, Grep     # the immutable core — see agent-library-schema.md §4.1
 model: sonnet
 
@@ -10,10 +10,10 @@ specseyal:
   schema_version: "2.0"
   kind: base
   id: agt_devtools_cli
-  version: 1.0.0
+  version: 2.0.0     # major bump 1.0.0->2.0.0 (agent-library-schema.md §2: taxonomy.type changed); D65 verdict 7 / I-15
 
   taxonomy:
-    type: [scaffold, service, endpoint, test, infra]
+    type: [scaffold, service, endpoint, test, infra, docs]   # `docs` added v2.0.0 (D65 verdict 7 / I-15: the docs×devtools-cli empty lane — tool READMEs/usage docs)
     specialization: devtools-cli
 
   provenance:

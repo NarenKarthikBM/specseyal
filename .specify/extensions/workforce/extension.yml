@@ -4,7 +4,7 @@ extension:
   id: workforce
   name: "The Workforce Pair"
   version: "0.1.0"
-  description: "Task categorization and specialist assembly for the implementation pipeline: /speckit-categorize tags every task against taxonomy v0 (a Sonnet inference session, code-validated against the general-cap), /speckit-agent-assign matches tasks to a seed library of 7 base specialists and 5 skills via a deterministic assemble.py script — escalating to a Sonnet skill-builder session only on a ∅-match gap — and /speckit-workforce-approve records the human gate signature that unlocks implementation. Categorization and skill-building are Sonnet inference; assembly is deterministic code, which is what makes the roster byte-reproducible on a gap-free run."
+  description: "Task categorization and specialist assembly for the implementation pipeline: /speckit-categorize tags every task against taxonomy v1 (a Sonnet inference session, code-validated against the general-cap), /speckit-agent-assign matches tasks to a seed library of 7 base specialists and 5 skills via a deterministic assemble.py script — escalating to a Sonnet skill-builder session only on a ∅-match gap — and /speckit-workforce-approve records the human gate signature that unlocks implementation. Categorization and skill-building are Sonnet inference; assembly is deterministic code, which is what makes the roster byte-reproducible on a gap-free run."
   author: narenkarthikbm
   license: MIT
 
@@ -15,7 +15,7 @@ provides:
   commands:
     - name: speckit.categorize
       file: commands/speckit.categorize.md
-      description: "Sonnet categorizer tags every task with taxonomy v0 (type, specialization, preserves_behavior, tags), code-validated against the general-cap before writing categorization.md"
+      description: "Sonnet categorizer tags every task with taxonomy v1 (type, specialization, preserves_behavior, runtime_consumed, tags), code-validated against the general-cap before writing categorization.md"
     - name: speckit.agent-assign
       file: commands/speckit.agent-assign.md
       description: "Deterministic assemble.py matches tasks to the seed library of base specialists and skills, escalating to a Sonnet skill-builder only on a ∅-match gap, and writes agents/assignment.md's roster"
