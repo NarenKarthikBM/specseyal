@@ -102,7 +102,7 @@
 - [X] T029 Author `extensions/workforce/test/run.sh` — the one harness (git-ext model, D57 S3): install → reinstall-survival → the deterministic-assembly golden test → validator unit checks → the committed per-SC tests. (aggregates T005, T013, T021, T026, T028)
 - [X] T030 [P] **D62 deck-prep improvement (council own source, D57 S2)**: mine round-1's five member transcripts for which `plan.md` sections the readers pulled, then enrich the deck-prep template in `extensions/council/extension/templates/` so those high-demand sections ride in the technical deck by default; **reinstall council**. After-metric: `plan.md` read-rate at the next council run (target: majority of the bench trusts the deck).
 - [X] T031 [P] Author the workforce-extension docs — `extensions/workforce/README.md` + `extension/README.md` (packaging, the three commands, the D60 grant, the S02 seam).
-- [ ] T032 Run `quickstart.md` scenarios S1–S12 and the **SC-009 dogfood exit** on `003` itself (`categorize → assign → workforce-gate → implement-parallel`). The M3 exit criterion. (depends on T029, T020, T027)
+- [X] T032 Run `quickstart.md` scenarios S1–S12 and the **SC-009 dogfood exit** on `003` itself (`categorize → assign → workforce-gate → implement-parallel`). The M3 exit criterion. (depends on T029, T020, T027)
 
 ---
 
