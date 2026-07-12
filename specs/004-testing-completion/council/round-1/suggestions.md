@@ -44,3 +44,9 @@
 ## Chairman's note
 
 One blocking finding carries the round: all five lenses converged independently (5/5, peer-confirmed as the round's strongest signal) that the I-17 fix's FR-016/SC-010 "wave 1 (or pre-wave)" placement has no mechanical enforcement, so a misordered wave-DAG would reproduce the exact wave-2 hard-block the fix removes (R1-S01). Both concerns are otherwise structurally sound — the strong tier clusters on making load-bearing guarantees mechanically checkable (SC-004 coverage, SC-008 seam regression, SC-010 auditability, `/speckit-complete` resumability) and on the tester's second-hand evidentiary base, while the two POSITIONs the plan defends (`/speckit-complete`-as-command, two contract files) drew ratifications rather than rejections. Members split only on the simplicity proposal to swap the diff-classifier for a canonicalized hash, which peer review showed would silently erase the plan's check-direction invariant (R1-S18, contested).
+
+### Chairman delta check — 2026-07-12T17:20:29Z
+
+- R1-S01 — RESOLVED — §2.3 relocates the I-17 fix out of the `tasks.md` wave loop entirely — invoking the D-row invariant "machinery that gates the waves is never itself a wave" so it is no longer a wave-DAG node that could be misordered — and makes provisioning mechanical via `implement-parallel`'s pre-flight, which refuses to enter wave 1 until the single bundled git-ext change, reinstall, and survival-regression report are done, so the wave-2 hard-block the finding named cannot recur.
+
+**Delta verdict:** all clear, ready for the gate
