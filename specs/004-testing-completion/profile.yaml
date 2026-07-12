@@ -1,0 +1,22 @@
+# Autonomy profile — 004-testing-completion
+# Both gates human (D33/D68) — deliberately, so M4's run exercises the FIRST
+# machine-written, machine-bound workforce gate (003's was hand-written +
+# grandfathered). council_tier: standard (D61) — M4 is S-sized and not
+# architecture-changing, so the cost-controlled ceremony applies; its plan
+# review is the D62 deck-enrichment after-metric run (baseline: 003's 2.83M /
+# 4-of-5 plan.md read-rate). The D67 grant tripwire is expected clear (the
+# roster is grant-free: a doc-only tester + mechanical git edits, core toolset
+# only). See docs/contracts/profile-schema.md.
+schema_version: "1.0"
+feature: "004-testing-completion"
+
+full_auto: false
+council_tier: standard
+
+gates:
+  council:
+    mode: human
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: human
