@@ -1,0 +1,17 @@
+# Autonomy profile — 005-graphify-context
+# Both gates human: the default posture (D9/D33). council_tier: standard — the
+# measured default since D61 (α-polish trio runs the full pipeline at standard, D73).
+# See docs/contracts/profile-schema.md.
+schema_version: "1.0"
+feature: "005-graphify-context"
+
+full_auto: false
+council_tier: standard
+
+gates:
+  council:
+    mode: human
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: human
