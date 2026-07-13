@@ -95,3 +95,28 @@ Council suggestion **R1-S06** (accepted, binding) mandates: *"the `tester` trace
 **Why it didn't bite:** v1 trace validation is prose-level (there is no strict trace-schema conformance checker running in the pipeline yet — `trace-schema.md` §7 is the spec for a future one). So the field is emitted and read fine today; the inconsistency is latent until someone builds the §7 validator.
 
 **Recommendation (owner):** amend `trace-schema.md` to sanction `context_in` — cleanest as a `role: tester`-scoped optional field in §1 with a one-line §7 carve-out (mirrors how `elevated_grants`/`skills` are role-gated), bumping the schema to 1.3 and citing R1-S06. Alternative (weaker): an explicit "the tester role adds `context_in`; §7 rule 2's unknown-field rejection excepts it" note in §7. Either closes the gap before the M6/M-later strict trace validator ships and starts rejecting valid tester traces. Out of M4's approved task scope (no task touches `trace-schema.md`); flagged, not fixed. → a `docs/90` I-row (fold R1-S06 `context_in` into trace-schema.md).
+
+---
+
+## F6 — the doc-only tester correctly GAPs a requirement satisfied UPSTREAM of implement (gap-honesty working as designed; the first live tester run surfaced it)
+
+**Station:** `testing` (the first live `/speckit-testing` run, M4 close-out). **Status:** ✅ correct-as-designed — no fix; pattern noted for future doc-only testing. **Severity:** none (a validation of the design, not a defect).
+
+The first live `testing.md` mapped 27 ids as a full bijection and flagged **exactly one honest GAP: FR-017** ("the I-17 fix design is plan-level and MUST be council-reviewed as gate-integrity"). FR-017 **is** genuinely satisfied — but at **council round-1** (`de0e62d`; `tasks.md` Dependencies even says so: *"FR-017 … already satisfied — round-1 council reviewed it … no build task"*), which is **upstream of the implement phase**. The tester's bounded context is `completion-report.md` + `spec.md` only (SC-003); the completion report is the *implement* account and legitimately carries no evidence of a *council* review, so the tester — correctly refusing to fabricate a `covered` from evidence it cannot point to (Step 5 gap-honesty, SC-002/004) — marked it `GAP`. **This is the honesty ethos working exactly as intended**, and it is a *correct, complete* run (a GAP is a valid answer; a fabricated `covered` would not be).
+
+**The pattern (for future features):** any requirement satisfied at spec/plan/council/gate — *outside* the implement run — will be GAPed by a completion-report-grounded tester **unless** the completion report's `### Integration status` deliberately surfaces that upstream evidence. Two honest readings, both defensible: (a) leave it a GAP (the tester's grounding is the implement account, and "council-reviewed" isn't an implement fact) — the human reading `testing.md` resolves it against the council record, which the GAP correctly points them to; or (b) have `/speckit-complete` note council/plan-satisfied requirements in Integration status so the tester can ground them as `covered` (report-claimed). M4 took (a) by construction (the report was authored before this was observed). **Not a defect** — booked as the design property the first live tester run confirmed. No `docs/90` row (nothing open to decide); if a future feature wants (b), that is a `/speckit-complete` authoring convention, a fresh decision then.
+
+---
+
+## Adjudication (M4 close-out) — all findings disposed
+
+Per this file's own model (each finding → a `docs/90` D-row/I-row on adjudication, folded into `completion-report.md`'s `### Findings adjudicated`):
+
+| Finding | Disposition |
+|---|---|
+| **F1** — flywheel first firing = seed-breadth signal | **RESOLVED → D71** (seed 2 authoring skills; 6 gaps closed, 2 residual; zero builder dispatches). Sub-finding → **I-21**. |
+| **F2** — workforce-gate commit-before-bind | **Booked → I-22** (M6 HookExecutor). Handled correctly by hand this run. |
+| **F3** — install.sh manual-fallback stale for the seam | **Booked → I-23** (git-ext follow-up pile). Latent; auto-merge path unaffected. |
+| **F4** — coverage validator must exclude `NNN-` cross-refs | **RESOLVED this run** (T016 `extract_ids()`; naive 28 → 27, isolated exclusion test). |
+| **F5** — tester `context_in` not in trace-schema.md | **RESOLVED → D72** (trace-schema → 1.3; committed `0ef22e5` before the tester ran). |
+| **F6** — doc-only tester GAPs upstream-satisfied FR-017 | **Correct-as-designed** — gap-honesty working; pattern noted, no fix. |
