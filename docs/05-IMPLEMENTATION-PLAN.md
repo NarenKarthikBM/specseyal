@@ -61,11 +61,15 @@ Doc-only testing agent (per your notes: "for now, creates a testing doc"); compl
 
 **Done when:** every pipeline run ends with a completion report + testing doc.
 
+**✅ CLOSED (2026-07-13).** Built through the full pipeline as the **4th extension** (`speckit-ext-testing`) — the pipeline's **first fully-unassisted run** (every upstream station live machinery, no grandfather, unlike `003`). **6 waves / 19/19 tasks**, preceded by a **pre-flight** (D69 — the I-17 workforce-freshness fix provisioned *before* wave 1, never a wave node: *machinery that gates the waves is never itself a wave*); council-defended by the D62-enriched `standard` council (synthesis spend −8.1% vs `003`). The **two new commands got their first live run on `004` itself**: `/speckit-complete` (main-thread orchestrator authoring — **no new model role**, FR-001) → a contract-validated `completion-report.md` (the D19 `phase.completed` `artifact.body`); `/speckit-testing` (one Sonnet `tester`, doc-only, `executed: none`) → `testing.md`, a **27/27 SC+FR bijection with 1 honest GAP** (FR-017, genuinely satisfied *upstream* at council — the tester correctly declined to fabricate coverage). Merged to `main` (ff, D52) + tagged `complete/004-testing-completion`; testing-ext installed live (`test/run.sh` **43/0**), git-ext reinstalled carrying the I-17 fix + testing seam (**46/0**). **Exit met: SC-001…010 all validated** — headline **SC-010** proven live on the dogfood run itself (waves 2–6 each cleared `verify-gate workforce` via the checkbox-delta branch, **zero hand assistance**, with durable audit lines; a content edit still BLOCKS). Findings **F1–F6 adjudicated** (F1→D71, F2→I-22, F3→I-23, F4 in-run, **F5→D72** — `trace-schema.md` → 1.3 admitting the tester `context_in`; F6 = gap-honesty confirmed as designed). See `specs/004-testing-completion/completion-report.md`. **This is the last milestone before the platform.**
+
 ---
 
 ### ★ Checkpoint α — the entire notebook pipeline runs, CLI-only
 
 Everything from the Ideas page is now real: specify → clarify → plan → council → tasks → analysis → agents → parallel implement → completion → testing doc. Full value with zero platform. Everything after this is leverage, not function.
+
+**★ REACHED (2026-07-13).** M4's close-out is the checkpoint: the entire notebook pipeline now runs **CLI-only, end to end**, every station live machinery dogfooded on its own build across `001`–`004` (spec → clarify → plan → council → tasks → analyze → categorize → agents → parallel implement → **complete → testing**). Four extensions ship (`graphify`, `git`, `workforce`, `testing`); the four `complete/00N` completion anchors tag the arc. **Full value, zero platform hours spent** — exactly the bet A-checkpoint made. **The α acts themselves are the owner's next steps** (D29: archive `speckit-graphifyy` with a pointer into `extensions/graphify/`; A1 repo-layout confirmations) — not performed here. Everything after α is leverage, not function; **M5 (platform observe + approve) is next.**
 
 ---
 
