@@ -1,7 +1,7 @@
 # Contract — `traces.jsonl` (observability)
 
-> **Status:** 1.2 (M0, amended 2026-07-09 by **D43**, **D47**). Normative.
-> **Implements:** principle 4 (observability), D6 (cost is a metric, not a principle), D18, D19 (sync model), D28 (subscription-only), D35, **D40** (assembly), **D41** (tool grants), **D43** (skill/grant attribution), **D47** (token capture method).
+> **Status:** 1.3 (M0, amended 2026-07-09 by **D43**, **D47**; M4, 2026-07-13 by **D72** — the `tester` role's `context_in` field). Normative.
+> **Implements:** principle 4 (observability), D6 (cost is a metric, not a principle), D18, D19 (sync model), D28 (subscription-only), D35, **D40** (assembly), **D41** (tool grants), **D43** (skill/grant attribution), **D47** (token capture method), **D72** (the `tester` role's `context_in` field, executing `004`-council **R1-S06**).
 > **Location:** `specs/NNN-feature/traces.jsonl` — one append-only file per feature.
 > **Consumed by:** agent-library skill `stats` (M3 flywheel), the M1 exit criterion, the central manager (M5).
 
@@ -83,6 +83,7 @@ An `implementer` record, showing a populated assembly (D40/D43) — a `service` 
 | `capture_method` | enum | `sdk` \| `transcript` \| `unavailable` (D47). How `tokens` were obtained: `sdk` = Agent SDK / API usage metadata (exact; the M6 path); `transcript` = parsed from the Claude Code transcript JSONL (exact; the interactive path); `unavailable` = not capturable, `tokens` is `null`. Never a fabricated estimate — the `cost_usd`-null ethos (§4) applied to tokens. |
 | `outcome` | enum | `success` \| `partial` \| `failed` \| `aborted`. Matches implement-parallel's wave-review vocabulary. |
 | `artifact` | string \| null | Repo-relative path of the **one** artifact this session produced (principle 1). `null` for sessions that produce none (a council member's opinion is chairman-only, not an artifact-out). |
+| `context_in` | array | **`role: tester` records only** (D72, executing `004`-council **R1-S06**). The repo-relative paths of the files the `tester` session read as its context-in — always `completion-report.md` + `spec.md`, plus `implement.log.md` when the R1-S05 lazy cross-check fired. Strings; order is the read order, consumers must not depend on it. Its purpose is auditability: it puts the tester's declared reads on the record so an SC-003 context-hygiene violation (a tester that read more than it should) is inspectable rather than invisible. **Absent** on every non-`tester` record (not `null`, not `[]` — the key is simply not present), so it is the one §1 field governed by role rather than being universal (§7 rule 2/11). |
 | `cost_usd` | number \| null | §4. |
 
 ## 2. `role` enum
@@ -191,7 +192,7 @@ A heartbeat carries **no `artifact` key at all** — not an empty one. D19 chose
 The file conforms iff:
 
 1. Every line is a complete JSON object; no line is ever modified after being written.
-2. Every record has all §1 fields; unknown fields are rejected.
+2. Every record has all §1 fields — **except `context_in`**, the one role-scoped field, which is present iff `role == "tester"` (rule 11). Any field not in §1 is still rejected (`context_in` is now in §1, so it is no longer an "unknown field" — the pre-1.3 tension R1-S06 created is resolved by admitting it to the schema, not by carving an exception into the unknown-field rule).
 3. `duration_ms == ended_at − started_at`, within 1 ms.
 4. `agent_id != null` ⟺ `role == "implementer"`.
 5. `skills` is always present and always an array; each element is `{id, version}` with `id` matching `^skl_[a-z0-9]+(_[a-z0-9]+)*$` and `version` valid semver. `skills != []` ⟹ `role == "implementer"` (only an assembly injects skills). `|skills| ≤ 3` (the assembly cap, `agent-library-schema.md` §3).
@@ -200,6 +201,7 @@ The file conforms iff:
 8. No value in any record contains a newline (JSONL invariant) — which §3 already guarantees, since only bodies would.
 9. Every completed phase in `artifact-layout.md` §2 that runs a session has ≥1 record. `branch`, `council-gate` and `workforce-gate` run no session — a git ref and a human, respectively — and correctly have none.
 10. `capture_method ∈ {sdk, transcript, unavailable}` (D47). `tokens == null ⟺ capture_method == unavailable`; when `tokens != null`, all four sub-fields are present non-negative ints.
+11. `context_in` is present iff `role == "tester"` (D72, executing `004`-council **R1-S06**): an array of repo-relative path strings naming the files that `tester` session read as its context-in. **Absent** (the key omitted entirely) on every non-`tester` record — not `null`, not `[]`. This is the single role-gated field in §1; it exists so an SC-003 context-hygiene violation is auditable from the trace itself (the tester's declared reads, on the record) rather than being invisible.
 
 ## 8. Non-goals (v1)
 
