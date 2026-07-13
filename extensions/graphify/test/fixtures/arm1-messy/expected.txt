@@ -1,0 +1,7 @@
+NODE	install.sh	sh
+NODE	legacy-gadget.yml	yml
+NODE	scripts/helper.sh	sh
+NODE	scripts/setup.sh	sh
+EDGE	asserted	install.sh	.specify/extensions/gadget/config.yml	ASSERTED
+EDGE	asserted	scripts/setup.sh	$PLUGIN_DIR/script.sh	ASSERTED
+EDGE	invokes	scripts/setup.sh	scripts/helper.sh	EXTRACTED

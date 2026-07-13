@@ -1,0 +1,5 @@
+canonical: sha256:44a90c48cdb9ce84d527d4655720c762932232f8d62deca7541a5cf1c5957a9e
+context.md: MATCH
+receipts.md: MATCH
+typesignal.md: MATCH
+coherent: yes

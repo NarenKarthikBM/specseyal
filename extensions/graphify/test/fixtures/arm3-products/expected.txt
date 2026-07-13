@@ -1,0 +1,19 @@
+<!-- graphify-provenance:v1
+graph-path: graphify-out/graph.json
+graph-scope: repo
+node-count: 7
+edge-count: 5
+generated-at: 2026-01-01T00:00:00Z
+generation-id: sha256:40f136910c6c60587cf31a50eb7f2c157b53e0868140184201623f056545986f
+source-fingerprint: git-commit:fab1a5edfab1a5edfab1a5edfab1a5edfab1a5ed
+-->
+
+shape-conformance:
+  PASS graphify-context.md :: heading "## Graph scope"
+  PASS graphify-context.md :: heading "## Relevant existing modules"
+  PASS graphify-context.md :: heading "## Blast radius (per anchor)"
+  PASS graphify-context.md :: heading "## Shared / mutable files (collision watch)"
+  PASS graphify-context.md :: heading "## Patterns to follow"
+  PASS receipts diet :: concept/rationale section present
+  PASS type-signal diet :: per-file file_type lines present
+shape-conformance: 7 checks, 7 passed, 0 failed

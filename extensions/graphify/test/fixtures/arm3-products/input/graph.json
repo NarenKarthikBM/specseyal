@@ -1,0 +1,189 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {
+    "hyperedges": [
+      {
+        "id": "widget_concept_cluster",
+        "label": "Widget concept cluster (concept + rationale + doc)",
+        "nodes": [
+          "widget_concept",
+          "widget_rationale_d1",
+          "widget_doc"
+        ],
+        "relation": "participate_in",
+        "confidence": "INFERRED",
+        "confidence_score": 0.8,
+        "source_file": "specs/900-widget/spec.md"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "label": "widget_service.py",
+      "file_type": "code",
+      "source_file": "src/widget/service.py",
+      "source_location": "L1",
+      "metadata": {
+        "language": "python",
+        "kind": "file"
+      },
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "widget_service.py",
+      "id": "widget_service_py"
+    },
+    {
+      "label": "widget_routes.py",
+      "file_type": "code",
+      "source_file": "src/widget/routes.py",
+      "source_location": "L1",
+      "metadata": {
+        "language": "python",
+        "kind": "file"
+      },
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "widget_routes.py",
+      "id": "widget_routes_py"
+    },
+    {
+      "label": "widget_model.py",
+      "file_type": "code",
+      "source_file": "src/widget/model.py",
+      "source_location": "L1",
+      "metadata": {
+        "language": "python",
+        "kind": "file"
+      },
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "widget_model.py",
+      "id": "widget_model_py"
+    },
+    {
+      "label": "test_widget.py",
+      "file_type": "code",
+      "source_file": "tests/test_widget.py",
+      "source_location": "L1",
+      "metadata": {
+        "language": "python",
+        "kind": "file"
+      },
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "test_widget.py",
+      "id": "widget_test_py"
+    },
+    {
+      "label": "Widget domain concept",
+      "file_type": "concept",
+      "source_file": "specs/900-widget/spec.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "A widget is a named, soft-deletable unit the catalog service exposes to callers.",
+      "community": 1,
+      "norm_label": "widget domain concept",
+      "id": "widget_concept"
+    },
+    {
+      "label": "D1: Widgets use soft-delete, never hard-delete",
+      "file_type": "rationale",
+      "source_file": "docs/90-DECISIONS-AND-IDEAS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Soft-delete keeps audit history queryable; hard-delete was rejected for compliance reasons.",
+      "community": 1,
+      "norm_label": "d1: widgets use soft-delete, never hard-delete",
+      "id": "widget_rationale_d1"
+    },
+    {
+      "label": "Widget module README",
+      "file_type": "document",
+      "source_file": "src/widget/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Usage notes for the widget module.",
+      "community": 1,
+      "norm_label": "widget module readme",
+      "id": "widget_doc"
+    }
+  ],
+  "links": [
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/widget/routes.py",
+      "source_location": "L12",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "widget_routes_py",
+      "target": "widget_service_py"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/widget/service.py",
+      "source_location": "L30",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "widget_service_py",
+      "target": "widget_model_py"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/test_widget.py",
+      "source_location": "L5",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "widget_test_py",
+      "target": "widget_service_py"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/90-DECISIONS-AND-IDEAS.md",
+      "source_location": null,
+      "weight": 1.0,
+      "confidence_score": 0.9,
+      "source": "widget_rationale_d1",
+      "target": "widget_concept"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "source_file": "src/widget/README.md",
+      "source_location": null,
+      "weight": 1.0,
+      "confidence_score": 0.7,
+      "source": "widget_doc",
+      "target": "widget_service_py"
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "widget_concept_cluster",
+      "label": "Widget concept cluster (concept + rationale + doc)",
+      "nodes": [
+        "widget_concept",
+        "widget_rationale_d1",
+        "widget_doc"
+      ],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "specs/900-widget/spec.md"
+    }
+  ],
+  "built_at_commit": "fab1a5edfab1a5edfab1a5edfab1a5edfab1a5ed"
+}

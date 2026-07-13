@@ -1,0 +1,2 @@
+stale_survivors: 3
+survivors_after_recovery: 0

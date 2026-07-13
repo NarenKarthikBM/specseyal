@@ -1,0 +1,127 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {
+    "hyperedges": []
+  },
+  "nodes": [
+    {
+      "id": "src_cli_stable_sh",
+      "label": "stable.sh",
+      "file_type": "code",
+      "source_file": "src/cli/stable.sh",
+      "source_location": "L1",
+      "metadata": {
+        "language": "bash",
+        "kind": "file"
+      },
+      "_origin": "ast",
+      "community": 1,
+      "norm_label": "stable.sh"
+    },
+    {
+      "id": "src_cli_stable_sh_log_info",
+      "label": "log_info",
+      "file_type": "code",
+      "source_file": "src/cli/stable.sh",
+      "source_location": "L4",
+      "metadata": {
+        "language": "bash",
+        "kind": "bash_function"
+      },
+      "_origin": "ast",
+      "community": 1,
+      "norm_label": "log_info"
+    },
+    {
+      "id": "src_cli_parse_sh",
+      "label": "parse.sh",
+      "file_type": "code",
+      "source_file": "src/cli/parse.sh",
+      "source_location": "L1",
+      "metadata": {
+        "language": "bash",
+        "kind": "file"
+      },
+      "_origin": "ast",
+      "community": 2,
+      "norm_label": "parse.sh"
+    },
+    {
+      "id": "src_cli_parse_sh_parse_args",
+      "label": "parse_args",
+      "file_type": "code",
+      "source_file": "src/cli/parse.sh",
+      "source_location": "L3",
+      "metadata": {
+        "language": "bash",
+        "kind": "bash_function"
+      },
+      "_origin": "ast",
+      "community": 2,
+      "norm_label": "parse_args"
+    },
+    {
+      "id": "src_cli_format_sh",
+      "label": "format.sh",
+      "file_type": "code",
+      "source_file": "src/cli/format.sh",
+      "source_location": "L1",
+      "metadata": {
+        "language": "bash",
+        "kind": "file"
+      },
+      "_origin": "ast",
+      "community": 3,
+      "norm_label": "format.sh"
+    },
+    {
+      "id": "src_cli_format_sh_format_output",
+      "label": "format_output",
+      "file_type": "code",
+      "source_file": "src/cli/format.sh",
+      "source_location": "L2",
+      "metadata": {
+        "language": "bash",
+        "kind": "bash_function"
+      },
+      "_origin": "ast",
+      "community": 3,
+      "norm_label": "format_output"
+    }
+  ],
+  "links": [
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "src/cli/stable.sh",
+      "source_location": "L4",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "src_cli_stable_sh",
+      "target": "src_cli_stable_sh_log_info"
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "src/cli/parse.sh",
+      "source_location": "L3",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "src_cli_parse_sh",
+      "target": "src_cli_parse_sh_parse_args"
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "src/cli/format.sh",
+      "source_location": "L2",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "src_cli_format_sh",
+      "target": "src_cli_format_sh_format_output"
+    }
+  ],
+  "hyperedges": [],
+  "built_at_commit": "0000000000000000000000000000000000000000"
+}

@@ -1,0 +1,60 @@
+{
+  "changed_file": "demo/changed.sh",
+  "nodes": [
+    {
+      "label": "changed.sh",
+      "file_type": "code",
+      "source_file": "demo/changed.sh",
+      "source_location": "L1",
+      "metadata": { "language": "bash", "kind": "file" },
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "changed.sh",
+      "id": "fx_changed_file"
+    },
+    {
+      "label": "alpha()",
+      "file_type": "code",
+      "source_file": "demo/changed.sh",
+      "source_location": "L4",
+      "metadata": { "language": "bash", "kind": "bash_function" },
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "alpha()",
+      "id": "fx_fn_alpha"
+    },
+    {
+      "label": "epsilon()",
+      "file_type": "code",
+      "source_file": "demo/changed.sh",
+      "source_location": "L9",
+      "metadata": { "language": "bash", "kind": "bash_function" },
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "epsilon()",
+      "id": "fx_fn_epsilon"
+    }
+  ],
+  "links": [
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "demo/changed.sh",
+      "source_location": "L1",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "fx_changed_file",
+      "target": "fx_fn_alpha"
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "demo/changed.sh",
+      "source_location": "L1",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "fx_changed_file",
+      "target": "fx_fn_epsilon"
+    }
+  ]
+}

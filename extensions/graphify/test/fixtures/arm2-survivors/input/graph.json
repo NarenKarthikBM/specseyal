@@ -1,0 +1,150 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {
+    "hyperedges": []
+  },
+  "nodes": [
+    {
+      "label": "changed.sh",
+      "file_type": "code",
+      "source_file": "demo/changed.sh",
+      "source_location": "L1",
+      "metadata": { "language": "bash", "kind": "file" },
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "changed.sh",
+      "id": "fx_changed_file"
+    },
+    {
+      "label": "alpha()",
+      "file_type": "code",
+      "source_file": "demo/changed.sh",
+      "source_location": "L4",
+      "metadata": { "language": "bash", "kind": "bash_function" },
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "alpha()",
+      "id": "fx_fn_alpha"
+    },
+    {
+      "label": "beta()",
+      "file_type": "code",
+      "source_file": "demo/changed.sh",
+      "source_location": "L9",
+      "metadata": { "language": "bash", "kind": "bash_function" },
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "beta()",
+      "id": "fx_fn_beta"
+    },
+    {
+      "label": "gamma()",
+      "file_type": "code",
+      "source_file": "demo/changed.sh",
+      "source_location": "L14",
+      "metadata": { "language": "bash", "kind": "bash_function" },
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "gamma()",
+      "id": "fx_fn_gamma"
+    },
+    {
+      "label": "delta()",
+      "file_type": "code",
+      "source_file": "demo/changed.sh",
+      "source_location": "L19",
+      "metadata": { "language": "bash", "kind": "bash_function" },
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "delta()",
+      "id": "fx_fn_delta"
+    },
+    {
+      "label": "stable.sh",
+      "file_type": "code",
+      "source_file": "demo/stable.sh",
+      "source_location": "L1",
+      "metadata": { "language": "bash", "kind": "file" },
+      "_origin": "ast",
+      "community": 1,
+      "norm_label": "stable.sh",
+      "id": "fx_stable_file"
+    },
+    {
+      "label": "watcher()",
+      "file_type": "code",
+      "source_file": "demo/stable.sh",
+      "source_location": "L4",
+      "metadata": { "language": "bash", "kind": "bash_function" },
+      "_origin": "ast",
+      "community": 1,
+      "norm_label": "watcher()",
+      "id": "fx_stable_fn"
+    }
+  ],
+  "links": [
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "demo/changed.sh",
+      "source_location": "L1",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "fx_changed_file",
+      "target": "fx_fn_alpha"
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "demo/changed.sh",
+      "source_location": "L1",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "fx_changed_file",
+      "target": "fx_fn_beta"
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "demo/changed.sh",
+      "source_location": "L1",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "fx_changed_file",
+      "target": "fx_fn_gamma"
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "demo/changed.sh",
+      "source_location": "L1",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "fx_changed_file",
+      "target": "fx_fn_delta"
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "demo/stable.sh",
+      "source_location": "L1",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "fx_stable_file",
+      "target": "fx_stable_fn"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "demo/stable.sh",
+      "source_location": "L4",
+      "weight": 1.0,
+      "confidence_score": 0.9,
+      "source": "fx_stable_fn",
+      "target": "fx_fn_gamma"
+    }
+  ],
+  "hyperedges": [],
+  "built_at_commit": "0000000000000000000000000000000000000000"
+}

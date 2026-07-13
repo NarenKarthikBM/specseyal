@@ -1,0 +1,13 @@
+schema_version: "1.0"
+
+extension:
+  id: widget
+  name: "Widget Fixture Extension"
+  version: "1.0.0"
+  description: "Minimal stand-in extension manifest for the arm1-success golden (T005, 005-graphify-context)."
+
+hooks:
+  before_thing:
+    command: speckit.widget.hello
+    optional: true
+    description: "Fixture hook target for the arm1-success golden (T005)"

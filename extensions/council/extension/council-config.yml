@@ -32,6 +32,21 @@ tiers:
                                # each member reviews the other four's opinions.
     context: eager             # every member reads deck + plan + spec up front.
     member_output_cap: none    # write as many suggestions as the review warrants.
+    query_ceiling: null        # UNCAPPED. Unlike standard, full tier has no
+                               # measured query-count baseline yet — no full-tier
+                               # round has run since arm 4 shipped. Do NOT copy
+                               # standard's 15 here: full tier's eager context
+                               # (`002`-era 25-38 per-member queries) is a
+                               # different ecosystem — deriving a ceiling from a
+                               # mismatched tier's behavior is the exact
+                               # calibration trap D77 caught (S05). Deliberately
+                               # `null`, not the `none` string used above for
+                               # `member_output_cap` — that means
+                               # uncapped-by-design; this means
+                               # not-yet-calibrated. Set a number the first time a
+                               # full-tier round measures its own uncapped
+                               # baseline (D61 M5-class trigger), the same way
+                               # standard's 15 was set from this round's.
   standard:
     # The cost-controlled tier (D56). Four independent, additive levers cut
     # the cache-creation churn the `002` finding traced (each member's 25-38
@@ -47,6 +62,23 @@ tiers:
     member_output_cap: 6       # <= 6 suggestions per stage-1 member; the
                                # consolidated peer critique caps at <= 15 points.
                                # Bounds padding; tunable, like member_count.
+    query_ceiling: 15          # HARD, enforced cap (arm 4) on a member's
+                               # graph-QUERY COUNT (graphify explain/path/query
+                               # calls) — NOT per-call output size, which
+                               # `--budget` already bounds. The orchestrator
+                               # refuses a query past this count — the Nth query
+                               # is the member's last (contracts/commands.md Arm
+                               # 4), never a soft suggestion. Calibrated (D77)
+                               # from THIS round's uncapped standard-tier
+                               # baseline: per-member queries A=8 B=7 C=9 D=2 E=6,
+                               # max 9 — so 15 is ~1.7× that max, headroom for a
+                               # thorough review yet tight enough to catch a
+                               # genuine runaway. Never derive one tier's ceiling
+                               # from another's baseline — tiers.full's stays
+                               # unset below (see its own comment). Contract
+                               # surface names this `member.query_ceiling`;
+                               # tier-scoped here as `query_ceiling`, alongside
+                               # `member_output_cap`, since both ARE tier-aware.
 member_lenses: [correctness, risk, simplicity, testability, sequencing]
 # Soft analytical-lens nudge, assigned one-per-member (A-E) on top of the
 # same base reviewer prompt (member-prompt.md). v1 members are

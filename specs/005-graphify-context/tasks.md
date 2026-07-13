@@ -37,7 +37,7 @@
 
 **⚠️ CRITICAL**: US2 and US3 cannot begin until this is complete. (US1 and US4 do not depend on it — they may start once Setup is done.)
 
-- [ ] T004 Define + document the **shared-provenance header** contract — `graph path · node/edge count · generated-at · graph content-hash / generation-id` — that every arm-3 context product emits and `freshness.sh` (arm 2) reads to decide staleness per product (data-model.md *Context products*; S13). Documented in `extensions/graphify/skills/speckit-graphify-context/SKILL.md` (provenance section) as the arm-2↔arm-3 coherence contract.
+- [X] T004 Define + document the **shared-provenance header** contract — `graph path · node/edge count · generated-at · graph content-hash / generation-id` — that every arm-3 context product emits and `freshness.sh` (arm 2) reads to decide staleness per product (data-model.md *Context products*; S13). Documented in `extensions/graphify/skills/speckit-graphify-context/SKILL.md` (provenance section) as the arm-2↔arm-3 coherence contract.
 
 **Checkpoint**: Provenance contract fixed — the freshness check and the product generator now share one definition of "current".
 

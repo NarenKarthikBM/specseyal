@@ -1,0 +1,86 @@
+{
+  "directed": true,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "id": "alpha_widget_py",
+      "label": "widget.py",
+      "file_type": "code",
+      "source_file": "src/alpha/widget.py",
+      "source_location": "L1",
+      "metadata": {
+        "language": "python",
+        "kind": "file"
+      },
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "widget.py"
+    },
+    {
+      "id": "alpha_widget_py_make_widget",
+      "label": "make_widget()",
+      "file_type": "code",
+      "source_file": "src/alpha/widget.py",
+      "source_location": "L12",
+      "metadata": {
+        "language": "python",
+        "kind": "function"
+      },
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "make_widget"
+    },
+    {
+      "id": "beta_gadget_py",
+      "label": "gadget.py",
+      "file_type": "code",
+      "source_file": "src/beta/gadget.py",
+      "source_location": "L1",
+      "metadata": {
+        "language": "python",
+        "kind": "file"
+      },
+      "_origin": "ast",
+      "community": 1,
+      "norm_label": "gadget.py"
+    }
+  ],
+  "links": [
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "src/alpha/widget.py",
+      "source_location": "L12",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "alpha_widget_py",
+      "target": "alpha_widget_py_make_widget"
+    },
+    {
+      "relation": "depends_on",
+      "confidence": "EXTRACTED",
+      "source_file": "src/alpha/widget.py",
+      "source_location": "L14",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "alpha_widget_py",
+      "target": "beta_gadget_py"
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "alpha_beta_pairing",
+      "label": "Alpha module participates with Beta module",
+      "nodes": [
+        "alpha_widget_py",
+        "beta_gadget_py"
+      ],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/alpha/widget.py"
+    }
+  ],
+  "built_at_commit": "7a23d80aad4ff9c83905932854e44bf6868729ec"
+}

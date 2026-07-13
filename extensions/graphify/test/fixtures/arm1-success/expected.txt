@@ -1,0 +1,8 @@
+NODE	extension/extension.yml	yml
+NODE	extension/scripts/entry.sh	sh
+NODE	extension/scripts/helper.sh	sh
+NODE	install.sh	sh
+NODE	speckit.widget.hello	command
+EDGE	installs	install.sh	.specify/extensions/widget	EXTRACTED
+EDGE	invokes	extension/scripts/entry.sh	extension/scripts/helper.sh	EXTRACTED
+EDGE	registers_hook	extension/extension.yml	speckit.widget.hello	EXTRACTED

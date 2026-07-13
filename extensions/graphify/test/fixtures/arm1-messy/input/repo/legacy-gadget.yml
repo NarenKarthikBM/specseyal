@@ -1,0 +1,8 @@
+# legacy-gadget.yml — fixture-only source file (arm1-messy golden, T007 /
+# 005-graphify-context)
+#
+# The real, already-tracked cp source named by install.sh's S10 construct 2. Its
+# content is irrelevant to augment.sh's static parse; it exists only so the
+# conditional cp names a genuine file instead of raising a second, unrelated
+# resolvability question on top of the conditionality question actually under test.
+mode: legacy

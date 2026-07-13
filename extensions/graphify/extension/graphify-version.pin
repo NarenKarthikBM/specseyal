@@ -1,0 +1,72 @@
+# graphify-version.pin — pinned upstream `graphifyy` CLI version (R4/S16)
+#
+# WHAT THIS PINS
+#   The exact, verbatim stdout of `graphify --version` for the installed
+#   upstream `graphifyy` pip package this repo's graph was last built or
+#   verified against. D75: `graphifyy` is NEVER modified by specseyal —
+#   this file only RECORDS its version; it is a drift TRIPWIRE, not a
+#   dependency lock/vendor file. `graphifyy` stays an ordinary versioned
+#   pip dependency (D75, archivable per D29).
+#
+#   Currently pinned: graphifyy 0.8.44 (live-verified via `graphify
+#   --version` -> "graphify 0.8.44").
+#
+# HOW THE VERSION IS OBTAINED AT CHECK TIME
+#   Run `graphify --version` and capture its stdout VERBATIM (trim only
+#   a trailing newline — no other normalization, no token-extraction,
+#   no regex pulling out just the semver). `importlib.metadata.version
+#   ("graphifyy")` is NOT used as the check-time source — it is not
+#   reliably available on every host this pipeline runs on. The
+#   installed CLI's own `--version` output is the sole source of truth,
+#   both here and at check time.
+#
+# THE PREVENTIVE-CHECK CONTRACT (R4/S16 — binding on T016's refresh.sh)
+#   plan.md, Risks: "R4 — Upstream graphifyy drift... upgraded to
+#   preventive, not reactive". Before refresh.sh calls the upstream
+#   `build_merge`/`detect_incremental` (Arm 2), it MUST, in this order:
+#
+#     1. Read this file's `pinned_graphify_version` value (extraction
+#        one-liner below — grepping/cutting is sufficient; sourcing the
+#        file also works, since the payload line is valid POSIX sh).
+#     2. Run `graphify --version` and capture its stdout verbatim.
+#     3. Compare the two with PLAIN STRING EQUALITY. Do not parse a
+#        version number out of either side first — pin and compare the
+#        full raw strings, so ANY drift in the CLI's version-string
+#        output (not only a semver bump) trips the check. This is the
+#        deliberately conservative, fail-closed reading of R4: a false
+#        "mismatch" only costs a full regen; a false "match" risks a
+#        silent wrong-contract `build_merge`/`detect_incremental` call.
+#
+#   - MATCH -> proceed to the normal S02 stale-branch table (cheap
+#     `refresh.sh` incremental, or prune+targeted-re-extract, as
+#     staleness dictates). This pin does not replace the freshness
+#     check (`freshness.sh`) — it gates entry to
+#     `build_merge`/`detect_incremental` specifically, once staleness
+#     has already routed there.
+#   - MISMATCH — including `graphify --version` failing, printing
+#     nothing, or `graphify` being absent from PATH entirely — refresh.sh
+#     MUST take the FULL-REGEN branch of the S02 table. Never fall
+#     through to `build_merge`/`detect_incremental` with an unverified
+#     version: that silent wrong-contract call is exactly what this pin
+#     exists to prevent (R4, upgraded preventive-not-reactive per S16).
+#     Fail-closed: an unverifiable version (command missing/erroring)
+#     is treated exactly like a confirmed mismatch, never like a match.
+#
+# HOW THIS FILE IS UPDATED
+#   Only by a deliberate, reviewed edit when the upstream `graphifyy`
+#   package is intentionally upgraded: re-run `graphify --version`,
+#   paste its exact new stdout as the value below, commit. refresh.sh
+#   (T016) only READS this file — it must never auto-rewrite the pin
+#   itself, or a genuine contract break would silently re-pin itself
+#   away instead of routing to full-regen.
+#
+# EXTRACTION (POSIX sh, no sourcing required):
+#   pinned=$(grep '^pinned_graphify_version=' graphify-version.pin | head -n1 | cut -d'"' -f2)
+#
+# (The payload line below is also valid POSIX sh variable-assignment
+# syntax, so ". graphify-version.pin" works too and sets
+# $pinned_graphify_version directly — either form is an acceptable
+# reading of this contract; pick whichever fits refresh.sh's own style
+# and stay consistent within that script.)
+
+pinned_graphify_version="graphify 0.8.44"
