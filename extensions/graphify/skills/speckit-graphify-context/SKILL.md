@@ -74,6 +74,130 @@ _Generated <ISO-8601> from `<graph path>` (<N> nodes, <M> edges, scope: repo|mer
 - <convention surfaced by the graph, with the exemplar file>
 ```
 
+## Shared-provenance header (arm-2 ↔ arm-3 coherence contract)
+
+This is the single authoritative contract for the header every arm-3 context product emits and `freshness.sh` (arm 2) reads. It is fixed precisely enough that a POSIX `sh` script extracts any field with `grep`/`sed` alone — no YAML/JSON parser — and a committed golden fixture asserts on it byte-for-byte. **Nothing in this section changes today's output.** The generator that stamps this header into all three arm-3 products, and `freshness.sh` itself, are later work; this section is the contract that work must satisfy.
+
+**Backward compatibility (FR-013).** The existing italic provenance line in the Output template above (`_Generated <ISO-8601> from ... regenerate with /speckit-graphify-context._`) is unchanged — this section *adds* a machine-readable block alongside it, it does not replace or reword it. `graphify-context.md`'s path and section grammar stay exactly as today; `/speckit-plan`, `/speckit-tasks-graph`, and `/speckit-implement-parallel` read it unchanged.
+
+**Placement.** Exactly one header block per product file, near the top (after the product's own title/intro prose, before its first `##` section) — position is a readability nicety only; every consumer locates the block by its sentinel marker, never by line number.
+
+### Literal syntax (normative)
+
+The header is a single HTML comment — invisible when the Markdown renders, present in the raw bytes for `grep`/`sed` and for byte-diffing — carrying exactly seven `field-name: value` lines, one per line, in this fixed order, no blank lines inside the block, no trailing whitespace:
+
+```
+<!-- graphify-provenance:v1
+graph-path: graphify-out/graph.json
+graph-scope: repo
+node-count: 1611
+edge-count: 2674
+generated-at: 2026-07-14T18:32:05Z
+generation-id: sha256:1f3c9a7d0e6b5c2a4f8d9e1b3c5a7f9d2e4b6c8a0f2d4e6b8c0a2f4e6d8c0b2a
+source-fingerprint: git-commit:9cc8479978f5f1986246e0fb6a9eb11ab8106dd5
+-->
+```
+
+(The `generation-id` hex above is an illustrative placeholder; `node-count`/`edge-count`/`source-fingerprint` reuse real values verified against this feature's own committed `graph-baseline.json`, cited below.) Extraction is one `sed` to isolate the block plus one `grep`/`sed` per field, e.g.:
+
+```sh
+sed -n '/<!-- graphify-provenance:v1/,/-->/p' "$product" | grep '^generation-id:' | sed 's/^generation-id: //'
+```
+
+### Field reference (normative)
+
+The first five fields are read directly off the `graph.json` named by `graph-path` — a NetworkX node-link-json document with top-level keys `directed`, `multigraph`, `graph`, `nodes`, `links`, `hyperedges`, `built_at_commit` (verified against `specs/005-graphify-context/graph-baseline.json`; no other top-level key exists at time of writing). A future upstream `graphifyy` schema change would need this section's extraction recipes amended to match — `graphifyy` itself stays unmodified (D75), this contract adapts to it, never the reverse.
+
+| Field | Format | Identical across all 3 products of one run? |
+|---|---|---|
+| `graph-path` | the `graph.json` path, written relative to this feature's repo root (`REPO_ROOT`) — `graphify-out/graph.json` for repo scope, `../graphify-out/graph.json` for merged scope (never absolute — an absolute path breaks byte-identical goldens across machines/CI) | Yes |
+| `graph-scope` | `repo` \| `merged` | Yes |
+| `node-count` | decimal integer — `len(graph.json["nodes"])`, the **full graph's** total (not this product's own diet-slice count) | Yes |
+| `edge-count` | decimal integer — `len(graph.json["links"])` (NetworkX calls edges "links"; this is the same figure the plan's own baseline cites as "edges") | Yes |
+| `generated-at` | `YYYY-MM-DDTHH:MM:SSZ`, UTC, second precision, literal `Z` (no fractional seconds, no numeric offset) | Yes |
+| `generation-id` | `sha256:` + 64 lowercase hex chars | Yes |
+| `source-fingerprint` | `git-commit:` + 40 lowercase hex chars (the common case), or `sha256:` + 64 lowercase hex chars (fallback — see below) | Yes |
+
+Every field is stamped once per generator run and copied verbatim into all three products (see *Coherence*, below).
+
+### `generation-id` — the graph content-hash
+
+`generation-id = sha256:<hex(SHA-256(canonical-bytes))>`, where `canonical-bytes` is produced by:
+
+1. Parse `graph.json` as JSON.
+2. **Remove the top-level `built_at_commit` key.** It is tracked separately, as `source-fingerprint` (below) — folding it in here would correlate the two checks (a refresh that re-stamps the commit marker with byte-identical node/edge content would needlessly flip both hashes at once, when the two are designed to answer different questions independently).
+3. Re-serialize the remainder with object keys sorted lexicographically (`LC_ALL=C` byte order) at every nesting level; arrays (`nodes`, `links`, `hyperedges`) keep their existing, already-stable element order — canonicalization never reorders array content, only object keys; compact form (no insignificant whitespace); UTF-8; LF line endings.
+4. SHA-256 the result.
+
+```sh
+python3 -c "
+import json
+d = json.load(open('graph.json'))
+d.pop('built_at_commit', None)
+print(json.dumps(d, sort_keys=True, separators=(',', ':')))
+" | shasum -a 256 | cut -d' ' -f1
+```
+
+(`shasum -a 256` matches this codebase's own existing hash-reference-definition convention — `docs/contracts/agent-library-schema.md` S2's `body_sha256`, `extensions/workforce/extension/scripts/frontmatter.py` — rather than a second, differently-named hashing convention. A GNU/Linux implementation may use `sha256sum` instead; both emit the identical lowercase-hex digest for identical bytes.)
+
+The generator (stamping `generation-id` at product-write time) and `freshness.sh` (recomputing it at check time) **MUST** perform identical canonicalization — share one implementation rather than reimplement it twice; any divergence between the two reproduces, mechanically, the exact false-staleness failure this contract exists to prevent. Step 2's "no other volatile field" claim is verified against the current upstream extraction, not assumed: if a future `graphifyy` release adds a second self-referential build-time field, apply the same rule (exclude it here; consider it for `source-fingerprint` instead if it is a more precise source-basis marker than `built_at_commit`).
+
+### `source-fingerprint` — the source-basis marker (why a sixth field, and why it is not an invented digest)
+
+The five fields above let a check compare a **product to the graph it was generated from** (did the graph change since this product was written) — they say nothing about whether the **graph itself still describes the current working tree** (did the tracked source change since the graph was built). Per data-model.md, freshness is defined against "the graph's manifest/hashes **vs the current working tree**," and closing that gap needs a value recorded *at generation time* that a later check can cheaply, mechanically recompute against *whatever the worktree looks like right now* — without a state file (D32).
+
+Rather than inventing a parallel content-hashing mechanism, reuse what is already there: `graph.json`'s own top-level `built_at_commit` field is exactly this basis — a git commit SHA (verified: `specs/005-graphify-context/graph-baseline.json` carries `built_at_commit: 9cc8479978f5f1986246e0fb6a9eb11ab8106dd5`, a real, valid, currently-reachable commit object in this repo's history). Carrying it forward costs nothing extra to compute (the upstream extraction already produced it) and lets the worktree-side check run as a single `git diff` plumbing call rather than a full re-hash of every tracked file.
+
+**Common case — `source-fingerprint: git-commit:<40-hex>`.** Copy `graph.json["built_at_commit"]` verbatim, prefixed for self-description. This is git's native SHA-1 commit id, not a digest this contract invents.
+
+**Fallback — `source-fingerprint: sha256:<64-hex>`** (merged/stack scope, or any future extraction path that does not emit `built_at_commit` — unverified either way, since no merged-scope `graph.json` sample exists in this repo to inspect): enumerate every git-tracked file under the graph's own scope root via `git ls-files -z`, sort `LC_ALL=C`, hash each file's *current on-disk content* (not git's cached index blob-sha, which would miss an edited-but-unstaged file) with `shasum -a 256`, concatenate the `<hash>  <path>` lines, and SHA-256 that concatenation. Using `git ls-files` rather than a raw filesystem walk has a free side effect worth naming: it automatically excludes `graphify-out/` (gitignored, D45) and everything else gitignored, so the graph's own disposable output never perturbs the fingerprint of the source it describes.
+
+`freshness.sh` distinguishes the two forms by the field's prefix and recomputes accordingly (below) — never by guessing.
+
+**Known, accepted limit.** An untracked file (never `git add`ed even once) that the upstream extraction nonetheless picked up from the raw filesystem would not perturb either form of this fingerprint — a narrow, accepted gap given this pipeline's git-native, branch-per-feature discipline (D25), where in-progress work is normally tracked-but-uncommitted rather than fully untracked.
+
+### Freshness decision — what `freshness.sh` reads and how it decides
+
+`freshness.sh <product-path>` (contracts/commands.md: exit `0` = fresh; exit non-zero + `stale: regenerate <product>` on stdout = stale) decides using **only** this header plus the current state of `graph.json` and the current worktree — no state file, nothing cached from a previous run (D32) — recomputed on every call, never reused across hook invocations.
+
+1. **Product-vs-graph check.** Read `graph-path` and `generation-id` from the header. Recompute `generation-id` fresh, right now, from the *current* `graph-path` file (canonicalization above). A mismatch means the graph has been rebuilt/changed since this product was generated → **stale**.
+2. **Graph-vs-worktree check.** Read `graph-scope` and `source-fingerprint` from the header.
+   - If `git-commit:<sha>`: run `git diff --quiet <sha>` from the graph's scope root. Exit `0` (no difference) → this check passes; a real diff, or an error (e.g. `<sha>` no longer reachable — an unusual case, such as a history rewrite) → **stale**. An error is never silently treated as fresh — unprovable freshness is stale, the safe default.
+   - If `sha256:<hex>`: recompute the `git ls-files`-based digest (above) against the current worktree and compare for exact string equality; a mismatch → **stale**.
+3. **Fresh** only if both checks pass. Either failing alone is sufficient for **stale** — the two checks are independent and complementary (check 1 catches "graph rebuilt, product not regenerated"; check 2 catches "source edited, graph never rebuilt"), not restatements of each other.
+
+Because `git diff --quiet` compares the recorded commit against the *current* working tree content (not merely commit identity), check 2 is genuinely content-based, not version-count-based: two different commits with byte-identical tracked content compare as fresh. It is also deliberately whole-tree, not narrowed to the file types the graph explicitly models — a tracked change to a file `graphify` doesn't parse still trips **stale**, by design: given `freshness.sh` only ever hard-warns and routes to regeneration (never a hard-block, per contracts/commands.md), an occasional over-cautious warning on an irrelevant change is the acceptable cost against the alternative of silently missing a relevant one.
+
+This maps directly onto the fixture branches this arm must prove — both branches of the guard, never only the passing one:
+- **stale-positive:** a graph + a mutated worktree → mutate any git-tracked file under the scope root without rebuilding the graph → check 2's recomputation differs from the recorded `source-fingerprint` → **stale**. (A distinct stale sub-case is separately exercisable: rebuild `graph.json` without regenerating the product, tripping check 1 instead of check 2 — the two are independently triggerable if finer-grained fixtures are wanted.)
+- **stale-negative / no false alarm:** a graph + an unmutated worktree → neither `graph.json` nor any tracked source file changed since generation → both recomputations match their recorded values exactly → **fresh**, exit `0`, nothing warned.
+
+Both checks are cheap: field extraction via `sed`/`grep`, one canonicalize-and-hash pass over `graph.json` for check 1, and one `git diff --quiet` plumbing call for check 2 (common case) — POSIX/git tools only, no state file, sub-second at this repo's current scale (FR-005).
+
+### Coherence across the three products
+
+All seven fields are stamped once per generator run and copied **verbatim** into all three products — not `generation-id` alone, the entire header block, byte-for-byte identical across `graphify-context.md`, the receipts diet, and the type-signal diet (one graph, one run, one set of facts about it; the same "structural, not aspirational" bar this plan already applied when it chose separate products over a single sectioned file, D53). This makes the cross-product coherence check mechanical and simple: extract the header block from each of the three products and diff them — the diffs must be empty. A per-product golden still independently covers each product's own diet-specific *body* beneath the header (the header's byte-identity does not substitute for that); the coherence fixture is what catches drift **between** products that no single product's own golden can ever catch alone.
+
+### Golden-fixture guidance
+
+`generated-at` is the one field that is not reproducible from a clean checkout by construction — it is real wall-clock time at generation, so it differs between any two separate runs, including two runs of a fixture harness. Goldens for this header **MUST NOT** assert `generated-at` byte-for-byte against a captured real timestamp; every other field (`graph-path`, `graph-scope`, `node-count`, `edge-count`, `generation-id`, `source-fingerprint`) **is** byte-stable given fixed input and **MUST** be asserted byte-for-byte. Recommended, singular convention, so fixture authors don't each invent a different one: normalize the actual output's `generated-at` line to a fixed sentinel (e.g. `generated-at: <FIXED-FOR-GOLDEN>`) before diffing, and commit the golden with that same sentinel rather than a captured real timestamp.
+
+### Worked example
+
+```
+<!-- graphify-provenance:v1
+graph-path: graphify-out/graph.json
+graph-scope: repo
+node-count: 1611
+edge-count: 2674
+generated-at: 2026-07-14T18:32:05Z
+generation-id: sha256:1f3c9a7d0e6b5c2a4f8d9e1b3c5a7f9d2e4b6c8a0f2d4e6b8c0a2f4e6d8c0b2a
+source-fingerprint: git-commit:9cc8479978f5f1986246e0fb6a9eb11ab8106dd5
+-->
+```
+
+`node-count`/`edge-count` above are this feature's own real, verified baseline (`specs/005-graphify-context/graph-baseline.json`); `generation-id`'s hex is an illustrative placeholder (not a real computed digest); `source-fingerprint`'s commit is real and reachable in this repo's history but illustrates the *field's shape*, not a pinned/special commit.
+
 ## Done When
 
 - [ ] `<FEATURE_DIR>/graphify-context.md` exists and cites real graph paths

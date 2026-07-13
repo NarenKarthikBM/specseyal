@@ -25,9 +25,9 @@
 
 **Purpose**: The test-harness scaffolding every arm's fixtures plug into, plus the mechanical-script home.
 
-- [ ] T001 [P] Scaffold the graphify extension test harness `extensions/graphify/test/run.sh` (fixture-driven, byte-checkable goldens, a `§3 reinstall-survival` stage) modeled on `extensions/git/test/run.sh` and `extensions/workforce/test/`, and create `extensions/graphify/test/fixtures/`.
-- [ ] T002 [P] Scaffold the council extension test harness `extensions/council/test/run.sh` + `extensions/council/test/fixtures/`, same model (council has no `test/` today).
-- [ ] T003 [P] Create `extensions/graphify/extension/scripts/` and establish the shared POSIX-`sh` idiom preamble the arm-1/2 scripts follow — `set -eu`, no LLM, no trace, no `ANTHROPIC_API_KEY`, exit-code-is-the-contract (the `commit.sh`/`verify-gate.sh` house style, constitution V).
+- [X] T001 [P] Scaffold the graphify extension test harness `extensions/graphify/test/run.sh` (fixture-driven, byte-checkable goldens, a `§3 reinstall-survival` stage) modeled on `extensions/git/test/run.sh` and `extensions/workforce/test/`, and create `extensions/graphify/test/fixtures/`.
+- [X] T002 [P] Scaffold the council extension test harness `extensions/council/test/run.sh` + `extensions/council/test/fixtures/`, same model (council has no `test/` today).
+- [X] T003 [P] Create `extensions/graphify/extension/scripts/` and establish the shared POSIX-`sh` idiom preamble the arm-1/2 scripts follow — `set -eu`, no LLM, no trace, no `ANTHROPIC_API_KEY`, exit-code-is-the-contract (the `commit.sh`/`verify-gate.sh` house style, constitution V).
 
 ---
 
