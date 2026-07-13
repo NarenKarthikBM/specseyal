@@ -1,0 +1,6 @@
+# Python-helper byproducts, in case contributors run the merge scripts
+# (augment_merge.py et al., T008) locally. D75: augment, don't fork —
+# these are throwaway local artifacts, never committed.
+__pycache__/
+*.pyc
+.venv/

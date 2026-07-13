@@ -1,0 +1,5 @@
+# Placeholder so this directory tracks in git ahead of the tasks that fill it: later
+# graphify arm-1/2/3 goldens and the six consumer fixtures each drop in their own
+# self-contained test/fixtures/<name>/{cmd.sh,expected.txt} directory (convention documented
+# verbatim in ../run.sh's header — see that file, never this one, for the contract). Safe to
+# delete once the first real fixture directory lands.
