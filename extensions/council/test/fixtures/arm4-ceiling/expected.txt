@@ -1,0 +1,2 @@
+ceiling_hit: true
+> **Reduced grounding** — query ceiling (15) reached; further graph queries for this review were not run.

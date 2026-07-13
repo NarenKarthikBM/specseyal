@@ -51,14 +51,14 @@
 
 ### Tests for User Story 1 (write FIRST, ensure they FAIL) ⚠️
 
-- [ ] T005 [P] [US1] Arm-1 **success-branch** golden: a fixture repo slice with a known `.sh`/`.yml` topology → the pass emits the expected nodes + all three edge kinds (`registers_hook`, `installs`, `invokes`), byte-identical. `extensions/graphify/test/fixtures/arm1-success/`.
-- [ ] T006 [P] [US1] Arm-1 **fallback-branch** golden (SC-002 honesty): a slice carrying a relationship *outside* the three modeled kinds → the pass emits the **labeled-assertion fallback**, never a silent gap. `extensions/graphify/test/fixtures/arm1-fallback/`.
-- [ ] T007 [P] [US1] Arm-1 **messy-pattern** golden (S10): commented-out `source`, conditional `cp`, `"$VAR/script.sh"` indirection → the pass mints **no wrong edge**; every unresolvable construct falls to the labeled assertion. `extensions/graphify/test/fixtures/arm1-messy/`.
+- [X] T005 [P] [US1] Arm-1 **success-branch** golden: a fixture repo slice with a known `.sh`/`.yml` topology → the pass emits the expected nodes + all three edge kinds (`registers_hook`, `installs`, `invokes`), byte-identical. `extensions/graphify/test/fixtures/arm1-success/`.
+- [X] T006 [P] [US1] Arm-1 **fallback-branch** golden (SC-002 honesty): a slice carrying a relationship *outside* the three modeled kinds → the pass emits the **labeled-assertion fallback**, never a silent gap. `extensions/graphify/test/fixtures/arm1-fallback/`.
+- [X] T007 [P] [US1] Arm-1 **messy-pattern** golden (S10): commented-out `source`, conditional `cp`, `"$VAR/script.sh"` indirection → the pass mints **no wrong edge**; every unresolvable construct falls to the labeled assertion. `extensions/graphify/test/fixtures/arm1-messy/`.
 
 ### Implementation for User Story 1
 
 - [ ] T008 [US1] Implement the post-extraction coverage pass `extensions/graphify/extension/scripts/augment.sh` (+ its small merge helper `extensions/graphify/extension/scripts/augment_merge.py`, calling no upstream-modifying `graphifyy` code): parse the repo's `.sh`/`.yml`/`.md`, emit nodes + the three edge kinds, merge into `graph.json`; labeled-assertion fallback for the unmodellable; **byte-deterministic** — canonical JSON key order, sorted iteration, no FS-iteration-order dependence (S11); exit-code contract per contracts/commands.md. (depends on T005, T006, T007)
-- [ ] T009 [P] [US1] Harden the `graphify explain` **ambiguous-match** footgun at the extension seam — a query guard `extensions/graphify/extension/scripts/explain-guard.sh` that post-processes `graphify explain` to emit `path`'s near-tie warning (today `explain` resolves a short name to the top node silently even on a near-tie); `graphifyy` untouched (D75). S04. (depends on T003)
+- [X] T009 [P] [US1] Harden the `graphify explain` **ambiguous-match** footgun at the extension seam — a query guard `extensions/graphify/extension/scripts/explain-guard.sh` that post-processes `graphify explain` to emit `path`'s near-tie warning (today `explain` resolves a short name to the top node silently even on a near-tie); `graphifyy` untouched (D75). S04. (depends on T003)
 - [ ] T010 [P] [US1] Adopt the **qualified-path/label citation convention** so a deck-cited or member-cited filename names an unambiguous anchor (arm 1 grows the same-named-node surface; arm 4 makes each query precious) — edit `extensions/council/extension/templates/deck-technical.md`, `deck-overview.md`, and `extensions/council/extension/templates/member-prompt.md`. S04. **⚠ shares `member-prompt.md` with T027 and `deck-technical.md` with T021 — never co-schedule (see Shared-file serialization).** (depends on T009)
 
 **Checkpoint**: US1 independently testable — the plumbing edges resolve; fallback claims are labeled.
@@ -73,14 +73,14 @@
 
 ### Tests for User Story 2 (write FIRST) ⚠️
 
-- [ ] T011 [P] [US2] Freshness fixtures **(a) stale-positive** (graph + mutated worktree → **stale**) **and (b) stale-negative / no-false-alarm** (graph + *unmutated* worktree → **fresh**, no crying-wolf — S18, the inverse branch). `extensions/graphify/test/fixtures/arm2-freshness/`. (depends on T004)
-- [ ] T012 [P] [US2] Refresh fixture **(c) equivalence, 0 survivors**: base graph + changed-file extraction → refresh yields a graph equivalent to a full regen, `stale_survivors: 0`. `extensions/graphify/test/fixtures/arm2-equiv/`.
-- [ ] T013 [P] [US2] Refresh fixture **(d) negative-path survivor guard** (S01, precondition for arm-2 sign-off): a fixture that *manufactures* >0 stale survivors (the M3 86-node incident in miniature) → the guard **detects** them **and** performs the prune-or-rebuild recovery. `extensions/graphify/test/fixtures/arm2-survivors/`.
+- [X] T011 [P] [US2] Freshness fixtures **(a) stale-positive** (graph + mutated worktree → **stale**) **and (b) stale-negative / no-false-alarm** (graph + *unmutated* worktree → **fresh**, no crying-wolf — S18, the inverse branch). `extensions/graphify/test/fixtures/arm2-freshness/`. (depends on T004)
+- [X] T012 [P] [US2] Refresh fixture **(c) equivalence, 0 survivors**: base graph + changed-file extraction → refresh yields a graph equivalent to a full regen, `stale_survivors: 0`. `extensions/graphify/test/fixtures/arm2-equiv/`.
+- [X] T013 [P] [US2] Refresh fixture **(d) negative-path survivor guard** (S01, precondition for arm-2 sign-off): a fixture that *manufactures* >0 stale survivors (the M3 86-node incident in miniature) → the guard **detects** them **and** performs the prune-or-rebuild recovery. `extensions/graphify/test/fixtures/arm2-survivors/`.
 - [ ] T014 [P] [US2] Cross-arm composition fixture **(e)** (S06): a changed `.sh` + incremental refresh → the refreshed graph **carries arm-1's augment edges** for the changed file (coverage not silently regressed). `extensions/graphify/test/fixtures/arm2-compose/`. (depends on T008)
 
 ### Implementation for User Story 2
 
-- [ ] T017 [P] [US2] Version-pin manifest + preventive check (R4/S16): record the installed `graphifyy` version in `extensions/graphify/extension/graphify-version.pin`; the refresh wrapper asserts the pin before calling `build_merge`/`detect_incremental`, and a mismatch routes to the **full-regen** branch (never a silent wrong-contract call).
+- [X] T017 [P] [US2] Version-pin manifest + preventive check (R4/S16): record the installed `graphifyy` version in `extensions/graphify/extension/graphify-version.pin`; the refresh wrapper asserts the pin before calling `build_merge`/`detect_incremental`, and a mismatch routes to the **full-regen** branch (never a silent wrong-contract call).
 - [ ] T015 [P] [US2] Implement `extensions/graphify/extension/scripts/freshness.sh <product-path>`: derive freshness from the shared-provenance header / graph manifest vs the worktree; exit `0` = fresh, non-zero + `stale: regenerate <product>` on stdout = stale (**hard-warn, not hard-block**); **no state file** (D32); **recomputed at every consumption point, never cached across hook calls** (S20). (depends on T004, T011)
 - [ ] T016 [US2] Implement `extensions/graphify/extension/scripts/refresh.sh`: wrap the upstream incremental merge; run the **stale-survivor guard** → print `stale_survivors: <N>`; apply the S02 branch table (common cheap-refresh / prune+targeted-re-extract on survivors>0 / full-regen only on version-change or operator demand); **re-invoke `augment.sh` on the changed scope** (S06); equivalence-to-full-regen is the SC-004 exit test. (depends on T017, T008, T012, T013, T014)
 
@@ -96,8 +96,8 @@
 
 ### Tests for User Story 3 (write FIRST) ⚠️
 
-- [ ] T018 [P] [US3] Per-product goldens (three): `graphify-context.md` (blast-radius, **unchanged** shape — the FR-013 tripwire), the receipts diet (concept/rationale), the type-signal diet (per-file `type` + path-convention fallback). `extensions/graphify/test/fixtures/arm3-products/`. (depends on T004)
-- [ ] T019 [P] [US3] **Cross-product coherence** fixture (S13): one generator run → all three diets carry the **same graph-hash / generation-id** in their shared-provenance header (mutual coherence, not just per-product correctness). `extensions/graphify/test/fixtures/arm3-coherence/`. (depends on T004)
+- [X] T018 [P] [US3] Per-product goldens (three): `graphify-context.md` (blast-radius, **unchanged** shape — the FR-013 tripwire), the receipts diet (concept/rationale), the type-signal diet (per-file `type` + path-convention fallback). `extensions/graphify/test/fixtures/arm3-products/`. (depends on T004)
+- [X] T019 [P] [US3] **Cross-product coherence** fixture (S13): one generator run → all three diets carry the **same graph-hash / generation-id** in their shared-provenance header (mutual coherence, not just per-product correctness). `extensions/graphify/test/fixtures/arm3-coherence/`. (depends on T004)
 
 ### Implementation for User Story 3
 
@@ -115,7 +115,7 @@
 
 **Independent Test**: drive a member fixture to the ceiling → its opinion carries the disclosure and its trace shows `ceiling_hit: true`; an ordinary round carries neither.
 
-- [ ] T023 [US4] Amend the trace contract `docs/contracts/trace-schema.md`: add `graph_queries: <int>` and `ceiling_hit: <bool>`, **role-scoped to `council-member`** (the D72 role-gating pattern, mirroring `context_in`) — the contract change authorized at implement (data-model.md).
+- [X] T023 [US4] Amend the trace contract `docs/contracts/trace-schema.md`: add `graph_queries: <int>` and `ceiling_hit: <bool>`, **role-scoped to `council-member`** (the D72 role-gating pattern, mirroring `context_in`) — the contract change authorized at implement (data-model.md).
 
 ### Tests for User Story 4 (write FIRST) ⚠️
 
@@ -124,7 +124,7 @@
 
 ### Implementation for User Story 4
 
-- [ ] T026 [P] [US4] Add `member.query_ceiling` to `extensions/council/extension/council-config.yml` — **tier-aware**: `standard: 15` (D77, calibrated from this round's uncapped max of 9); `full:` **unset / uncapped** until the first full-tier round measures its own baseline (D77 — no ceiling derived from the wrong tier).
+- [X] T026 [P] [US4] Add `member.query_ceiling` to `extensions/council/extension/council-config.yml` — **tier-aware**: `standard: 15` (D77, calibrated from this round's uncapped max of 9); `full:` **unset / uncapped** until the first full-tier round measures its own baseline (D77 — no ceiling derived from the wrong tier).
 - [ ] T027 [US4] Edit the member prompt `extensions/council/extension/templates/member-prompt.md`: the query-ceiling instruction, the ceiling-hit disclosure hook (extending the existing FR-019 reduced-grounding note), and point the member at its **receipts diet** (arm-3 consumer 4). **⚠ shares `member-prompt.md` with T010 — never co-schedule.** (depends on T020, T026)
 - [ ] T028 [US4] Edit the council orchestrator `extensions/council/skills/speckit-council/SKILL.md` member-dispatch: **enforce** the query-count cap (the `N`th query is the last); **mechanically append** the reduced-grounding disclosure line the instant the cap is enforced (S09 — orchestrator appends, member prose is courtesy); record `graph_queries` + `ceiling_hit` per member trace fragment (FR-012); add the mid-implementation self-reopen guard note (S17 — a `--reopen delta` before arm 4 wires dispatches the pre-ceiling prompt). (depends on T023, T026)
 

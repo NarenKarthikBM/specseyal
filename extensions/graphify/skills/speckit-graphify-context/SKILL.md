@@ -1,8 +1,8 @@
 ---
 name: "speckit-graphify-context"
-description: "Generate a token-bounded graphify codebase-grounding file (graphify-context.md) for the current feature: relevant existing modules, per-file blast radius, shared/mutable files, and patterns to follow. Runs as a before_plan / before_tasks / before_implement hook and inline from the graph-aware speckit variants."
+description: "Generate three token-bounded graphify grounding products from one graph pass for the current feature: graphify-context.md (relevant existing modules, per-file blast radius, shared/mutable files, patterns to follow — unchanged path and shape, read by the graph-aware speckit variants), graphify-receipts.md (the concept/rationale/contracts diet for the council member and deck-prep), and graphify-type-signal.md (the per-file type-signal diet for the categorizer) — all three share one provenance header and generation-id from a single generator run. Runs as a before_plan / before_tasks / before_implement hook and inline from the graph-aware speckit variants."
 argument-hint: "Optional: a feature dir override, or the word 'merged' to force the cross-repo stack graph"
-compatibility: "Requires spec-kit .specify/ structure AND a graphify-out/graph.json built for the repo (run /graphify first)."
+compatibility: "Requires spec-kit .specify/ structure, a graphify-out/graph.json built for the repo (run /graphify first), and extensions/graphify/extension/scripts/provenance.sh for the shared provenance header (present)."
 metadata:
   author: narenkarthikbm
   source: "graphify:commands/speckit.graphify.context.md"
@@ -21,6 +21,8 @@ Consider the user input (e.g. an explicit feature dir, or the word `merged` to f
 ## Goal
 
 Produce `<FEATURE_DIR>/graphify-context.md` — a compact, token-bounded grounding file that the graph-aware Spec Kit commands (`/speckit-plan`, `/speckit-tasks-graph`, `/speckit-implement-parallel`) read so they don't re-explore the repo from scratch. It captures what already exists around this feature, the dependency blast radius of the files it will touch, and the shared/mutable files that constrain parallel execution.
+
+The same generator run also emits two sibling, token-bounded diet products from the identical graph pass, so one invocation grounds every downstream consumer instead of three separate explorations: `<FEATURE_DIR>/graphify-receipts.md` (the concept/rationale/contracts slice the council member and deck-prep read) and `<FEATURE_DIR>/graphify-type-signal.md` (the per-file type-signal slice the categorizer reads). All three products carry one shared-provenance header and generation-id (see "Shared-provenance header" below); `graphify-context.md` itself keeps its current path and section grammar unchanged (FR-013).
 
 ## Steps
 
@@ -41,14 +43,22 @@ Produce `<FEATURE_DIR>/graphify-context.md` — a compact, token-bounded groundi
 
 5. **Identify shared / mutable files.** From the results, flag files that many things depend on and that multiple tasks would edit — route manifests (e.g. `app/routes.ts`), barrels / `index` re-exports, DI / registry / settings modules, URL confs, migration directories. These are the collision points that force serialization during parallel implementation.
 
-6. **Write `<FEATURE_DIR>/graphify-context.md`** using the template below. Keep it lean (target < ~1500 tokens). Cite real `source_file` paths from the graph, not guesses. Mark anything absent from the graph as `(not in graph — new code)`.
+6. **Obtain the shared-provenance header once, then write `<FEATURE_DIR>/graphify-context.md`.** Call `<REPO_ROOT>/extensions/graphify/extension/scripts/provenance.sh header <absolute path to the chosen <GRAPH_ROOT>/graphify-out/graph.json> <repo|merged, from Step 2>` **exactly once per run** — `<REPO_ROOT>` is always this repo (from Step 1); only the `graph.json` and scope arguments change for a merged run. Omit the optional 4th argument so it stamps the real generation instant (a fixture harness passes a fixed literal instead — see "Golden-fixture guidance" below). Capture its full 9-line `<!-- graphify-provenance:v1 ... -->` block verbatim: this single captured block is what Steps 7 and 8 also stamp into their own products, byte-for-byte — never recompute it or re-invoke `provenance.sh` per product (that risks a different `generated-at` per call and is wasted work when the entire point is one shared identity). If the call fails — e.g. the graph has no `built_at_commit`, a hard error by `provenance.sh`'s own design — STOP and surface the error verbatim; never fabricate a header or write a product without one. Then write `graphify-context.md` per the template below: keep it lean (target < ~1500 tokens, unchanged), insert the captured header near the top (after the intro italic line, before the first `##` — the header's own "Placement" rule, below), cite real `source_file` paths from the graph, and mark anything absent as `(not in graph — new code)`.
 
-## Output template
+7. **Write `<FEATURE_DIR>/graphify-receipts.md`** — the concept/rationale diet for the council member and deck-prep. Stamp it with the identical header captured in Step 6. Populate `## Concept / rationale receipts` from concept-/rationale-typed nodes (and any `participate_in` hyperedge clustering them) already surfaced by Step 4's queries, or reachable from an already-resolved anchor via a `rationale_for` / `participate_in` / `references` edge — never a fresh full-graph scan for every concept/rationale node in the repo, which would blow past Step 4's own query budget. Populate `## Contracts cited` directly from the `contracts/` directory already read in Step 3 — no additional graph query needed — one line per contract file with a one-line gloss of what it specifies, or the literal line `(none found in this slice)` when the feature has no `contracts/` directory or it is empty. Keep it lean (target < ~800 tokens — about half of `graphify-context.md`'s budget, since this slice carries no blast-radius/shared-file analysis). Template below.
+
+8. **Write `<FEATURE_DIR>/graphify-type-signal.md`** — the per-file type-signal diet for the categorizer. Stamp it with the identical header captured in Step 6. One line per file already named as an anchor or blast-radius file in Steps 3–5 (the same file universe `graphify-context.md` draws from — issue no new queries to build this diet): if the file is a graph node, cite its own `file_type` attribute directly under `## Per-file type signal (graph-grounded)`; if the file was named by this feature's spec/plan/tasks but never resolved to a graph node, apply the path-convention fallback table below under `## Path-convention fallback (not in graph)`, labeled plainly `convention-derived / engineer assertion, not graph fact` (FR-004's honesty phrasing) — never presented as graph-grounded. Keep it lean (target < ~500 tokens — one short line per file, the leanest of the three). Template below.
+
+## Output template — `graphify-context.md`
+
+Unchanged from before this task (FR-013) except for one insertion: the shared-provenance header, placed as shown.
 
 ```markdown
 # Graphify Context — <feature>
 
 _Generated <ISO-8601> from `<graph path>` (<N> nodes, <M> edges, scope: repo|merged). Stale after large merges — regenerate with `/speckit-graphify-context`._
+
+<shared-provenance header — captured once in Step 6, inserted verbatim; exact 9-line syntax in "Shared-provenance header" below>
 
 ## Graph scope
 - Repo graph: `<REPO_ROOT>/graphify-out/graph.json`
@@ -73,6 +83,60 @@ _Generated <ISO-8601> from `<graph path>` (<N> nodes, <M> edges, scope: repo|mer
 ## Patterns to follow
 - <convention surfaced by the graph, with the exemplar file>
 ```
+
+## Output template — `graphify-receipts.md`
+
+The concept/rationale/contracts diet (Step 7). Same captured header as above, same placement rule; body is this feature's concept/rationale/contract slice only — no blast-radius or shared-file sections.
+
+```markdown
+# Graphify Receipts — <feature>
+
+_Generated <ISO-8601> from `<graph path>` (<N> nodes, <M> edges, scope: repo|merged) — concept/rationale diet for the council member and deck-prep. Stale after large merges — regenerate with `/speckit-graphify-context`._
+
+<shared-provenance header — the identical block captured in Step 6, inserted verbatim>
+
+## Concept / rationale receipts
+- **<concept-or-rationale node label>** (`<source_file>`) — <the node's own `rationale` text>. (`<relation>` → <target node label>, when a grounding edge links it to another cited node)
+- **<hyperedge label>** (hyperedge, <confidence>, confidence <score>) — <which nodes it clusters and why, when a relevant hyperedge exists>
+- ...
+
+## Contracts cited
+- `<contracts/... path>` — <one-line gloss of what it specifies>
+- ...
+- (or, if none: `(none found in this slice)`)
+```
+
+## Output template — `graphify-type-signal.md`
+
+The per-file type-signal diet (Step 8). Same captured header as above, same placement rule; body is one short line per file, nothing else.
+
+```markdown
+# Graphify Type Signals — <feature>
+
+_Generated <ISO-8601> from `<graph path>` (<N> nodes, <M> edges, scope: repo|merged) — per-file type-signal diet for the categorizer. Stale after large merges — regenerate with `/speckit-graphify-context`._
+
+<shared-provenance header — the identical block captured in Step 6, inserted verbatim>
+
+## Per-file type signal (graph-grounded)
+- `<source_file>` — file_type: <file_type>
+- ...
+
+## Path-convention fallback (not in graph)
+- `<path named by this feature but absent from the graph>` — file_type: <fallback file_type> — convention-derived / engineer assertion, not graph fact (`<the convention applied>`; file absent from the graph)
+- (or, if none needed: `(none needed — every named file resolved to a graph node)`)
+```
+
+**Path-convention fallback table** (Step 8) — applied only to a file Steps 3–5 named that never resolved to a graph node; never applied speculatively to a file nobody named. The six `file_type` values are the graph's own enum (`code|document|paper|image|rationale|concept`, per data-model.md "Knowledge graph") — the fallback never invents a seventh:
+
+| Path / extension pattern | Fallback `file_type` |
+|---|---|
+| `*.md` under this feature's own `specs/**` (spec.md, plan.md, data-model.md, tasks.md, research.md, quickstart.md, checklists/**) | `concept` |
+| `*.md` naming a decision/rationale log (e.g. `docs/90-DECISIONS-AND-IDEAS.md`, `council/decision-record.md`) | `rationale` |
+| any other `*.md` (READMEs, `SKILL.md`, command/template docs) | `document` |
+| source/config-as-code extension (`.py`, `.ts`, `.tsx`, `.js`, `.jsx`, `.go`, `.rs`, `.sh`, `.yml`/`.yaml`) | `code` |
+| image extension (`.png`, `.jpg`, `.jpeg`, `.svg`, `.gif`) | `image` |
+| `.pdf` | `paper` |
+| anything else | `document` (least specific, safest default) |
 
 ## Shared-provenance header (arm-2 ↔ arm-3 coherence contract)
 
@@ -203,3 +267,6 @@ source-fingerprint: git-commit:9cc8479978f5f1986246e0fb6a9eb11ab8106dd5
 - [ ] `<FEATURE_DIR>/graphify-context.md` exists and cites real graph paths
 - [ ] Shared/mutable files section is populated (or explicitly "none found")
 - [ ] If the graph was missing, the user was told to run `/graphify` (no file fabricated)
+- [ ] `<FEATURE_DIR>/graphify-receipts.md` and `<FEATURE_DIR>/graphify-type-signal.md` also exist, written in the same run
+- [ ] All three products carry the identical shared-provenance header, byte-for-byte — one `provenance.sh header` call (Step 6), never three
+- [ ] `graphify-context.md`'s five section headings are unchanged (FR-013); the two new diets follow their own templates above, including honest fallback labeling on any convention-derived line
