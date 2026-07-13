@@ -1,0 +1,26 @@
+# testing-config.yml — policy for the speckit-ext-testing extension.
+# Governs /speckit-complete and /speckit-testing (one config file for both
+# commands, mirroring council-config.yml / workforce-config.yml's shared-file
+# convention rather than a per-command file each).
+# Keys/values transcribed from specs/004-testing-completion/contracts/commands.md
+# § "Testing extension manifest" (Config row) and plan.md §1.1/§1.3.
+
+tester:
+  model: sonnet
+  # D18 role -> model policy: the testing phase dispatches a Sonnet `tester`
+  # subagent (never Opus/Haiku — v1 leaves Haiku unused). Global policy for
+  # this extension, not a per-feature setting — do not override per spec.
+  # Read by /speckit-testing when it dispatches the tester's separate session
+  # (FR-006/011); /speckit-complete does not consult this key (it runs in
+  # main, no new model role, FR-001).
+
+# The doc-only guard (FR-009/010): the testing agent produces testing.md, a
+# coverage MAP — it does not execute tests, run suites, or produce its own
+# pass/fail results. It cites tests already run during implement as EXISTING
+# evidence (via completion-report.md), never re-runs them. A test-executing
+# `tester` (testing-agent v2, with a remediation feedback loop) is explicitly
+# out of scope here (I-3) — this guard is what keeps that boundary legible in
+# the config, not just in prose. testing.md's own frontmatter also records
+# `executed: none` per-document (FR-010); this key is the extension-level
+# policy that value must always come from.
+executed: none

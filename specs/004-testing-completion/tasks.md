@@ -88,7 +88,7 @@ description: "Dependency-ordered tasks for 004-testing-completion (graph-verifie
 **Purpose**: the contract-ownership edit, the extension install, and the end-to-end quickstart validation.
 
 - [X] T017 [P] [US1/US2] Edit `docs/contracts/artifact-layout.md` §6 ownership table — add rows: `completion-report.md` ← the `complete` phase (`/speckit-complete`, main orchestrator); `testing.md` ← the testing extension (`tester`). A D46-rule-3-authorized contract edit (no new writer of an existing artifact). **Collision watch (R1-S22): serialize — `artifact-layout.md` is a shared/mutable file.**
-- [ ] T018 Install the testing extension (`bash extensions/testing/install.sh .`) + run `extensions/testing/test/run.sh` → contracts validate (both goldens), coverage validator green, install/uninstall round-trip byte-identical. (Touches `.specify/extensions.yml` — serial integration.) (depends on T001–T016)
+- [X] T018 Install the testing extension (`bash extensions/testing/install.sh .`) + run `extensions/testing/test/run.sh` → contracts validate (both goldens), coverage validator green, install/uninstall round-trip byte-identical. (Touches `.specify/extensions.yml` — serial integration.) (depends on T001–T016)
 - [ ] T019 Run the `quickstart.md` validation scenarios (SC-001…SC-010 map). SC-009 (M4 exit — validated report + testing doc, both committed) and SC-010 (wave 2+ unassisted freshness) are proven on **M4's own downstream run**, not simulated here. (depends on T018)
 
 **Checkpoint**: the tail is validated end to end; M4 is ready for its own `complete` + `testing` phases.

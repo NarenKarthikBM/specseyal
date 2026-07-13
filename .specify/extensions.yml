@@ -2,6 +2,7 @@ installed:
 - graphify
 - git
 - workforce
+- testing
 settings:
   auto_execute_hooks: true
 hooks:

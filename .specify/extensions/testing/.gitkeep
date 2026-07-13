@@ -1,0 +1,6 @@
+# Placeholder so this directory tracks in git ahead of the tasks that fill it:
+# T002 adds extension.yml + testing-config.yml; T010/T011/T013/T014/T015 add
+# commands/, templates/, and skills/ (extension/skills/ — nested here per
+# this feature's own council-approved plan.md §1.1 Project Structure, not the
+# top-level extensions/testing/skills/ convention graphify/council/git/
+# workforce use). Safe to delete once real content lands.
