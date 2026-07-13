@@ -71,3 +71,15 @@ T005 (correctly, per its file scope = `extension.yml` only) added the `after_com
 **Why it didn't surface as a wave failure:** the T007 seam regression and the T008 reinstall both exercise the *auto-merge* path (uv present), which is manifest-driven and correct; the manual block is unreachable on any host the tests run on.
 
 **Recommendation (owner):** cheapest correct fix is a one-line-per-hook addition to `print_manual_block` **plus** a run.sh §4-style static grep (`install.sh manual fallback declares after_complete/after_testing`) so the manifest and the hand-paste block can't silently diverge — the same belt-and-suspenders 003 applied. Out of scope for M4's approved task set (T005 was scoped to `extension.yml`); flagged here rather than fixed. → a `docs/90` I-row (installer manual-fallback completeness as a standing invariant).
+
+---
+
+## F4 — the SC/FR coverage validator must exclude cross-feature `NNN-FR-` references (a real grep hazard the T016 validator must dodge)
+
+**Station:** `implement` Wave 3 T012 (testing-doc contract authoring) surfaced it; **owner of the fix:** Wave 4 T016 (the coverage validator). **Status:** handled — baked into the T016 dispatch prompt this run; booked here as the durable rationale. **Severity:** correctness (a naive validator would false-positive).
+
+`spec.md` cites `001-FR-019` twice — line 83 (Edge Cases) and **line 106 (inside `### Functional Requirements`, in FR-010's own body)** — a **cross-feature reference to feature 001's FR-019**, not one of `004`'s own requirements (004's real range is **FR-001…FR-017**, 17 FRs; SCs are **SC-001…SC-010**, 10). A naive `grep -oE 'FR-[0-9]+' spec.md` returns **18** distinct FRs including a spurious `FR-019`, and R1-S03's rule ("every `SC-\d+`/`FR-\d+` in spec.md must have a `testing.md` coverage-map row, fail on any gap") would then demand a coverage row for a non-existent 004 requirement — a false failure, or worse a fabricated row.
+
+**Why section-scoping alone is insufficient:** the `001-FR-019` on line 106 sits *inside* the `### Functional Requirements` section (lines 90–120), so bounding the grep to that section does NOT exclude it. The robust rule (empirically confirmed this run: `[0-9]{3}-FR-[0-9]+` matches only `FR-019`): **exclude any `SC-`/`FR-` token immediately preceded by a `\d{3}-` prefix** (a cross-feature citation), then take the distinct set → exactly the 10 SC + 17 FR of 004. No `SC-` cross-feature citation exists in spec.md (only the FR one), but the validator should apply the same exclusion symmetrically for durability.
+
+**Disposition:** the T016 validator prompt (Wave 4) carries this exclusion rule explicitly, and T016's own tests should include a guard that the validator counts exactly 10 SC + 17 FR (not 18) against this spec. A good standing generalization for the pipeline: SC/FR coverage validators across features must treat `NNN-`-prefixed ids as foreign. → a `docs/90` I-row (cross-feature-reference exclusion as a coverage-validator invariant).

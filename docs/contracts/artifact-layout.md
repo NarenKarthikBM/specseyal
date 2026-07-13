@@ -118,6 +118,8 @@ The collision is inherited from spec-kit. It is documented rather than renamed (
 | Categorize extension | `categorization.md` — and **nothing else** (D37) |
 | Agents extension | `agents/assignment.md` |
 | Implement-parallel | `implement.log.md`, source code |
+| Complete | `completion-report.md` |
+| Testing extension | `testing.md` |
 | Any session | one append to `traces.jsonl` |
 | Human | `profile.yaml`, gate sections |
 
