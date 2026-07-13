@@ -53,6 +53,22 @@
 
 ---
 
+## Human Gate — 2026-07-13T18:20:45Z
+
+| Field | Value |
+|---|---|
+| reviewer | Naren Karthik B M |
+| decision | `approved` |
+| reviewed | `defense-deck/overview.md`, `round-1/suggestions.md`, this record |
+
+**Notes:** none.
+
+**Overrides:** none.
+
+**Binding:** plan↔SHA binding recorded at `specs/005-graphify-context/gates.yml` (git-ext-owned; FR-008/D55).
+
+---
+
 ## Carried Constraints
 
 > Accepted suggestions that constrain task generation. `/speckit-tasks` reads this section

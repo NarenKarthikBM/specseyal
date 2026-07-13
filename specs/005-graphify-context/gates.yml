@@ -1,0 +1,8 @@
+# gates.yml -- GateSHABinding record (git-ext-owned; see
+# data-model.md #GateSHABinding). Written and read only by
+# gates.sh -- do not hand-edit: a stale or malformed binding
+# hard-blocks its gated phase (verify-gate fails closed on
+# drift, R1-S10).
+version: 1
+council:
+  plan.md: 031bf13bdbef14cc7939fa404abffbd4216de8c2
