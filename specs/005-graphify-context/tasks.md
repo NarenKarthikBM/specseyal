@@ -142,7 +142,7 @@
 - [X] T032 [P] Consumer fixture 5 — the categorizer reads the type-signal diet; `type` derivation + path-convention fallback intact. `extensions/graphify/test/fixtures/consumer-categorizer/`. (depends on T022)
 - [X] T033 [P] Consumer fixture 6 — deck-prep reads the receipts diet unbroken. `extensions/graphify/test/fixtures/consumer-deck-prep/`. (depends on T021)
 - [X] T034 [P] **Severability / detached-configuration** fixture (S12): assert arms **2 + 3 + 4 pass green with arm 1 absent** (the fallback story realized as a test, so detach stays a live, checked option). `extensions/graphify/test/fixtures/severability/`. (depends on T015, T016, T020, T028)
-- [ ] T035 **Reinstall-survival** test (D57, quickstart §13): run `bash extensions/graphify/install.sh .` and `bash extensions/council/install.sh .`, then re-run every fixture against the *installed* copies → all edits survive the installer `rm -rf`+`cp` (model: `extensions/git/test/run.sh §3`). Touches both harnesses → serial. (depends on T008, T015, T016, T020, T021, T022, T027, T028)
+- [X] T035 **Reinstall-survival** test (D57, quickstart §13): run `bash extensions/graphify/install.sh .` and `bash extensions/council/install.sh .`, then re-run every fixture against the *installed* copies → all edits survive the installer `rm -rf`+`cp` (model: `extensions/git/test/run.sh §3`). Touches both harnesses → serial. (depends on T008, T015, T016, T020, T021, T022, T027, T028)
 - [ ] T036 Run the full `quickstart.md` validation (all 13 scenarios → each SC + each arm + non-regression + reinstall). Final integration gate. (depends on all prior)
 
 ---
