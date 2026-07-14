@@ -81,7 +81,7 @@
 ### Implementation for User Story 2
 
 - [X] T017 [P] [US2] Version-pin manifest + preventive check (R4/S16): record the installed `graphifyy` version in `extensions/graphify/extension/graphify-version.pin`; the refresh wrapper asserts the pin before calling `build_merge`/`detect_incremental`, and a mismatch routes to the **full-regen** branch (never a silent wrong-contract call).
-- [ ] T015 [P] [US2] Implement `extensions/graphify/extension/scripts/freshness.sh <product-path>`: derive freshness from the shared-provenance header / graph manifest vs the worktree; exit `0` = fresh, non-zero + `stale: regenerate <product>` on stdout = stale (**hard-warn, not hard-block**); **no state file** (D32); **recomputed at every consumption point, never cached across hook calls** (S20). (depends on T004, T011)
+- [X] T015 [P] [US2] Implement `extensions/graphify/extension/scripts/freshness.sh <product-path>`: derive freshness from the shared-provenance header / graph manifest vs the worktree; exit `0` = fresh, non-zero + `stale: regenerate <product>` on stdout = stale (**hard-warn, not hard-block**); **no state file** (D32); **recomputed at every consumption point, never cached across hook calls** (S20). (depends on T004, T011)
 - [ ] T016 [US2] Implement `extensions/graphify/extension/scripts/refresh.sh`: wrap the upstream incremental merge; run the **stale-survivor guard** → print `stale_survivors: <N>`; apply the S02 branch table (common cheap-refresh / prune+targeted-re-extract on survivors>0 / full-regen only on version-change or operator demand); **re-invoke `augment.sh` on the changed scope** (S06); equivalence-to-full-regen is the SC-004 exit test. (depends on T017, T008, T012, T013, T014)
 
 **Checkpoint**: US2 independently testable — staleness is caught before consumption; incremental ≡ full-regen for the changed scope, 0 survivors.
@@ -101,7 +101,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T020 [US3] Extend the generator `extensions/graphify/skills/speckit-graphify-context/SKILL.md` to emit **three separate products from one graph pass**: `graphify-context.md` (unchanged path + section grammar, FR-013), the **receipts** diet (for council member + deck-prep), the **type-signal** diet (for the categorizer); each token-bounded, each carrying the shared-provenance header (T004). (depends on T004, T018, T019)
+- [X] T020 [US3] Extend the generator `extensions/graphify/skills/speckit-graphify-context/SKILL.md` to emit **three separate products from one graph pass**: `graphify-context.md` (unchanged path + section grammar, FR-013), the **receipts** diet (for council member + deck-prep), the **type-signal** diet (for the categorizer); each token-bounded, each carrying the shared-provenance header (T004). (depends on T004, T018, T019)
 - [ ] T021 [P] [US3] Lockstep-update **deck-prep** to source the **receipts diet** (the D62 enrichment source) — edit `extensions/council/extension/templates/deck-technical.md` so Stage-0 deck-prep mines the receipts product (consumer 6). **⚠ shares `deck-technical.md` with T010 — never co-schedule.** (depends on T020)
 - [ ] T022 [P] [US3] Lockstep-update the **categorizer** to read the **type-signal diet** with its path-convention fallback — edit `extensions/workforce/extension/templates/categorizer-prompt.md` (consumer 5). (depends on T020)
 
@@ -119,8 +119,8 @@
 
 ### Tests for User Story 4 (write FIRST) ⚠️
 
-- [ ] T024 [P] [US4] **Ceiling** fixture (consumer fixture 4): a member reviewing-loop driven to the ceiling → the opinion carries the reduced-grounding disclosure **and** the trace records `ceiling_hit: true`. `extensions/council/test/fixtures/arm4-ceiling/`. (depends on T002, T023)
-- [ ] T025 [P] [US4] **Non-disclosure-default inverse** fixture (S18): an ordinary non-ceiling round → **no** disclosure line and `ceiling_hit: false` (the quiet-path branch, so disclosure never fires spuriously). `extensions/council/test/fixtures/arm4-noceiling/`. (depends on T002, T023)
+- [X] T024 [P] [US4] **Ceiling** fixture (consumer fixture 4): a member reviewing-loop driven to the ceiling → the opinion carries the reduced-grounding disclosure **and** the trace records `ceiling_hit: true`. `extensions/council/test/fixtures/arm4-ceiling/`. (depends on T002, T023)
+- [X] T025 [P] [US4] **Non-disclosure-default inverse** fixture (S18): an ordinary non-ceiling round → **no** disclosure line and `ceiling_hit: false` (the quiet-path branch, so disclosure never fires spuriously). `extensions/council/test/fixtures/arm4-noceiling/`. (depends on T002, T023)
 
 ### Implementation for User Story 4
 
