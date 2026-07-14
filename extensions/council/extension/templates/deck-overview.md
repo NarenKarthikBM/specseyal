@@ -6,6 +6,8 @@
 
 > Format: markdown v1 (D15). Rendered at the human gate — the reviewer's primary artifact, alongside `round-N/suggestions.md` and the decision record — and, read on its own afterward, doubles as a shareable stakeholder summary (I-6). Git-versioned in place alongside `technical.md`, not round-scoped (D38): overwritten on every revision, prior versions live in git history on the feature branch.
 
+> **Citation convention (S04).** The "no internal tool or process names" rule below already means no bare filenames belong on this page either — a short name like `verify-gate.sh` can resolve to the wrong node the instant two files share it. If a risk or outcome genuinely must point at one specific technical artifact, name it the way `technical.md` does — a qualified path or fully-qualified label — or, preferably, drop the specific name and describe the consequence in plain terms; never shorten a citation into an ambiguous one just to sound less technical.
+
 *This is the one-page overview: written for a reader with no technical background. A reviewer must be able to reach an approve/reject decision from this page ALONE, without opening the companion `technical.md` (SC-007, principle 8) — so nothing here may assume the reader has, or needs, that file. No jargon, no code, no internal tool or process names. If a sentence needs an engineering background to parse, cut it or replace it with a plain analogy. Keep the whole page to about one page — a reviewer should be able to read it in under two minutes.*
 
 ---

@@ -1,0 +1,77 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {
+    "hyperedges": []
+  },
+  "nodes": [
+    {
+      "id": "install_sh",
+      "label": "install.sh",
+      "file_type": "code",
+      "source_file": "install.sh",
+      "source_location": "L1",
+      "metadata": { "language": "bash", "kind": "file" },
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "install.sh"
+    },
+    {
+      "id": "install_sh_old_stage",
+      "label": "old_stage",
+      "file_type": "code",
+      "source_file": "install.sh",
+      "source_location": "L12",
+      "metadata": { "language": "bash", "kind": "bash_function" },
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "old_stage"
+    },
+    {
+      "id": "util_sh",
+      "label": "util.sh",
+      "file_type": "code",
+      "source_file": "util.sh",
+      "source_location": "L1",
+      "metadata": { "language": "bash", "kind": "file" },
+      "_origin": "ast",
+      "community": 1,
+      "norm_label": "util.sh"
+    },
+    {
+      "id": "util_sh_helper",
+      "label": "helper",
+      "file_type": "code",
+      "source_file": "util.sh",
+      "source_location": "L10",
+      "metadata": { "language": "bash", "kind": "bash_function" },
+      "_origin": "ast",
+      "community": 1,
+      "norm_label": "helper"
+    }
+  ],
+  "links": [
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "install.sh",
+      "source_location": "L12",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "install_sh",
+      "target": "install_sh_old_stage"
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "util.sh",
+      "source_location": "L10",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "util_sh",
+      "target": "util_sh_helper"
+    }
+  ],
+  "hyperedges": [],
+  "built_at_commit": "0000000000000000000000000000000000000000"
+}

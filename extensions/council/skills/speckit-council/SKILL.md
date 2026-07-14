@@ -93,6 +93,18 @@ Dispatch **one `Opus` subagent**, mode `synthesis` — never `delta-check`; that
 
 Barrier: wait for the return, then append its trace fragment (§ Traces).
 
+## Query-ceiling enforcement (arm 4 — D77, S09, `005-graphify-context`)
+
+A council member's graph-query loop is bounded by a **hard, tier-aware ceiling** — `tiers.<tier>.query_ceiling` in `council-config.yml` (Pre-Execution step 4): `standard: 15` (D77, calibrated from this round's uncapped per-member max of 9); `full:` unset/uncapped until its own baseline is measured. This applies to **every `council-member` dispatch** — stage 1, and stage 2's per-member (`full`) or consolidated (`standard`) reviewer.
+
+**The member reports its count; the orchestrator enforces the consequence — mechanically (S09/D53).** The member prompt (`member-prompt.md`, wired by `005`'s T027) instructs the member to stop after its `N`th graph query and to append its graph-query **count** to its status-line return (`graph_queries: <count>`, the same metadata-only channel as the `standard`-tier `consulted:` suffix — still status-only, S2). A member scrambling at its ceiling is prompt-following at its *least* reliable, so the load-bearing guarantee is **not** the member's own prose — it is mechanical, on you, the orchestrator, at each member barrier:
+
+1. Run `.specify/extensions/council/scripts/ceiling-check.sh <tier> <count>` (source: `extensions/council/extension/scripts/ceiling-check.sh`). It reads `query_ceiling` for the tier and prints `ceiling_hit: true|false` and, **iff** hit, the exact reduced-grounding disclosure line on a second line.
+2. On `ceiling_hit: true`, **mechanically append that disclosure line to the member's own opinion file** — a *blind append* (`ceiling-check.sh <tier> <count> | tail -n +2 >> "$FEATURE_DIR/council/round-N/opinions/<letter>.md"`), never reading the opinion's content. An append is a write, not a read, so the S2/SC-005 context-hygiene invariant (you never open `opinions/`) still holds by construction. The member's own prose, if it disclosed anything, is courtesy; this mechanical append is what guarantees the chairman weights a ceiling-limited opinion rather than trusting it as fully grounded (SC-008).
+3. Record `graph_queries: <count>` and `ceiling_hit: <bool>` in that member's trace fragment (§ Traces) — the "never silent" flag (SC-006/SC-008): a ceiling-limited opinion is auditable *after* the round from the trace itself, not only mid-round.
+
+Under `full` (uncapped), `ceiling-check.sh` returns `ceiling_hit: false` for any count, no disclosure fires, and the fragment still records the observed `graph_queries` — the count that will calibrate `full`'s own eventual ceiling (the SC-006 measurement trigger, booked against the first post-arm-4 `full`-tier round). If a member's return omits `graph_queries` (e.g. a pre-T027 member prompt, or a failed member), record `ceiling_hit: false` with the count you can determine, or omit both fields for that fragment if none is knowable — never fabricate a count (the exact-or-null ethos, D47).
+
 ## Context hygiene — the one rule that cannot bend (S2, SC-005)
 
 Across every stage above, you never read `opinions/` or `opinions/peer/` — not to confirm a member finished (use `test -f`), not to sanity-check quality, not for any reason. The only council artifact whose *content* you ever read is `round-N/suggestions.md`, once, after the stage-3 barrier — that is what your completion report is built from. This is what makes SC-005's grep-based conformance check sufficient: there is no opinion content in your transcript to leak, by construction, not by discipline alone.
@@ -111,11 +123,15 @@ Per fragment, fixed council values (`trace-fragment.md` §2): `agent_id: null`, 
 | `council-member` | `"council"` | `"claude-sonnet-5"` | `"medium"` | `null` (an opinion is chairman-only, never an artifact-out) |
 | `chairman` | `"council"` | `"claude-opus-4-8"` | `"xhigh"` | the `suggestions.md` path |
 
+**Arm-4 fields on `council-member` fragments (D77, `005`; `trace-schema.md` §1/§7 rule 12, role-scoped).** Every `council-member` fragment (stage 1, and stage 2's per-member/consolidated reviewer) additionally carries `graph_queries: <int>` and `ceiling_hit: <bool>` — the two present or absent **together**, and **only** on `council-member` records (never on `deck-prep`/`chairman`). They are the Query-ceiling-enforcement outputs above: `graph_queries` is the count the member reported; `ceiling_hit` is `ceiling-check.sh`'s verdict for the tier. See `trace-fragment.md` §3.1.
+
 `tokens`/`capture_method` follow `trace-fragment.md` §4's policy exactly: attempt `transcript`-based attribution from the session transcript (the T005 spike validated this path — `capture_method: "transcript"`); fall back honestly to `capture_method: "unavailable"` + `tokens: null` when attribution isn't available — never a guessed number (D47). Mint a fresh, unique `trace_id` per fragment (e.g. `trc_` + a ULID/timestamp-random token) — never reused across sessions.
 
 ## Reopen — `--reopen delta|full` (FR-017, D46, `research.md` R-D7)
 
-Both tiers still run the round-resolution in Pre-Execution step 6 and still produce a normal `round-N/suggestions.md` via a **synthesis**-mode chairman — a reopen is a round with a different-shaped context package, not a different pipeline. Do not confuse this with `/speckit-council-triage`'s own "chairman-only delta check" (FR-010) — that is a same-round, append-to-the-existing-`suggestions.md` re-adjudication triage runs after one blocking-triggered revision; it is a different mechanism entirely and this skill never touches it.
+Both tiers still run the round-resolution in Pre-Execution step 6 and still produce a normal `round-N/suggestions.md` via a **synthesis**-mode chairman — a reopen is a round with a different-shaped context package, not a different pipeline.
+
+> **Mid-implementation self-reopen guard (S17, `005-graphify-context` arm 4).** While `005` itself is mid-implementation — after arm 4 is spec'd but before its member-prompt change (T027) wires the query-cap instruction into `member-prompt.md` — a `/speckit-council --reopen delta` on `005` would dispatch the **pre-ceiling** member prompt (no `graph_queries` report, no cap). That is expected and harmless (the Query-ceiling-enforcement section above records `ceiling_hit: false` and omits the count it cannot know); this note simply flags the pre-ceiling prompt status until T027 lands. Once T027 is in, the member prompt reports the count and every reopen is fully ceiling-aware. Do not confuse this with `/speckit-council-triage`'s own "chairman-only delta check" (FR-010) — that is a same-round, append-to-the-existing-`suggestions.md` re-adjudication triage runs after one blocking-triggered revision; it is a different mechanism entirely and this skill never touches it.
 
 **`full`** — no special handling: run Stage 0–3 exactly as a fresh round would (deck-prep regenerates `defense-deck/` in place; members get the full deck + plan + spec). The only difference from an ordinary re-run is cosmetic — note "reopen (full)" in the completion report.
 

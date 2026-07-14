@@ -1,0 +1,2 @@
+stale_survivors: 0
+augment_edge_present: yes

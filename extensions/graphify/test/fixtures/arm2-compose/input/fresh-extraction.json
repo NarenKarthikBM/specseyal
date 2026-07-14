@@ -1,0 +1,38 @@
+{
+  "nodes": [
+    {
+      "id": "install_sh",
+      "label": "install.sh",
+      "file_type": "code",
+      "source_file": "install.sh",
+      "source_location": "L1",
+      "metadata": { "language": "bash", "kind": "file" },
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "install.sh"
+    },
+    {
+      "id": "install_sh_old_stage",
+      "label": "old_stage",
+      "file_type": "code",
+      "source_file": "install.sh",
+      "source_location": "L11",
+      "metadata": { "language": "bash", "kind": "bash_function" },
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "old_stage"
+    }
+  ],
+  "links": [
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "install.sh",
+      "source_location": "L11",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "install_sh",
+      "target": "install_sh_old_stage"
+    }
+  ]
+}

@@ -9,7 +9,9 @@
 > D18 (Sonnet, mechanical role), D37 (categorize writes `categorization.md` only), D48/**D65** (the
 > `runtime_consumed` modifier / Sonnet-floor signal — v1 promotion of the `prompt` tag),
 > `taxonomy.md` §1/§2/§2.3/**§2.4**/§4/§6 (reproduced verbatim below), S14 (source `tasks.md` SHA
-> binding).
+> binding), and **005-graphify-context**'s FR-009(c)/FR-004 (the per-file type-signal diet —
+> `graphify-type-signal.md` — read as a corroborating signal for `type`, honestly labeled
+> graph-grounded vs. path-convention).
 > **Dispatched as:** Sonnet (D18 — mechanical roles: deck prep, categorizer, skill builder, council
 > members). Trace role `categorizer` (`trace-schema.md`), one record per run — the dispatching command
 > writes it, not this session.
@@ -85,13 +87,24 @@ reconciling — a taxonomy change is a `docs/90` D-row, never something inferred
    doesn't settle a task's domain on its own (taxonomy §1: specialization also comes from "the spec's
    domain"). Don't make this a routine third read; open it on demand, the way a council member opens
    `spec.md` only when the deck doesn't settle a claim.
+4. **`specs/{{feature}}/graphify-type-signal.md`** — optional, read when present. The per-file
+   type-signal diet `/speckit-graphify-context` writes alongside `graphify-context.md`: one `file_type`
+   line per file this feature already named, split into a graph-grounded section and a
+   path-convention-fallback section (Step 1, below, explains how to read each and how it corroborates
+   `type`). It is a **corroborating signal, never a replacement** for Step 1's derivation table — its
+   own `file_type` enum is a different, coarser axis than this taxonomy's 8-value `type`. If it doesn't
+   exist (no graph was ever built for this feature), derive `type` from `tasks.md`'s own annotations
+   alone and say so in your return value.
 
 If `tasks.md` has no graphify annotations at all for some task (e.g. it came from plain
 `/speckit-tasks` rather than `/speckit-tasks-graph`), you cannot mechanically derive `type`/
 `preserves_behavior` for that task from signals that don't exist. Fall back to the task's own
 description and any file paths it names in prose, apply the same rules by inspection, and say so
 plainly in your return value — a coverage gap in the annotations should be visible, never silently
-patched over.
+patched over. When `graphify-type-signal.md` exists, also check its own `## Path-convention fallback
+(not in graph)` section for that same file before you finalize the call — the two fallbacks are
+independent path-convention judgments over the same file and should agree; if they don't, say so
+plainly in your return value rather than silently trusting one over the other.
 
 ---
 
@@ -130,6 +143,21 @@ T010  files=extensions/workforce/extension/templates/categorizer-prompt.md   dep
 — is `*.md` outside `specs/`, so it is mechanically `type: docs`. (Its `specialization` is a separate,
 interpretive question — see Step 2 — and see the note on the `prompt` tag in Step 3: a `docs`-typed
 prompt-authoring task is not what it looks like.)
+
+**Corroborate with the type-signal diet, when one exists.** If `specs/{{feature}}/graphify-type-signal.md`
+is present (Input 4), cross-check each task's `files=` path(s) against it before you finalize `type` — it
+is a **corroborating signal, never a substitute** for the table above: its own `file_type` enum
+(`code | document | paper | image | rationale | concept`) is a coarser, different axis than this
+taxonomy's 8-value `type`, so it can back the `docs`-vs-everything-else split (`file_type: code`
+corroborates any of the 7 non-`docs` values; `file_type: document` / `concept` / `rationale` corroborates
+`docs`) but it cannot, by itself, choose among `scaffold`/`data-model`/`service`/`endpoint`/`ui`/`test`/
+`infra` — that choice is still the table's job. Read the diet's two sections exactly as it labels them: a
+line under `## Per-file type signal (graph-grounded)` is a graph fact; a line under `## Path-convention
+fallback (not in graph)` is convention-derived / engineer assertion, weighted no higher than your own
+path-convention fallback above (Inputs). If the diet's signal for a file disagrees with what the table
+above produces, don't silently pick one — say so plainly in your return value. If the diet doesn't exist
+at all, derive `type` from the table above alone and say so plainly too, the same honesty rule this
+document already applies to a missing `tasks.md` annotation.
 
 ### `preserves_behavior` — boolean modifier, not a 9th type
 
@@ -366,4 +394,4 @@ the cap will pass — that reply line is the whole of what leaves this session (
 
 | Slot | Filled by | Value |
 |---|---|---|
-| `{{feature}}` | `/speckit-categorize` | spec ID, e.g. `003-workforce` — resolves `specs/{{feature}}/tasks.md`, `.../plan.md`, `.../spec.md`, and the output path `specs/{{feature}}/categorization.md` |
+| `{{feature}}` | `/speckit-categorize` | spec ID, e.g. `003-workforce` — resolves `specs/{{feature}}/tasks.md`, `.../plan.md`, `.../spec.md`, `.../graphify-type-signal.md` (if present), and the output path `specs/{{feature}}/categorization.md` |

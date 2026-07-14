@@ -65,6 +65,14 @@ Everything else — `role`, `phase`, `model`, `effort`, timestamps, `tokens`, `c
 
 `model` is always the **exact** id, never an alias (`sonnet`/`opus`) — `trace-schema.md` §1: "Aliases move; a trace is a historical claim." `effort` is never `null` for a council fragment: D18 names an effort for every role above, so it is always recorded.
 
+### 3.1 Arm-4 fields — `council-member` only (D77, `005-graphify-context`)
+
+Since `005` (arm 4's query ceiling), a `council-member` fragment additionally carries two fields — `graph_queries: <int>` (the graph-query count that member ran) and `ceiling_hit: <bool>` (whether that count hit `council-config.yml`'s tier-aware `query_ceiling`) — **role-scoped exactly like the schema's `context_in`** (`trace-schema.md` §1, §7 rule 12): present **iff** `role == "council-member"`, present-or-absent as a **pair**, and **absent** (the keys simply omitted — not `null`/`0`/`false`) on `deck-prep` and `chairman` fragments. `/speckit-council` populates them at each member barrier from `ceiling-check.sh` (its "Query-ceiling enforcement" section); they are the mechanical, auditable "never silent" record of a ceiling-limited opinion (SC-006/SC-008). A member fragment that carries them is §2.1 with the two extra keys appended after `capture_method`:
+
+```json
+{ "…": "… every §2.1 council-member field …", "capture_method": "transcript", "graph_queries": 15, "ceiling_hit": true, "outcome": "success", "artifact": null, "cost_usd": null }
+```
+
 The other three roles, same shape, showing the variance above:
 
 ```json
