@@ -80,15 +80,37 @@ done
 [ "$n_fixtures" -eq 0 ] && printf '  (no fixtures present yet — scaffold only; see header above for the convention)\n'
 
 # ---------------------------------------------------------------------------
-bold "3. reinstall-survival (STUB — T035 completes this)"
-# Placeholder only — do NOT implement install/reinstall logic in this task. T035 replaces
-# this block with the real sequence: install graphify (and any extension whose reinstall
-# could clobber graphify-owned state) into a scratch repo, plant/mutate graphify-owned
-# state, force a reinstall, then assert the state survived byte-for-byte — the same R1-S04
-# reinstall-survival class extensions/git/test/run.sh section 3 and
-# extensions/workforce/test/run.sh section 1 regress for their own extensions. This stub is
-# a deliberate no-op and must never fail on its own until T035 lands real assertions.
-printf '  (stub — see T035)\n'
+bold "3. reinstall-survival (D57 — T035)"
+# The installer rm -rf + cp -R's extensions/graphify/extension/ -> .specify/extensions/graphify/
+# and each skills/*/ -> .claude/skills/. Every 005 source edit under those trees must survive an
+# install AND a REINSTALL (the S04 hazard extensions/git/test/run.sh §3 and workforce §1 regress
+# for their own extensions). Install graphify into a throwaway target, assert the 005 edits are
+# present + functional in the INSTALLED copies, reinstall, and re-assert they survived.
+RT="$TMP/reinstall-graphify"
+mkdir -p "$RT/.specify" "$RT/.claude/skills"
+GSRC="$REPO/extensions/graphify"
+sh "$GSRC/install.sh" "$RT" >/dev/null 2>&1 || bad "graphify install.sh failed"
+
+isc="$RT/.specify/extensions/graphify/scripts"
+iskill="$RT/.claude/skills/speckit-graphify-context/SKILL.md"
+for s in augment.sh augment_merge.py explain-guard.sh freshness.sh refresh.sh refresh_merge.py provenance.sh; do
+  [ -f "$isc/$s" ] && ok "installed $s present" || bad "installed $s MISSING after install"
+done
+[ -f "$RT/.specify/extensions/graphify/graphify-version.pin" ] && ok "installed graphify-version.pin present" || bad "installed .pin MISSING"
+grep -q 'arm 1 detached' "$isc/refresh.sh" && ok "refresh.sh arm-1-detached branch survived install" || bad "refresh.sh detach branch MISSING after install"
+grep -q 'graphify-provenance:v1' "$iskill" && ok "provenance-header contract survived install" || bad "provenance contract MISSING in installed SKILL.md"
+grep -q 'graphify-receipts.md' "$iskill" && grep -q 'graphify-type-signal.md' "$iskill" && ok "3-product generator survived install" || bad "3-product generator MISSING in installed SKILL.md"
+# FUNCTIONAL: the installed provenance.sh actually runs (not just copied bytes).
+rgj="$RT/reinstall-probe.json"
+printf '{"directed":true,"multigraph":false,"graph":{},"nodes":[],"links":[],"hyperedges":[],"built_at_commit":"abc"}' > "$rgj"
+if sh "$isc/provenance.sh" generation-id "$rgj" 2>/dev/null | grep -q '^sha256:'; then ok "installed provenance.sh functional"; else bad "installed provenance.sh broken"; fi
+# THE S04 property: a reinstall must not wipe the 005 edits.
+sh "$GSRC/install.sh" "$RT" >/dev/null 2>&1 || bad "graphify reinstall failed"
+if [ -f "$isc/augment.sh" ] && grep -q 'graphify-provenance:v1' "$iskill" && grep -q 'arm 1 detached' "$isc/refresh.sh"; then
+  ok "005 graphify edits SURVIVED reinstall (source-owned, D57)"
+else
+  bad "005 graphify edits WIPED by reinstall — the S04 hazard"
+fi
 
 # ---------------------------------------------------------------------------
 bold "Result: $PASS passed, $FAIL failed"

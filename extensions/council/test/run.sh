@@ -85,15 +85,35 @@ done
 [ "$n_fixtures" -eq 0 ] && printf '  (no fixtures present yet — scaffold only; see header above for the convention)\n'
 
 # ---------------------------------------------------------------------------
-bold "3. reinstall-survival (STUB — T035 completes this)"
-# Placeholder only — do NOT implement install/reinstall logic in this task. T035 replaces
-# this block with the real sequence: install council-ext (and any extension whose reinstall
-# could clobber council-owned state) into a scratch repo, plant/mutate council-owned state,
-# force a reinstall, then assert the state survived byte-for-byte — the same R1-S04
-# reinstall-survival class extensions/git/test/run.sh section 3 and
-# extensions/workforce/test/run.sh section 1 regress for their own extensions. This stub is
-# a deliberate no-op and must never fail on its own until T035 lands real assertions.
-printf '  (stub — see T035)\n'
+bold "3. reinstall-survival (D57 — T035)"
+# The installer rm -rf + cp -R's extensions/council/extension/ -> .specify/extensions/council/
+# and skills/*/ -> .claude/skills/. Every 005 arm-4 source edit must survive an install AND a
+# REINSTALL (the S04 hazard). Install council into a throwaway target, assert the arm-4 edits are
+# present + functional in the INSTALLED copies, reinstall, and re-assert.
+RT="$TMP/reinstall-council"
+mkdir -p "$RT/.specify" "$RT/.claude/skills"
+CSRC="$REPO/extensions/council"
+sh "$CSRC/install.sh" "$RT" >/dev/null 2>&1 || bad "council install.sh failed"
+
+ics="$RT/.specify/extensions/council/scripts"
+icfg="$RT/.specify/extensions/council/council-config.yml"
+imember="$RT/.specify/extensions/council/templates/member-prompt.md"
+iorch="$RT/.claude/skills/speckit-council/SKILL.md"
+[ -f "$ics/ceiling-check.sh" ] && ok "installed ceiling-check.sh present" || bad "installed ceiling-check.sh MISSING after install"
+grep -q 'query_ceiling' "$icfg" && ok "council-config query_ceiling survived install" || bad "query_ceiling MISSING in installed config"
+grep -qE 'query ceiling|graph_queries' "$imember" && ok "member-prompt ceiling instruction survived install" || bad "member-prompt ceiling MISSING after install"
+grep -qE 'ceiling-check.sh|Query-ceiling enforcement' "$iorch" && ok "orchestrator ceiling wiring survived install" || bad "orchestrator ceiling wiring MISSING after install"
+# FUNCTIONAL: the installed ceiling-check.sh runs — and resolves ../council-config.yml in the
+# installed layout too (both branches, to prove the quiet path also survived).
+if sh "$ics/ceiling-check.sh" standard 15 2>/dev/null | head -1 | grep -q 'ceiling_hit: true'; then ok "installed ceiling-check.sh functional (ceiling hit)"; else bad "installed ceiling-check.sh broken (hit path)"; fi
+if sh "$ics/ceiling-check.sh" standard 8 2>/dev/null | head -1 | grep -q 'ceiling_hit: false'; then ok "installed ceiling-check.sh functional (quiet path)"; else bad "installed ceiling-check.sh broken (quiet path)"; fi
+# THE S04 property: a reinstall must not wipe the arm-4 edits.
+sh "$CSRC/install.sh" "$RT" >/dev/null 2>&1 || bad "council reinstall failed"
+if [ -f "$ics/ceiling-check.sh" ] && grep -q 'query_ceiling' "$icfg" && grep -qE 'ceiling-check.sh|Query-ceiling enforcement' "$iorch"; then
+  ok "005 council arm-4 edits SURVIVED reinstall (source-owned, D57)"
+else
+  bad "005 council arm-4 edits WIPED by reinstall — the S04 hazard"
+fi
 
 # ---------------------------------------------------------------------------
 bold "Result: $PASS passed, $FAIL failed"

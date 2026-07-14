@@ -136,12 +136,12 @@
 
 **Purpose**: The FR-013/FR-014/SC-007/SC-009 guarantees that span all four arms — non-regression with teeth, the severability claim realized as a test, and reinstall survival.
 
-- [ ] T029 [P] Consumer fixture 1 — `/speckit-plan` reads `graphify-context.md` (blast-radius diet) **unchanged in shape**. `extensions/graphify/test/fixtures/consumer-plan/`. (depends on T020)
-- [ ] T030 [P] Consumer fixture 2 — `/speckit-tasks-graph` consumes the same diet; `[P]`/wave derivation unbroken. `extensions/graphify/test/fixtures/consumer-tasks-graph/`. (depends on T020)
-- [ ] T031 [P] Consumer fixture 3 — `/speckit-implement-parallel` consumes the same diet; per-task blast-radius unbroken. `extensions/graphify/test/fixtures/consumer-implement/`. (depends on T020)
-- [ ] T032 [P] Consumer fixture 5 — the categorizer reads the type-signal diet; `type` derivation + path-convention fallback intact. `extensions/graphify/test/fixtures/consumer-categorizer/`. (depends on T022)
-- [ ] T033 [P] Consumer fixture 6 — deck-prep reads the receipts diet unbroken. `extensions/graphify/test/fixtures/consumer-deck-prep/`. (depends on T021)
-- [ ] T034 [P] **Severability / detached-configuration** fixture (S12): assert arms **2 + 3 + 4 pass green with arm 1 absent** (the fallback story realized as a test, so detach stays a live, checked option). `extensions/graphify/test/fixtures/severability/`. (depends on T015, T016, T020, T028)
+- [X] T029 [P] Consumer fixture 1 — `/speckit-plan` reads `graphify-context.md` (blast-radius diet) **unchanged in shape**. `extensions/graphify/test/fixtures/consumer-plan/`. (depends on T020)
+- [X] T030 [P] Consumer fixture 2 — `/speckit-tasks-graph` consumes the same diet; `[P]`/wave derivation unbroken. `extensions/graphify/test/fixtures/consumer-tasks-graph/`. (depends on T020)
+- [X] T031 [P] Consumer fixture 3 — `/speckit-implement-parallel` consumes the same diet; per-task blast-radius unbroken. `extensions/graphify/test/fixtures/consumer-implement/`. (depends on T020)
+- [X] T032 [P] Consumer fixture 5 — the categorizer reads the type-signal diet; `type` derivation + path-convention fallback intact. `extensions/graphify/test/fixtures/consumer-categorizer/`. (depends on T022)
+- [X] T033 [P] Consumer fixture 6 — deck-prep reads the receipts diet unbroken. `extensions/graphify/test/fixtures/consumer-deck-prep/`. (depends on T021)
+- [X] T034 [P] **Severability / detached-configuration** fixture (S12): assert arms **2 + 3 + 4 pass green with arm 1 absent** (the fallback story realized as a test, so detach stays a live, checked option). `extensions/graphify/test/fixtures/severability/`. (depends on T015, T016, T020, T028)
 - [ ] T035 **Reinstall-survival** test (D57, quickstart §13): run `bash extensions/graphify/install.sh .` and `bash extensions/council/install.sh .`, then re-run every fixture against the *installed* copies → all edits survive the installer `rm -rf`+`cp` (model: `extensions/git/test/run.sh §3`). Touches both harnesses → serial. (depends on T008, T015, T016, T020, T021, T022, T027, T028)
 - [ ] T036 Run the full `quickstart.md` validation (all 13 scenarios → each SC + each arm + non-regression + reinstall). Final integration gate. (depends on all prior)
 
