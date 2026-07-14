@@ -1,0 +1,8 @@
+consumer-deck-prep:
+  PASS (a1) **Sources** line names graphify-receipts.md
+  PASS (a2) an instruction mines graphify-receipts.md ("Mine its")
+  PASS (a3) that instruction cites the "## Concept / rationale receipts" section
+  PASS (a4) that instruction cites the "## Contracts cited" section
+  PASS (b1) exemplar graphify-receipts.md carries "## Concept / rationale receipts"
+  PASS (b2) exemplar graphify-receipts.md carries "## Contracts cited"
+consumer-deck-prep: 6 checks, 6 passed, 0 failed

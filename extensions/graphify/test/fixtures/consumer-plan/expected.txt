@@ -1,0 +1,16 @@
+consumer-plan (FR-013): /speckit-plan blast-radius-diet consumption — unchanged shape
+  PASS extensions/graphify/skills/speckit-graphify-context/SKILL.md :: source file exists
+  PASS extensions/graphify/skills/speckit-graphify-context/SKILL.md :: heading "## Graph scope" present
+  PASS extensions/graphify/skills/speckit-graphify-context/SKILL.md :: heading "## Relevant existing modules" present
+  PASS extensions/graphify/skills/speckit-graphify-context/SKILL.md :: heading "## Blast radius (per anchor)" present
+  PASS extensions/graphify/skills/speckit-graphify-context/SKILL.md :: heading "## Shared / mutable files (collision watch)" present
+  PASS extensions/graphify/skills/speckit-graphify-context/SKILL.md :: heading "## Patterns to follow" present
+  PASS extensions/graphify/skills/speckit-graphify-context/SKILL.md :: all 5 headings present, in original order
+  PASS extensions/graphify/examples/graphify-context.example.md :: source file exists
+  PASS extensions/graphify/examples/graphify-context.example.md :: heading "## Graph scope" present
+  PASS extensions/graphify/examples/graphify-context.example.md :: heading "## Relevant existing modules" present
+  PASS extensions/graphify/examples/graphify-context.example.md :: heading "## Blast radius (per anchor)" present
+  PASS extensions/graphify/examples/graphify-context.example.md :: heading "## Shared / mutable files (collision watch)" present
+  PASS extensions/graphify/examples/graphify-context.example.md :: heading "## Patterns to follow" present
+  PASS extensions/graphify/examples/graphify-context.example.md :: all 5 headings present, in original order
+consumer-plan: 14 checks, 14 passed, 0 failed

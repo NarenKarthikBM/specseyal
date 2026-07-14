@@ -1,0 +1,25 @@
+consumer-tasks-graph: FR-013 parallelism-derivation tripwire for /speckit-tasks-graph
+
+-- generator Output template (speckit-graphify-context/SKILL.md) --
+PASS generator template carries heading "## Blast radius (per anchor)"
+PASS generator template carries heading "## Shared / mutable files (collision watch)"
+PASS generator template :: blast-radius section shapes a "depends on" edge
+PASS generator template :: blast-radius section shapes a "depended on by" edge
+PASS generator template :: shared/mutable section carries serialization guidance
+
+-- worked diet example (examples/graphify-context.example.md) --
+PASS example mirrors heading "## Blast radius (per anchor)" byte-for-byte
+PASS example mirrors heading "## Shared / mutable files (collision watch)" byte-for-byte
+PASS example :: blast-radius section populated with a real "depends on" edge
+PASS example :: shared/mutable section populated with a real shared file (not just "none found")
+
+-- consumer skill (speckit-tasks-graph/SKILL.md) still reads the diet --
+PASS Step A names graphify-context.md as the file it grounds in
+PASS Step D ties [P] derivation to the shared/mutable list in graphify-context.md
+PASS Wave rules pull any shared/mutable-file task into a serial wave
+
+-- worked tasks+waves example demonstrates the end-to-end derivation --
+PASS Shared-file serialization section names the real T011/T021 routes.ts collision
+PASS note records a naive [P] stripped because of the graph-informed collision
+
+consumer-tasks-graph: 14 checks, 14 passed, 0 failed

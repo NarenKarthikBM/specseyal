@@ -68,5 +68,14 @@ fi
 # S06: re-invoke arm-1's augment pass on the changed scope so its .sh/.yml edges are carried
 # into the refreshed graph (a pure AST refresh would drop them). augment.sh's `augmented: …`
 # summary lands on stdout after the guard's `stale_survivors:` line; consumers grep, not diff.
-[ -f "$augment" ] || die "sibling augment.sh not found at $augment"
-"$augment" "$graph" "$scratch" || die "augment.sh re-invocation failed"
+#
+# Arm-1 is the detach-first arm (plan.md Detach order): it has a working fallback and is
+# cleanly severable. If augment.sh is ABSENT (arm 1 detached), refresh.sh must still work —
+# it skips the S06 re-invoke and .sh/.yml coverage degrades to today's honest
+# labeled-assertion / file-disjointness behavior, never dies. This is exactly what the
+# severability fixture (T034) asserts: arms 2+3+4 stay green with arm 1 absent.
+if [ -f "$augment" ]; then
+    "$augment" "$graph" "$scratch" || die "augment.sh re-invocation failed"
+else
+    printf 'refresh.sh: note: augment.sh absent (arm 1 detached) — skipping the S06 augment re-invoke; .sh/.yml coverage degrades to the labeled-assertion fallback\n' >&2
+fi

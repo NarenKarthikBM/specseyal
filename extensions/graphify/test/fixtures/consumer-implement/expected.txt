@@ -1,0 +1,25 @@
+generator-shape (speckit-graphify-context/SKILL.md, Output template -- graphify-context.md):
+  PASS heading "## Blast radius (per anchor)" present
+  PASS per-anchor entry line "- **<anchor>** (`<source_file>`)" present
+  PASS sub-field "depends on:" present
+  PASS sub-field "depended on by:" present
+  PASS sub-field "follow the pattern in:" present
+  PASS FR-013 unchanged-shape marker present
+
+example-realization (examples/graphify-context.example.md):
+  PASS heading "## Blast radius (per anchor)" present
+  PASS concrete (non-placeholder) "depends on:" line present
+  PASS concrete (non-placeholder) "depended on by:" line present
+  PASS concrete (non-placeholder) "follow the pattern in:" line present
+
+consumer-shape (speckit-implement-parallel/SKILL.md):
+  PASS Pre-Execution reads FEATURE_DIR/graphify-context.md for grounding
+  PASS subagent prompt template heading "### Graphify blast radius" present
+  PASS template line "This code depends on:" cites graphify-context.md
+  PASS template line "Depended on by (do not break these):" cites graphify-context.md
+  PASS template line "Follow the existing pattern in:" present
+
+cross-file coherence (producer grammar == consumer prompt grammar, order-preserving):
+  PASS generator per-anchor relation sequence == implement-parallel per-task relation sequence
+
+consumer-implement: 16 checks, 16 passed, 0 failed

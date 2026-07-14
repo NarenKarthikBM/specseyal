@@ -82,7 +82,7 @@
 
 - [X] T017 [P] [US2] Version-pin manifest + preventive check (R4/S16): record the installed `graphifyy` version in `extensions/graphify/extension/graphify-version.pin`; the refresh wrapper asserts the pin before calling `build_merge`/`detect_incremental`, and a mismatch routes to the **full-regen** branch (never a silent wrong-contract call).
 - [X] T015 [P] [US2] Implement `extensions/graphify/extension/scripts/freshness.sh <product-path>`: derive freshness from the shared-provenance header / graph manifest vs the worktree; exit `0` = fresh, non-zero + `stale: regenerate <product>` on stdout = stale (**hard-warn, not hard-block**); **no state file** (D32); **recomputed at every consumption point, never cached across hook calls** (S20). (depends on T004, T011)
-- [ ] T016 [US2] Implement `extensions/graphify/extension/scripts/refresh.sh`: wrap the upstream incremental merge; run the **stale-survivor guard** → print `stale_survivors: <N>`; apply the S02 branch table (common cheap-refresh / prune+targeted-re-extract on survivors>0 / full-regen only on version-change or operator demand); **re-invoke `augment.sh` on the changed scope** (S06); equivalence-to-full-regen is the SC-004 exit test. (depends on T017, T008, T012, T013, T014)
+- [X] T016 [US2] Implement `extensions/graphify/extension/scripts/refresh.sh`: wrap the upstream incremental merge; run the **stale-survivor guard** → print `stale_survivors: <N>`; apply the S02 branch table (common cheap-refresh / prune+targeted-re-extract on survivors>0 / full-regen only on version-change or operator demand); **re-invoke `augment.sh` on the changed scope** (S06); equivalence-to-full-regen is the SC-004 exit test. (depends on T017, T008, T012, T013, T014)
 
 **Checkpoint**: US2 independently testable — staleness is caught before consumption; incremental ≡ full-regen for the changed scope, 0 survivors.
 
@@ -102,7 +102,7 @@
 ### Implementation for User Story 3
 
 - [X] T020 [US3] Extend the generator `extensions/graphify/skills/speckit-graphify-context/SKILL.md` to emit **three separate products from one graph pass**: `graphify-context.md` (unchanged path + section grammar, FR-013), the **receipts** diet (for council member + deck-prep), the **type-signal** diet (for the categorizer); each token-bounded, each carrying the shared-provenance header (T004). (depends on T004, T018, T019)
-- [ ] T021 [P] [US3] Lockstep-update **deck-prep** to source the **receipts diet** (the D62 enrichment source) — edit `extensions/council/extension/templates/deck-technical.md` so Stage-0 deck-prep mines the receipts product (consumer 6). **⚠ shares `deck-technical.md` with T010 — never co-schedule.** (depends on T020)
+- [X] T021 [P] [US3] Lockstep-update **deck-prep** to source the **receipts diet** (the D62 enrichment source) — edit `extensions/council/extension/templates/deck-technical.md` so Stage-0 deck-prep mines the receipts product (consumer 6). **⚠ shares `deck-technical.md` with T010 — never co-schedule.** (depends on T020)
 - [X] T022 [P] [US3] Lockstep-update the **categorizer** to read the **type-signal diet** with its path-convention fallback — edit `extensions/workforce/extension/templates/categorizer-prompt.md` (consumer 5). (depends on T020)
 
 **Checkpoint**: US3 independently testable — three diets from one pass, mutually coherent, each consumer on its own slice.
@@ -125,7 +125,7 @@
 ### Implementation for User Story 4
 
 - [X] T026 [P] [US4] Add `member.query_ceiling` to `extensions/council/extension/council-config.yml` — **tier-aware**: `standard: 15` (D77, calibrated from this round's uncapped max of 9); `full:` **unset / uncapped** until the first full-tier round measures its own baseline (D77 — no ceiling derived from the wrong tier).
-- [ ] T027 [US4] Edit the member prompt `extensions/council/extension/templates/member-prompt.md`: the query-ceiling instruction, the ceiling-hit disclosure hook (extending the existing FR-019 reduced-grounding note), and point the member at its **receipts diet** (arm-3 consumer 4). **⚠ shares `member-prompt.md` with T010 — never co-schedule.** (depends on T020, T026)
+- [X] T027 [US4] Edit the member prompt `extensions/council/extension/templates/member-prompt.md`: the query-ceiling instruction, the ceiling-hit disclosure hook (extending the existing FR-019 reduced-grounding note), and point the member at its **receipts diet** (arm-3 consumer 4). **⚠ shares `member-prompt.md` with T010 — never co-schedule.** (depends on T020, T026)
 - [X] T028 [US4] Edit the council orchestrator `extensions/council/skills/speckit-council/SKILL.md` member-dispatch: **enforce** the query-count cap (the `N`th query is the last); **mechanically append** the reduced-grounding disclosure line the instant the cap is enforced (S09 — orchestrator appends, member prose is courtesy); record `graph_queries` + `ceiling_hit` per member trace fragment (FR-012); add the mid-implementation self-reopen guard note (S17 — a `--reopen delta` before arm 4 wires dispatches the pre-ceiling prompt). (depends on T023, T026)
 
 **Checkpoint**: US4 independently testable — the loop is bounded, the ceiling-hit is never silent.

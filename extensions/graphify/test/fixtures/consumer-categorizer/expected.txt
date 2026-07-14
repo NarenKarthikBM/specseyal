@@ -1,0 +1,9 @@
+consumer-categorizer:
+  PASS categorizer-prompt.md :: references graphify-type-signal.md (the diet)
+  PASS categorizer-prompt.md :: frames the diet as corroboration, never substitution
+  PASS categorizer-prompt.md :: own 8-value `type` derivation table header intact
+  PASS categorizer-prompt.md :: all 8 `type` enum values still present in the table
+  PASS categorizer-prompt.md :: still cites the diet own "Path-convention fallback (not in graph)" section
+  PASS input/graphify-type-signal.md :: has "## Per-file type signal (graph-grounded)"
+  PASS input/graphify-type-signal.md :: has "## Path-convention fallback (not in graph)"
+consumer-categorizer: 7 checks, 7 passed, 0 failed
