@@ -549,5 +549,64 @@ hook_routed after_complete complete && ok "after_complete routing SURVIVED forei
 hook_routed after_testing  testing  && ok "after_testing routing SURVIVED foreign (graphify) reinstall"  || bad "after_testing routing lost after foreign (graphify) reinstall"
 
 # ---------------------------------------------------------------------------
+bold "8. worktree regression (I-28): .git is a FILE, not a directory"
+# Every section above builds a plain clone via mk_repo, where `.git` is a real
+# directory — which is exactly why this bug survived to 006. In a LINKED
+# WORKTREE `.git` is a FILE (`gitdir: …/.git/worktrees/<name>`), so a lock path
+# hardcoded as `.git/<lock>` can never be mkdir'd: ENOTDIR on every retry, then
+# a bogus "another /speckit-specify may be running" timeout pointing at a lock
+# dir that cannot exist. commit.sh self-heals through branch.sh (R1-S12), so
+# EVERY phase-commit hook fails in a worktree.
+COMMIT_SH="$GIT_EXT/extension/scripts/commit.sh"
+R8="$TMP/u8"; mk_repo "$R8" "080-main-feature"
+WT="$TMP/u8-wt"
+( cd "$R8" && git worktree add -q -b 081-worktree-feature "$WT" >/dev/null 2>&1 )
+
+# make the worktree a spec-kit target in its own right
+mkdir -p "$WT/.specify" "$WT/specs/081-worktree-feature"
+printf '{"feature_directory": "specs/081-worktree-feature"}\n' > "$WT/.specify/feature.json"
+printf '# spec\n' > "$WT/specs/081-worktree-feature/spec.md"
+
+[ -f "$WT/.git" ] \
+  && ok "fixture: the worktree's .git is a FILE (the I-28 precondition holds)" \
+  || bad "fixture: worktree .git is not a file — this section is NOT exercising I-28"
+
+# THE regression: the lock must be acquirable where `.git` is not a directory.
+if ( cd "$WT" && sh "$BRANCH_SH" >/dev/null 2>&1 ); then
+  ok "branch.sh acquires its lock and exits 0 inside a worktree (I-28)"
+else
+  bad "branch.sh FAILED inside a worktree — the I-28 ENOTDIR lock bug is back"
+fi
+
+# and the end-to-end property that actually broke: a phase commit in a worktree.
+if ( cd "$WT" && sh "$COMMIT_SH" plan "worktree lock regression" >/dev/null 2>&1 ); then
+  if ( cd "$WT" && git log -1 --format=%s | grep -q '^plan(081-worktree-feature): ' ); then
+    ok "commit.sh phase-commits inside a worktree (the hook path that failed)"
+  else
+    bad "commit.sh exited 0 in a worktree but the phase commit is missing/misgrammared"
+  fi
+else
+  bad "commit.sh FAILED inside a worktree — the after_* phase-commit hooks are broken there"
+fi
+
+# Design lint: the lock must live in the COMMON git dir, not the worktree's
+# private gitdir. The branch namespace is SHARED across worktrees, so two
+# worktrees racing ensure_branch must contend on the SAME lock; --git-dir would
+# hand each one a private lock and silently defeat the guard. Asserted
+# statically (the lock is trap-removed on exit, so it can't be observed after).
+if grep -q 'git rev-parse --git-common-dir' "$BRANCH_SH"; then
+  ok "branch.sh resolves the lock via --git-common-dir (shared branch namespace)"
+else
+  bad "branch.sh does not use --git-common-dir — a per-worktree lock defeats the R1-S13 guard"
+fi
+if grep -qE '^(flock_file|mkdir_lock)="\.git/' "$BRANCH_SH"; then
+  bad "branch.sh still hardcodes a .git/ lock path — the I-28 bug"
+else
+  ok "branch.sh hardcodes no .git/ lock path (I-28 drift lint)"
+fi
+
+( cd "$R8" && git worktree remove --force "$WT" >/dev/null 2>&1 ) || true
+
+# ---------------------------------------------------------------------------
 bold "Result: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] || exit 1

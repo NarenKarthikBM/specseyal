@@ -130,8 +130,24 @@ ensure_branch() {
 # ---------------------------------------------------------------------------
 
 lock_wait_seconds=15
-flock_file=".git/speckit-git-branch.flock"
-mkdir_lock=".git/speckit-git-branch.lock"
+
+# Resolve the git dir rather than assuming `.git/` is one (I-28). In a linked
+# WORKTREE `.git` is a FILE (`gitdir: …/.git/worktrees/<name>`), so `mkdir
+# .git/<lock>` fails with ENOTDIR on every iteration — the retry loop below can
+# never succeed and the guard times out claiming another run holds a lock that
+# cannot exist. Every phase-commit hook then fails, since commit.sh self-heals
+# through this script (R1-S12).
+#
+# `--git-common-dir` (not `--git-dir`) is the correct semantic: the branch
+# namespace is SHARED across all worktrees of one repo, so two worktrees racing
+# ensure_branch must contend on the SAME lock. --git-dir would give each
+# worktree its own private lock and silently defeat the guard.
+git_dir="$(git rev-parse --git-common-dir 2>/dev/null)" \
+    || die "not inside a git repository (git rev-parse --git-common-dir failed)"
+[ -n "$git_dir" ] || die "could not resolve the git directory"
+
+flock_file="$git_dir/speckit-git-branch.flock"
+mkdir_lock="$git_dir/speckit-git-branch.lock"
 
 cleanup_mkdir_lock() {
     rmdir "$mkdir_lock" 2>/dev/null || true
