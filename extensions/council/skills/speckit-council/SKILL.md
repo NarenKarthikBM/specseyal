@@ -57,7 +57,7 @@ You are the **orchestrator**. `/speckit-council` runs in the main thread and nev
 
 ## Stage 0 — Deck prep
 
-Dispatch **one `Sonnet` subagent**. Prompt = point it at `.../templates/deck-technical.md` and `deck-overview.md` (the shapes to fill) and at `$FEATURE_DIR/plan.md`, `spec.md`, `graphify-context.md` (its sources). Tell it to write `council/defense-deck/technical.md` and `council/defense-deck/overview.md` (paths relative to `$FEATURE_DIR`), overwriting in place if they already exist (D38 — the deck is not round-scoped; git on the feature branch holds prior versions). Its return is one status line confirming the two files were written — nothing else.
+Dispatch **one `Sonnet` subagent**. Prompt = point it at `.../templates/deck-technical.md` and `deck-overview.md` (the shapes to fill) and at `$FEATURE_DIR/plan.md`, `spec.md`, `graphify-context.md`, `graphify-receipts.md` (its sources — the receipts diet is the arm-3 D62 concept/rationale enrichment source deck-prep mines per `deck-technical.md`, `005`). Tell it to write `council/defense-deck/technical.md` and `council/defense-deck/overview.md` (paths relative to `$FEATURE_DIR`), overwriting in place if they already exist (D38 — the deck is not round-scoped; git on the feature branch holds prior versions). Its return is one status line confirming the two files were written — nothing else.
 
 **Skip this stage entirely for `--reopen delta`** (§ Reopen) — the delta tier's context is the diff + finding, not a re-rendered deck, and `defense-deck/` is left untouched. Run it normally for a fresh/resumed round and for `--reopen full`.
 

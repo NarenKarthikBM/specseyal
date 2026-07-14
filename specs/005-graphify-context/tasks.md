@@ -59,7 +59,7 @@
 
 - [X] T008 [US1] Implement the post-extraction coverage pass `extensions/graphify/extension/scripts/augment.sh` (+ its small merge helper `extensions/graphify/extension/scripts/augment_merge.py`, calling no upstream-modifying `graphifyy` code): parse the repo's `.sh`/`.yml`/`.md`, emit nodes + the three edge kinds, merge into `graph.json`; labeled-assertion fallback for the unmodellable; **byte-deterministic** — canonical JSON key order, sorted iteration, no FS-iteration-order dependence (S11); exit-code contract per contracts/commands.md. (depends on T005, T006, T007)
 - [X] T009 [P] [US1] Harden the `graphify explain` **ambiguous-match** footgun at the extension seam — a query guard `extensions/graphify/extension/scripts/explain-guard.sh` that post-processes `graphify explain` to emit `path`'s near-tie warning (today `explain` resolves a short name to the top node silently even on a near-tie); `graphifyy` untouched (D75). S04. (depends on T003)
-- [ ] T010 [P] [US1] Adopt the **qualified-path/label citation convention** so a deck-cited or member-cited filename names an unambiguous anchor (arm 1 grows the same-named-node surface; arm 4 makes each query precious) — edit `extensions/council/extension/templates/deck-technical.md`, `deck-overview.md`, and `extensions/council/extension/templates/member-prompt.md`. S04. **⚠ shares `member-prompt.md` with T027 and `deck-technical.md` with T021 — never co-schedule (see Shared-file serialization).** (depends on T009)
+- [X] T010 [P] [US1] Adopt the **qualified-path/label citation convention** so a deck-cited or member-cited filename names an unambiguous anchor (arm 1 grows the same-named-node surface; arm 4 makes each query precious) — edit `extensions/council/extension/templates/deck-technical.md`, `deck-overview.md`, and `extensions/council/extension/templates/member-prompt.md`. S04. **⚠ shares `member-prompt.md` with T027 and `deck-technical.md` with T021 — never co-schedule (see Shared-file serialization).** (depends on T009)
 
 **Checkpoint**: US1 independently testable — the plumbing edges resolve; fallback claims are labeled.
 
@@ -76,7 +76,7 @@
 - [X] T011 [P] [US2] Freshness fixtures **(a) stale-positive** (graph + mutated worktree → **stale**) **and (b) stale-negative / no-false-alarm** (graph + *unmutated* worktree → **fresh**, no crying-wolf — S18, the inverse branch). `extensions/graphify/test/fixtures/arm2-freshness/`. (depends on T004)
 - [X] T012 [P] [US2] Refresh fixture **(c) equivalence, 0 survivors**: base graph + changed-file extraction → refresh yields a graph equivalent to a full regen, `stale_survivors: 0`. `extensions/graphify/test/fixtures/arm2-equiv/`.
 - [X] T013 [P] [US2] Refresh fixture **(d) negative-path survivor guard** (S01, precondition for arm-2 sign-off): a fixture that *manufactures* >0 stale survivors (the M3 86-node incident in miniature) → the guard **detects** them **and** performs the prune-or-rebuild recovery. `extensions/graphify/test/fixtures/arm2-survivors/`.
-- [ ] T014 [P] [US2] Cross-arm composition fixture **(e)** (S06): a changed `.sh` + incremental refresh → the refreshed graph **carries arm-1's augment edges** for the changed file (coverage not silently regressed). `extensions/graphify/test/fixtures/arm2-compose/`. (depends on T008)
+- [X] T014 [P] [US2] Cross-arm composition fixture **(e)** (S06): a changed `.sh` + incremental refresh → the refreshed graph **carries arm-1's augment edges** for the changed file (coverage not silently regressed). `extensions/graphify/test/fixtures/arm2-compose/`. (depends on T008)
 
 ### Implementation for User Story 2
 
@@ -103,7 +103,7 @@
 
 - [X] T020 [US3] Extend the generator `extensions/graphify/skills/speckit-graphify-context/SKILL.md` to emit **three separate products from one graph pass**: `graphify-context.md` (unchanged path + section grammar, FR-013), the **receipts** diet (for council member + deck-prep), the **type-signal** diet (for the categorizer); each token-bounded, each carrying the shared-provenance header (T004). (depends on T004, T018, T019)
 - [ ] T021 [P] [US3] Lockstep-update **deck-prep** to source the **receipts diet** (the D62 enrichment source) — edit `extensions/council/extension/templates/deck-technical.md` so Stage-0 deck-prep mines the receipts product (consumer 6). **⚠ shares `deck-technical.md` with T010 — never co-schedule.** (depends on T020)
-- [ ] T022 [P] [US3] Lockstep-update the **categorizer** to read the **type-signal diet** with its path-convention fallback — edit `extensions/workforce/extension/templates/categorizer-prompt.md` (consumer 5). (depends on T020)
+- [X] T022 [P] [US3] Lockstep-update the **categorizer** to read the **type-signal diet** with its path-convention fallback — edit `extensions/workforce/extension/templates/categorizer-prompt.md` (consumer 5). (depends on T020)
 
 **Checkpoint**: US3 independently testable — three diets from one pass, mutually coherent, each consumer on its own slice.
 
@@ -126,7 +126,7 @@
 
 - [X] T026 [P] [US4] Add `member.query_ceiling` to `extensions/council/extension/council-config.yml` — **tier-aware**: `standard: 15` (D77, calibrated from this round's uncapped max of 9); `full:` **unset / uncapped** until the first full-tier round measures its own baseline (D77 — no ceiling derived from the wrong tier).
 - [ ] T027 [US4] Edit the member prompt `extensions/council/extension/templates/member-prompt.md`: the query-ceiling instruction, the ceiling-hit disclosure hook (extending the existing FR-019 reduced-grounding note), and point the member at its **receipts diet** (arm-3 consumer 4). **⚠ shares `member-prompt.md` with T010 — never co-schedule.** (depends on T020, T026)
-- [ ] T028 [US4] Edit the council orchestrator `extensions/council/skills/speckit-council/SKILL.md` member-dispatch: **enforce** the query-count cap (the `N`th query is the last); **mechanically append** the reduced-grounding disclosure line the instant the cap is enforced (S09 — orchestrator appends, member prose is courtesy); record `graph_queries` + `ceiling_hit` per member trace fragment (FR-012); add the mid-implementation self-reopen guard note (S17 — a `--reopen delta` before arm 4 wires dispatches the pre-ceiling prompt). (depends on T023, T026)
+- [X] T028 [US4] Edit the council orchestrator `extensions/council/skills/speckit-council/SKILL.md` member-dispatch: **enforce** the query-count cap (the `N`th query is the last); **mechanically append** the reduced-grounding disclosure line the instant the cap is enforced (S09 — orchestrator appends, member prose is courtesy); record `graph_queries` + `ceiling_hit` per member trace fragment (FR-012); add the mid-implementation self-reopen guard note (S17 — a `--reopen delta` before arm 4 wires dispatches the pre-ceiling prompt). (depends on T023, T026)
 
 **Checkpoint**: US4 independently testable — the loop is bounded, the ceiling-hit is never silent.
 

@@ -2,13 +2,15 @@
 
 **Feature**: `[NNN-feature-name]`
 **Prepared by**: Session A — deck-prep (Sonnet, D18)
-**Sources**: `plan.md`, `spec.md`, `graphify-context.md`
+**Sources**: `plan.md`, `spec.md`, `graphify-context.md`, `graphify-receipts.md`
 
 > Format: markdown v1 (D15). This deck is **git-versioned in place, not round-scoped** (D38) — `defense-deck/technical.md` is overwritten on every revision; prior versions live in git history on the feature branch, not in a `round-N/` copy.
 
 > **Citation convention (S04).** Any repo file, script, or symbol this deck names — architecture walkthrough, dependency/graph-impact section, risk register, anywhere — MUST be a qualified path or fully-qualified label (e.g. `.specify/extensions/git/scripts/verify-gate.sh`, never a bare `verify-gate.sh`). `graphify explain`/`graphify path` resolve a short name to its single top-scoring node with **no signal on a near-tie**, so a bare filename is an ambiguous anchor the instant two nodes share it — a surface arm 1's own `.sh`/`.yml`/`.md` coverage pass only grows. A member re-querying this deck's own citation must land on the node the deck meant.
 
 > **D62 (`003-workforce` round-1, 2026-07-10).** The first `standard`-tier ceremony measured a per-member `plan.md` read-rate of **4/5** (spec 1/5, graph 3/5): most of that round's 25 suggestions — including **both blocking defects** (S01, S02) — trace to three `plan.md` sections this template rendered too thinly, or not at all, to be trusted on their own: `## Architecture & data flow` (6 of 25 suggestions), `## Plan-time verifications & per-SC test coverage` (7 of 25 — the round's single highest-demand section), `## Project Structure` (3 of 25). §3 (new below) and the strengthened §4/§7 exist to close that gap by default, so a lazy-context member can reach an opinion from this deck alone. **After-metric:** the per-member `plan.md` read-rate at the *next* council run — target: a majority of the bench (≤2/5) no longer needs to open `plan.md`.
+
+> **Concept/rationale enrichment — the receipts diet (D62).** The same graphify generator run that writes `graphify-context.md` also emits `graphify-receipts.md` (arm 3; deck-prep is consumer 6 of `plan.md`'s six named non-regression fixtures) — the concept/rationale/contracts diet for deck-prep and the council member. Mine its `## Concept / rationale receipts` (graph-grounded concept/rationale nodes — e.g. requirements, D-rows — each carrying its own citation) and `## Contracts cited` (the `contracts/` files this feature references, one gloss each) wherever this deck states a rationale or names a contract, rather than restating `spec.md`/`plan.md` prose unverified. This diet **is** the D62 enrichment source for that grounding specifically — it complements `graphify-context.md`'s blast-radius/shared-file grounding in §4 below, it does not replace it. If `graphify-receipts.md` is absent from this feature's directory, say so plainly rather than silently omitting the grounding it would have supplied — the same honest-fallback convention §4 already applies to a missing `graph.json`.
 
 *This is the technical deck: council members and the chairman read it in full (FR-005). The companion `overview.md` is the one-page non-technical rendering for the human gate — do not duplicate that scope here; this file can assume a technical reader.*
 
