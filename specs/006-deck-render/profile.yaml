@@ -1,0 +1,37 @@
+# Autonomy profile — 006-deck-render
+#
+# Both gates human: the default posture (D9/D33). The roster is expected grant-free
+# (a mechanical, model-free renderer reaches no network), so the D67 grant tripwire
+# is expected clear.
+#
+# council_tier: standard — the measured default since D61; 006 is S-sized and not
+# architecture-changing (D73(2)), so the cost-controlled tier applies.
+#
+# deck_render: DELIBERATELY ABSENT, which is exactly `none` (FR-006).
+#   Two reasons, and they agree:
+#   1. Bootstrap fact (the D46(2) class): the renderer does not exist when 006's own
+#      council convenes, so 006's council necessarily runs unrendered. The profile
+#      keeps telling the truth about what its council actually ran with.
+#   2. Contract hygiene: `deck_render` is not yet admitted to profile-schema.md, and
+#      §3 makes an unknown key a validation error. Writing the key before the
+#      amendment lands would violate the contract this feature exists to amend.
+#      The key is admitted in the same commit as the contract change and the
+#      000-sample fixture move (D47/D59 discipline) — see plan.md, Phase A.
+#   006's own dogfood exit test (SC-009) therefore renders via FR-016's
+#   explicit-invocation path, not via this profile. 007-oss-docs is the first
+#   feature that can set the flag at council time and have it fire by default.
+#
+# See docs/contracts/profile-schema.md.
+schema_version: "1.0"
+feature: "006-deck-render"
+
+full_auto: false
+council_tier: standard
+
+gates:
+  council:
+    mode: human
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: human
