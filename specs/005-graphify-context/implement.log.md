@@ -6,3 +6,4 @@
 2026-07-14T08:52:55Z | wave 6 | tasks: T016,T021,T027 | agents: 3 (T016 inline) | outcome: success
 2026-07-14T09:06:00Z | wave 7 | tasks: T029,T030,T031,T032,T033,T034 | agents: 6 | outcome: success
 2026-07-14T09:14:34Z | wave 8 | tasks: T035 | agents: 1 (inline) | outcome: success
+2026-07-14T10:50:43Z | wave 9 | tasks: T036 | agents: 1 (inline) | outcome: success (SC-001 GAP surfaced)
