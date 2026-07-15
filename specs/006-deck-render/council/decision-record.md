@@ -54,6 +54,22 @@
 
 ---
 
+## Human Gate — 2026-07-15T07:20:20Z
+
+| Field | Value |
+|---|---|
+| reviewer | Naren Karthik B M |
+| decision | `approved` |
+| reviewed | `defense-deck/overview.md`, `round-1/suggestions.md`, this record |
+
+**Notes:** none.
+
+**Overrides:** none.
+
+**Binding:** plan↔SHA binding recorded at `specs/006-deck-render/gates.yml` (git-ext-owned; FR-008/D55).
+
+---
+
 ## Carried Constraints
 
 *Rebuilt from every round's accepted rows; `/speckit-tasks` reads this section and nothing else from this file.*
