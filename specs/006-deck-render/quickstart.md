@@ -138,8 +138,10 @@ Grep-able, not asserted. Run after any rendered run:
 
 ```sh
 git ls-files | grep -i '\.pptx$'                        # EMPTY — never tracked (FR-014)
-grep -ri 'pptx\|renders/' specs/*/gates.yml             # EMPTY — no render is gate-bound
-grep -ri 'pptx\|renders/' specs/*/traces.jsonl          # EMPTY — no render is traced
+grep -rE 'renders/[^"[:space:]]*\.pptx' specs/*/gates.yml    # EMPTY — no render is gate-bound
+grep -rE 'renders/[^"[:space:]]*\.pptx' specs/*/traces.jsonl # EMPTY — no render path is traced
+#   (match an actual renders/<deck>.pptx artifact path — a bare 'pptx' substring would
+#    false-positive on a legitimately-traced source file like extract_pptx_text.py)
 git check-ignore -v specs/005-graphify-context/renders/ # confirms the gitignore rule fires
 ```
 
