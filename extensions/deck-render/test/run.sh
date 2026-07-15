@@ -2434,4 +2434,773 @@ PYEOF
   fi
 fi
 
+# ---------------------------------------------------------------------------
+section "5. SC-005 boundary -- render never in git, gates.yml, traces.jsonl, or council context-in (FR-001/FR-014)"
+# SC-005's own text: "no rendered file appears in gates.yml, in any
+# traces.jsonl record, in any council session's context-in, or in git's
+# tracked file set" -- the falsifiable form of FR-001 ("MUST NOT be bound by
+# any gate... MUST NOT be an input to any pipeline phase... MUST NOT appear
+# in traces.jsonl") + FR-014 ("derived build product, not a committed
+# artifact... written under a gitignored path"). Unlike every other section
+# in this file, the claim under test is a static fact about the ALREADY-
+# COMMITTED repository (an untracked .gitignore rule; zero gate/trace/
+# council references), not about anything a fresh invocation of render.py
+# does -- so, deliberately, this section inspects the REAL repo tree ($REPO)
+# rather than rendering into a $TMP fixture. No require_pptx guard: every
+# check below is git plumbing or grep against files already on disk; it
+# PASSES even on a host where python-pptx is not installed (confirmed
+# absent on this host per section 0's banner above) -- exactly the S10
+# posture the task calls for. A scratch dir is still used, per the file's
+# own per-section "$TMP/<short-name>" convention, purely to hold
+# intermediate grep/find output for readable FAIL detail.
+SC005="$TMP/sc005"
+mkdir -p "$SC005"
+
+# ---- (a) not in git: the .gitignore rule exists, AND the current tracked --
+# set is already clean. Two independent checks on purpose: the RULE check
+# proves a FUTURE render is ignored before it can be staged (FR-014's
+# "written under a gitignored path"); the ls-files checks prove no render
+# has EVER slipped past it (e.g. before the rule was ever added). The
+# second ls-files check (bare *.pptx, not path-scoped) is deliberately
+# stronger than SC-005's literal "specs/*/renders/" wording -- a rendered
+# deck must never be tracked, full stop, regardless of where it landed.
+if grep -qxF 'specs/*/renders/' "$REPO/.gitignore"; then
+  pass "SC-005 not in git -- .gitignore carries the exact 'specs/*/renders/' rule (FR-014), so a future render is ignored before it can ever be staged"
+else
+  fail "SC-005 not in git -- .gitignore does NOT carry a literal 'specs/*/renders/' line -- a future render would be stageable by accident, breaking FR-014's gitignored-path guarantee"
+fi
+
+SC005_GIT_TRACKED="$SC005/git-ls-files.txt"
+git -C "$REPO" ls-files > "$SC005_GIT_TRACKED"
+
+SC005_GIT_RENDERS="$SC005/git-tracked-renders.txt"
+grep -E 'specs/[^/]+/renders/' "$SC005_GIT_TRACKED" > "$SC005_GIT_RENDERS" || true
+if [ -s "$SC005_GIT_RENDERS" ]; then
+  fail "SC-005 not in git -- git ls-files tracks $(wc -l < "$SC005_GIT_RENDERS" | tr -d ' ') file(s) under a specs/*/renders/ path, e.g. $(head -n 1 "$SC005_GIT_RENDERS") -- the boundary is broken"
+else
+  pass "SC-005 not in git -- git -C \"\$REPO\" ls-files contains ZERO tracked files under any specs/*/renders/ path (SC-005's literal wording)"
+fi
+
+SC005_GIT_PPTX="$SC005/git-tracked-pptx.txt"
+grep -E '\.pptx$' "$SC005_GIT_TRACKED" > "$SC005_GIT_PPTX" || true
+if [ -s "$SC005_GIT_PPTX" ]; then
+  fail "SC-005 not in git -- git ls-files tracks $(wc -l < "$SC005_GIT_PPTX" | tr -d ' ') .pptx file(s) anywhere in the repo, e.g. $(head -n 1 "$SC005_GIT_PPTX") -- a rendered deck must never be tracked, regardless of path"
+else
+  pass "SC-005 not in git -- git -C \"\$REPO\" ls-files contains ZERO tracked .pptx files anywhere in the repo (stronger than the path-scoped check above)"
+fi
+
+# ---- (b) not in any gates.yml: gates bind .md SHAs only (data-model.md's --
+# GateSHABinding; see e.g. specs/006-deck-render/gates.yml's own
+# 'plan.md: <sha>' / 'tasks.md: <sha>' shape) -- grep every committed
+# gates.yml for a renders/ path or a .pptx reference; zero is the only
+# correct answer.
+SC005_GATES_FILES="$SC005/gates-files.txt"
+find "$REPO/specs" -maxdepth 2 -name 'gates.yml' -type f | sort > "$SC005_GATES_FILES"
+
+if [ -s "$SC005_GATES_FILES" ]; then
+  pass "SC-005 not in gates.yml setup -- found $(wc -l < "$SC005_GATES_FILES" | tr -d ' ') committed gates.yml file(s) under $REPO/specs to inspect (see $SC005_GATES_FILES)"
+else
+  fail "SC-005 not in gates.yml setup -- found ZERO gates.yml files under $REPO/specs -- the check below would be a silent 0-file pass, which S10's discipline forbids"
+fi
+
+SC005_GATES_HITS="$SC005/gates-hits.txt"
+: > "$SC005_GATES_HITS"
+while read -r sc005_gates_file; do
+  [ -n "$sc005_gates_file" ] || continue
+  grep -HnE 'renders/|\.pptx' "$sc005_gates_file" >> "$SC005_GATES_HITS" || true
+done < "$SC005_GATES_FILES"
+
+if [ -s "$SC005_GATES_HITS" ]; then
+  fail "SC-005 not in gates.yml -- $(wc -l < "$SC005_GATES_HITS" | tr -d ' ') line(s) across the committed gates.yml files reference a renders/ path or a .pptx file, e.g. $(head -n 1 "$SC005_GATES_HITS") -- gates bind .md SHAs only"
+else
+  pass "SC-005 not in gates.yml -- none of the $(wc -l < "$SC005_GATES_FILES" | tr -d ' ') committed gates.yml file(s) reference a renders/ path or a .pptx file -- every binding is an .md SHA, as data-model.md's GateSHABinding requires"
+fi
+
+# ---- (c) not in any traces.jsonl: a mechanical, model-free transform ------
+# leaves no trace record at all (FR-011; the render write itself is never a
+# session) -- but FR-001 also forbids a render being "an input to any
+# pipeline phase," which would show up as some OTHER session's own
+# context-in reference (e.g. a tester's role-gated `context_in` array,
+# trace-schema.md Sec 1) naming a renders/ path. One grep across every
+# committed traces.jsonl record covers both: no record's `artifact` field,
+# and no record's `context_in` field, ever names a renders/ path or a
+# .pptx file.
+SC005_TRACES_FILES="$SC005/traces-files.txt"
+find "$REPO/specs" -maxdepth 2 -name 'traces.jsonl' -type f | sort > "$SC005_TRACES_FILES"
+
+if [ -s "$SC005_TRACES_FILES" ]; then
+  pass "SC-005 not in traces.jsonl setup -- found $(wc -l < "$SC005_TRACES_FILES" | tr -d ' ') committed traces.jsonl file(s) under $REPO/specs to inspect (see $SC005_TRACES_FILES)"
+else
+  fail "SC-005 not in traces.jsonl setup -- found ZERO traces.jsonl files under $REPO/specs -- the check below would be a silent 0-file pass, which S10's discipline forbids"
+fi
+
+SC005_TRACES_HITS="$SC005/traces-hits.txt"
+: > "$SC005_TRACES_HITS"
+while read -r sc005_traces_file; do
+  [ -n "$sc005_traces_file" ] || continue
+  grep -HnE 'renders/|\.pptx' "$sc005_traces_file" >> "$SC005_TRACES_HITS" || true
+done < "$SC005_TRACES_FILES"
+
+if [ -s "$SC005_TRACES_HITS" ]; then
+  fail "SC-005 not in traces.jsonl -- $(wc -l < "$SC005_TRACES_HITS" | tr -d ' ') record(s) across the committed traces.jsonl files reference a renders/ path or a .pptx file (in 'artifact', 'context_in', or any other field), e.g. $(head -n 1 "$SC005_TRACES_HITS") -- a render must never be a phase/session artifact"
+else
+  pass "SC-005 not in traces.jsonl -- none of the $(wc -l < "$SC005_TRACES_FILES" | tr -d ' ') committed traces.jsonl file(s) have any record whose fields reference a renders/ path or a .pptx file -- a mechanical render leaves no trace (FR-011), and no OTHER session's context-in ever names one either (FR-001)"
+fi
+
+# ---- (d) not in any council session's context-in --------------------------
+# artifact-layout.md's phase table pins EXACTLY what each council-family
+# session reads as context-in: `council` reads `defense-deck/`, `plan.md`,
+# `spec.md` + the graphify query tool; `council-gate` (the human) reads
+# `overview.md`, `suggestions.md`, `decision-record.md` -- neither row ever
+# names `renders/`. That table itself is grepped first, below, as the
+# contract-level guarantee.
+#
+# The grep across the ACTUAL committed council/ subtrees is deliberately
+# NARROWER than a bare 'renders/' or '.pptx' substring search: 006-deck-
+# render is dogfooding review of the deck-render FEATURE ITSELF, so its own
+# council/defense-deck/technical.md, opinions, and decision-record.md
+# legitimately DISCUSS the renders/ mechanism in prose ("write
+# `renders/<deck>.pptx`", ".gitignore | + specs/*/renders/", "a truncated
+# `.pptx`" describing the atomic-write hazard, etc.) while proposing and
+# reviewing this very feature -- a bare substring grep for 'renders/' or
+# '.pptx' independently would flag that legitimate design commentary as a
+# false positive (confirmed by hand against this repo's own
+# specs/006-deck-render/council/ tree while authoring this section). What
+# SC-005 actually forbids is a council session's context-in NAMING a real
+# rendered ARTIFACT PATH -- i.e. a literal 'renders/<name>.pptx'-shaped
+# path fragment, the thing a session would have had to read FROM, not the
+# word "renders" appearing in prose ABOUT the mechanism. That precise
+# pattern is what is grepped for below, and it correctly returns zero
+# matches even across 006's own self-referential review.
+SC005_AL_HITS="$SC005/artifact-layout-hits.txt"
+grep -nE '^\| (council|council-gate) \|' "$REPO/docs/contracts/artifact-layout.md" > "$SC005_AL_HITS" || true
+
+if [ -s "$SC005_AL_HITS" ]; then
+  pass "SC-005 context-in contract setup -- found $(wc -l < "$SC005_AL_HITS" | tr -d ' ') council/council-gate row(s) in artifact-layout.md's phase table to inspect (see $SC005_AL_HITS)"
+else
+  fail "SC-005 context-in contract setup -- found ZERO council/council-gate rows in $REPO/docs/contracts/artifact-layout.md's phase table -- the check below would be a silent 0-row pass, which S10's discipline forbids"
+fi
+
+if grep -qE 'renders/|\.pptx' "$SC005_AL_HITS"; then
+  fail "SC-005 not in council context-in -- artifact-layout.md's council/council-gate phase-table row(s) reference a renders/ path or a .pptx file: $(cat "$SC005_AL_HITS") -- the contract itself would admit a render as context-in"
+else
+  pass "SC-005 not in council context-in -- artifact-layout.md's council row (context-in: defense-deck/, plan.md, spec.md, graphify query tool) and council-gate row (context-in: overview.md, suggestions.md, decision-record.md) name no renders/ path or .pptx file"
+fi
+
+SC005_COUNCIL_DIRS="$SC005/council-dirs.txt"
+find "$REPO/specs" -maxdepth 2 -type d -name 'council' | sort > "$SC005_COUNCIL_DIRS"
+
+if [ -s "$SC005_COUNCIL_DIRS" ]; then
+  pass "SC-005 not in council context-in setup -- found $(wc -l < "$SC005_COUNCIL_DIRS" | tr -d ' ') committed council/ subtree(s) under $REPO/specs to inspect (see $SC005_COUNCIL_DIRS)"
+else
+  fail "SC-005 not in council context-in setup -- found ZERO council/ subtrees under $REPO/specs -- the check below would be a silent 0-tree pass, which S10's discipline forbids"
+fi
+
+SC005_COUNCIL_HITS="$SC005/council-hits.txt"
+: > "$SC005_COUNCIL_HITS"
+while read -r sc005_council_dir; do
+  [ -n "$sc005_council_dir" ] || continue
+  grep -rHnE 'renders/[A-Za-z0-9_.-]*\.pptx' "$sc005_council_dir" >> "$SC005_COUNCIL_HITS" 2>/dev/null || true
+done < "$SC005_COUNCIL_DIRS"
+
+if [ -s "$SC005_COUNCIL_HITS" ]; then
+  fail "SC-005 not in council context-in -- $(wc -l < "$SC005_COUNCIL_HITS" | tr -d ' ') line(s) across the committed council/ subtrees reference a literal renders/<name>.pptx artifact path, e.g. $(head -n 1 "$SC005_COUNCIL_HITS") -- a council session's context-in must be .md decks only"
+else
+  pass "SC-005 not in council context-in -- none of the $(wc -l < "$SC005_COUNCIL_DIRS" | tr -d ' ') committed council/ subtree(s) (decision-record.md, defense-deck/, round-N/opinions/, suggestions.md, across every feature including 006's own self-referential review) contain a literal renders/<name>.pptx artifact-path reference -- a council session's inputs are the .md decks under council/defense-deck/, never a renders/ path"
+fi
+
+# ---------------------------------------------------------------------------
+section "6. SC-006 free -- render is trace-free and costs zero tokens (FR-011, /speckit-git-cleanup precedent)"
+# The guarantee under test (SC-006/FR-011; plan.md's "model-free => trace-
+# free => free" reasoning): render.py is a deterministic, mechanical
+# transform -- never a session -- so it appends NO record to traces.jsonl
+# and spends NO tokens, exactly the /speckit-git-cleanup FR-007 precedent
+# plan.md names ("mechanical, model-free steps leave no trace record --
+# traces record sessions", D35). This is a LIBRARY-INDEPENDENT property:
+# render.py never even reaches its one lazy `import pptx` site (FR-015/R2,
+# inside `_render_deck()`'s try block) until long after any traces.jsonl
+# write would have had to happen -- so the trace-free guarantee holds
+# identically whether the render below actually RENDERS or DEGRADES-and-
+# discloses (SC-004's branch; python-pptx is confirmed ABSENT on this host
+# per section 0's banner, so both renders below are expected to degrade).
+# No require_pptx guard, deliberately -- mirroring SC-001/SC-005/SC-008
+# above, the other library-independent sections.
+#
+# Setup: a throwaway feature dir (a SIBLING of this section's own scratch
+# dir, never inside it -- the SC-001 precedent above, so this section's own
+# helper/log files can never pollute the "no other trace/cost file under
+# the feature dir" check below) carries BOTH fixture decks, a profile.yaml
+# that actually SELECTS a render (fixtures/profiles/overview.yaml --
+# deck_render: overview), and a PRE-SEEDED traces.jsonl of three realistic
+# records (deck-prep, council-member, chairman -- the exact record shape
+# docs/contracts/trace-schema.md Sec 1 documents, including the
+# council-member role's role-scoped graph_queries/ceiling_hit pair, Sec
+# 1/Sec 7 rule 12) -- so there IS a file with real content for "unchanged"
+# to be a meaningful claim, never a vacuous empty-file check.
+#
+# Two renders run against the SAME feature dir, back to back: an EXPLICIT-
+# arg render (`render.py technical --feature <dir>`, which per FR-016
+# ignores the profile entirely) and a PROFILE-driven render (`render.py
+# --feature <dir>`, no deck arg, so selection comes from profile.yaml's
+# `deck_render: overview`) -- covering both of render.py's selection paths
+# in one pass.
+#
+# The core assertion is byte-identity of traces.jsonl's sha256 before vs.
+# after BOTH renders -- the strongest possible form (stronger than a
+# record-count or role-count check alone, either of which a same-length,
+# different-content mutation could pass vacuously). Record count, per-role
+# counts, and a council_spend rollup computed per trace-schema.md Sec 5's
+# OWN formula (tokens_billable = input+output+cache_creation, cache_read
+# excluded -- "it is the saving, not the spend"; council_spend =
+# phase_spend(council) + phase_spend(deck-prep)) are ALSO computed and
+# compared independently below -- logically implied by the byte-identical
+# check, but asserted explicitly anyway, since SC-006's own spec text names
+# "council_spend... identical" as the falsifiable claim, not merely "the
+# file didn't change".
+SC006_SCRATCH="$TMP/sc006"
+SC006="$SC006_SCRATCH/feature"
+mkdir -p "$SC006/council/defense-deck"
+cp "$FIXTURES/deck/technical.md" "$SC006/council/defense-deck/technical.md"
+cp "$FIXTURES/deck/overview.md" "$SC006/council/defense-deck/overview.md"
+cp "$FIXTURES/profiles/overview.yaml" "$SC006/profile.yaml"
+
+SC006_TRACES="$SC006/traces.jsonl"
+cat > "$SC006_TRACES" <<'JSONLEOF'
+{"schema_version": "1.0", "trace_id": "trc_01SC006DECKPREP001", "parent_trace_id": null, "feature": "006-deck-render-sc006-fixture", "phase": "deck-prep", "role": "deck-prep", "agent_id": null, "skills": [], "elevated_grants": [], "model": "claude-sonnet-5", "effort": "medium", "started_at": "2026-07-10T09:00:00.000Z", "ended_at": "2026-07-10T09:04:12.500Z", "duration_ms": 252500, "tokens": {"input": 8000, "output": 2200, "cache_read": 1500, "cache_creation": 0}, "capture_method": "transcript", "outcome": "success", "artifact": "specs/006-deck-render-sc006-fixture/council/defense-deck/technical.md", "cost_usd": null}
+{"schema_version": "1.0", "trace_id": "trc_01SC006COUNCILMEM01", "parent_trace_id": "trc_01SC006CHAIRMAN0001", "feature": "006-deck-render-sc006-fixture", "phase": "council", "role": "council-member", "agent_id": null, "skills": [], "elevated_grants": [], "model": "claude-sonnet-5", "effort": "medium", "started_at": "2026-07-10T09:10:00.000Z", "ended_at": "2026-07-10T09:13:45.000Z", "duration_ms": 225000, "tokens": {"input": 15000, "output": 3400, "cache_read": 9000, "cache_creation": 500}, "capture_method": "sdk", "outcome": "success", "artifact": null, "cost_usd": null, "graph_queries": 9, "ceiling_hit": false}
+{"schema_version": "1.0", "trace_id": "trc_01SC006CHAIRMAN0001", "parent_trace_id": null, "feature": "006-deck-render-sc006-fixture", "phase": "council", "role": "chairman", "agent_id": null, "skills": [], "elevated_grants": [], "model": "claude-opus-4-8", "effort": "xhigh", "started_at": "2026-07-10T09:15:00.000Z", "ended_at": "2026-07-10T09:18:31.900Z", "duration_ms": 211900, "tokens": {"input": 22000, "output": 5100, "cache_read": 12000, "cache_creation": 1000}, "capture_method": "transcript", "outcome": "success", "artifact": "specs/006-deck-render-sc006-fixture/council/round-1/suggestions.md", "cost_usd": null}
+JSONLEOF
+
+SC006_SHA_PY="$SC006_SCRATCH/sha_one.py"
+cat > "$SC006_SHA_PY" <<'PYEOF'
+#!/usr/bin/env python3
+"""SC-006 single-file sha256 (T033 inline helper) -- mirrors SC-004's own
+sha_one.py idiom (run.sh Sec 4 above): the strongest form of "unchanged" is
+byte-identity of the raw file, independent of any parsed-content rollup.
+
+Usage: sha_one.py FILE
+"""
+import hashlib
+import sys
+
+print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())
+PYEOF
+
+SC006_ROLLUP_PY="$SC006_SCRATCH/rollup.py"
+cat > "$SC006_ROLLUP_PY" <<'PYEOF'
+#!/usr/bin/env python3
+"""SC-006 trace rollup (T033 inline helper).
+
+Three metrics off a traces.jsonl file, computed per
+docs/contracts/trace-schema.md Sec 5's OWN rollup formulas -- never a
+re-derived one:
+
+  records        total record (line) count.
+  roles          role -> count for every DISTINCT role present, one
+                 "role:count" entry per role, sorted alphabetically by role
+                 name for a stable, diffable ordering.
+  council_spend  phase_spend(f, "council") + phase_spend(f, "deck-prep"),
+                 where phase_spend sums tokens_billable(r) = 0 if
+                 r["tokens"] is None else input+output+cache_creation
+                 (cache_read excluded -- Sec 5: "it is the saving, not the
+                 spend") over every record in that phase.
+
+Invoked TWICE by run.sh's SC-006 section -- once before, once after the
+render(s) under test -- so the two output files can be `cmp -s`'d for exact
+rollup equality, independently of (and in addition to) the raw-file sha256
+byte-identity check.
+
+Usage: rollup.py TRACES_JSONL_PATH
+"""
+import json
+import sys
+from collections import Counter
+
+path = sys.argv[1]
+
+records = []
+with open(path, "r", encoding="utf-8") as fh:
+    for line in fh:
+        line = line.strip()
+        if not line:
+            continue
+        records.append(json.loads(line))
+
+role_counts = Counter(r.get("role") for r in records)
+
+
+def tokens_billable(r):
+    tokens = r.get("tokens")
+    if tokens is None:
+        return 0
+    return tokens["input"] + tokens["output"] + tokens["cache_creation"]
+
+
+council_spend = sum(
+    tokens_billable(r) for r in records if r.get("phase") in ("council", "deck-prep")
+)
+
+print("records=%d" % len(records))
+print("roles=" + ",".join("%s:%d" % (role, count) for role, count in sorted(role_counts.items())))
+print("council_spend=%d" % council_spend)
+PYEOF
+
+# ---- BEFORE snapshot: raw sha256, parsed rollup, and the feature dir's own
+# trace/cost-file inventory (scoped to $SC006 -- the feature dir under test
+# -- never $SC006_SCRATCH, which holds this section's own helper/log files
+# and would otherwise self-pollute the "no other trace/cost file" check).
+SC006_SHA_BEFORE="$SC006_SCRATCH/traces-before.sha256"
+SC006_ROLLUP_BEFORE="$SC006_SCRATCH/rollup-before.txt"
+"$PY" "$SC006_SHA_PY" "$SC006_TRACES" > "$SC006_SHA_BEFORE"
+"$PY" "$SC006_ROLLUP_PY" "$SC006_TRACES" > "$SC006_ROLLUP_BEFORE"
+
+SC006_TRACE_FILES_BEFORE="$SC006_SCRATCH/trace-files-before.txt"
+find "$SC006" -type f \( -iname '*trace*' -o -iname '*.jsonl' \) | sort > "$SC006_TRACE_FILES_BEFORE"
+
+# ---- the renders themselves: an explicit-arg render, then a profile-driven
+# render, both against the SAME feature dir -----------------------------
+SC006_LOG_EXPLICIT="$SC006_SCRATCH/render-explicit.log"
+sc006_explicit_rc=0
+"$PY" "$RENDER_PY" technical --feature "$SC006" >"$SC006_LOG_EXPLICIT" 2>&1 || sc006_explicit_rc=$?
+
+SC006_LOG_PROFILE="$SC006_SCRATCH/render-profile.log"
+sc006_profile_rc=0
+"$PY" "$RENDER_PY" --feature "$SC006" >"$SC006_LOG_PROFILE" 2>&1 || sc006_profile_rc=$?
+
+if grep -q "Traceback (most recent call last)" "$SC006_LOG_EXPLICIT" "$SC006_LOG_PROFILE" 2>/dev/null; then
+  fail "SC-006 setup -- render.py produced an uncaught Python traceback in the explicit-arg (exit $sc006_explicit_rc) or profile-driven (exit $sc006_profile_rc) render -- see $SC006_LOG_EXPLICIT / $SC006_LOG_PROFILE"
+else
+  pass "SC-006 setup -- ran BOTH an explicit-arg render (render.py technical --feature <dir>, exit $sc006_explicit_rc, FR-016 ignores the profile entirely) and a profile-driven render (render.py --feature <dir>, deck_render: overview via fixtures/profiles/overview.yaml, exit $sc006_profile_rc) against the SAME feature dir, neither producing an uncaught traceback -- library-independent (no require_pptx): whichever outcome fired (rendered, or degrade-and-disclose since python-pptx is ABSENT on this host per section 0's banner) is irrelevant to the trace-free property under test"
+fi
+
+# ---- AFTER snapshot: guarded against a (hypothetical) deleted traces.jsonl
+# so a bug under test fails this check cleanly instead of crashing the
+# harness via an unhandled Python exception under `set -eu`.
+SC006_SHA_AFTER="$SC006_SCRATCH/traces-after.sha256"
+SC006_ROLLUP_AFTER="$SC006_SCRATCH/rollup-after.txt"
+if [ -f "$SC006_TRACES" ]; then
+  "$PY" "$SC006_SHA_PY" "$SC006_TRACES" > "$SC006_SHA_AFTER"
+  "$PY" "$SC006_ROLLUP_PY" "$SC006_TRACES" > "$SC006_ROLLUP_AFTER"
+  pass "SC-006 traces.jsonl still exists -- render.py never deletes the pre-seeded trace file (it never opens traces.jsonl at all, FR-011)"
+else
+  : > "$SC006_SHA_AFTER"
+  : > "$SC006_ROLLUP_AFTER"
+  fail "SC-006 traces.jsonl MISSING after the render(s) -- the pre-seeded trace file was deleted; every comparison below will correctly fail as a consequence"
+fi
+
+SC006_TRACE_FILES_AFTER="$SC006_SCRATCH/trace-files-after.txt"
+find "$SC006" -type f \( -iname '*trace*' -o -iname '*.jsonl' \) | sort > "$SC006_TRACE_FILES_AFTER"
+SC006_COST_FILES_AFTER="$SC006_SCRATCH/cost-files-after.txt"
+find "$SC006" -type f \( -iname '*cost*' -o -iname '*spend*' \) | sort > "$SC006_COST_FILES_AFTER"
+
+# ---- (1) byte-identical: the strongest form of "unchanged" ----------------
+if cmp -s "$SC006_SHA_BEFORE" "$SC006_SHA_AFTER"; then
+  pass "SC-006 byte-identical -- traces.jsonl's sha256 is UNCHANGED across both the explicit-arg and the profile-driven render ($(cat "$SC006_SHA_BEFORE")) -- render.py appended NO record (FR-011); the strongest possible form of 'unchanged'"
+else
+  fail "SC-006 byte-identical -- traces.jsonl's sha256 CHANGED across the render(s) (before=$(cat "$SC006_SHA_BEFORE" 2>/dev/null || echo MISSING), after=$(cat "$SC006_SHA_AFTER" 2>/dev/null || echo MISSING)) -- a supposedly model-free, session-free transform wrote to the trace ledger"
+fi
+
+# ---- (2) record count / role-count / council_spend, computed per
+# trace-schema.md Sec 5's own formula -- logically implied by (1) above, but
+# asserted explicitly per SC-006's own "council_spend... identical" wording.
+sc006_records_before=$(grep '^records=' "$SC006_ROLLUP_BEFORE" | cut -d= -f2)
+sc006_records_after=$(grep '^records=' "$SC006_ROLLUP_AFTER" | cut -d= -f2)
+sc006_roles_before=$(grep '^roles=' "$SC006_ROLLUP_BEFORE" | cut -d= -f2-)
+sc006_roles_after=$(grep '^roles=' "$SC006_ROLLUP_AFTER" | cut -d= -f2-)
+sc006_spend_before=$(grep '^council_spend=' "$SC006_ROLLUP_BEFORE" | cut -d= -f2)
+sc006_spend_after=$(grep '^council_spend=' "$SC006_ROLLUP_AFTER" | cut -d= -f2)
+
+if [ -n "$sc006_records_before" ] && [ "$sc006_records_before" = "$sc006_records_after" ]; then
+  pass "SC-006 record count unchanged -- traces.jsonl carries $sc006_records_before record(s) both before and after the render(s) -- render.py appends none"
+else
+  fail "SC-006 record count changed -- traces.jsonl carried $sc006_records_before record(s) before the render(s), $sc006_records_after after -- render.py must never append a record (FR-011)"
+fi
+
+if [ -n "$sc006_roles_before" ] && [ "$sc006_roles_before" = "$sc006_roles_after" ]; then
+  pass "SC-006 role-count unchanged -- per-role record counts ($sc006_roles_before) are identical before and after the render(s) -- a rendered run's role-count is identical to an unrendered run's, exactly SC-006's own wording"
+else
+  fail "SC-006 role-count changed -- per-role counts were '$sc006_roles_before' before the render(s), '$sc006_roles_after' after -- render.py must never add (or remove) a role's trace record"
+fi
+
+if [ -n "$sc006_spend_before" ] && [ "$sc006_spend_before" = "$sc006_spend_after" ]; then
+  pass "SC-006 council_spend unchanged -- the trace-schema.md Sec 5 council_spend rollup (phase_spend(council) + phase_spend(deck-prep)) is $sc006_spend_before token(s) both before and after the render(s) -- the render adds ZERO tokens (FR-011/SC-006)"
+else
+  fail "SC-006 council_spend changed -- council_spend rollup was $sc006_spend_before token(s) before the render(s), $sc006_spend_after after -- a model-free transform must add zero tokens"
+fi
+
+# ---- (3) no OTHER trace/cost file anywhere under the feature dir ----------
+if cmp -s "$SC006_TRACE_FILES_BEFORE" "$SC006_TRACE_FILES_AFTER"; then
+  pass "SC-006 no new trace file -- the set of trace-/.jsonl-named files under the feature dir is UNCHANGED by the render(s): exactly the one pre-seeded traces.jsonl, nothing else (see $SC006_TRACE_FILES_AFTER)"
+else
+  fail "SC-006 no new trace file -- the set of trace-/.jsonl-named files under the feature dir CHANGED (diff: $(diff "$SC006_TRACE_FILES_BEFORE" "$SC006_TRACE_FILES_AFTER" | head -10)) -- render.py must never create a second trace file anywhere in the feature dir"
+fi
+
+if [ -s "$SC006_COST_FILES_AFTER" ]; then
+  fail "SC-006 no cost/spend file -- found $(wc -l < "$SC006_COST_FILES_AFTER" | tr -d ' ') cost-/spend-named file(s) under the feature dir after the render(s), e.g. $(head -n 1 "$SC006_COST_FILES_AFTER") -- render.py's cost is zero and nothing should record otherwise (D28: cost_usd is a field WITHIN traces.jsonl, never a separate ledger)"
+else
+  pass "SC-006 no cost/spend file -- zero cost-/spend-named files anywhere under the feature dir after the render(s) -- the only ledger this repo ever writes is traces.jsonl (D28), and SC-006 proves the render doesn't even touch that"
+fi
+
+# ---------------------------------------------------------------------------
+section "10. SC-010 reinstall-survival + zero-hook seam integrity (FR-012/FR-013)"
+# The guarantee under test (SC-010/FR-012/FR-013): deck-render declares ZERO
+# hooks and makes NO source edit into the council or graphify extensions (its
+# own extension.yml's header comment: "this extension cannot rot the council
+# or graphify trees because it never reaches into them"). This section proves
+# that claim mechanically, mirroring extensions/git/test/run.sh's own §3
+# reinstall-survival model (S17 class) but with the roles reversed: THERE the
+# git extension is the one under test and graphify/council are reinstalled
+# around it; HERE deck-render is the one under test and council/graphify are
+# reinstalled around it -- entirely inside a throwaway sandbox under $TMP,
+# never touching this repo's own .specify/ or .claude/.
+#
+# Five properties, in order:
+#   (1) a baseline ecosystem -- council + graphify installed ONCE into the
+#       sandbox, exactly the "sandbox target with a .specify/extensions.yml
+#       and the payload/skill dirs the installers expect" setup, produced the
+#       same way extensions/git/test/run.sh's §3 produces it: by actually
+#       running the sibling installers, never by hand-authoring extensions.yml
+#       (council's own install.sh writes nothing there by design -- "no
+#       before_* hooks to register" -- so this baseline's extensions.yml
+#       content comes entirely from graphify's merge).
+#   (2) deck-render installs cleanly on TOP of that ecosystem: payload, skill,
+#       and the `installed:` entry all appear, and the installed render.py
+#       resolves as a real, invokable command (`--help` exits 0).
+#   (3) council + graphify are REINSTALLED (the actual regression class this
+#       section exists to catch) -- and deck-render's payload, skill,
+#       `installed:` entry, and command-resolves property all SURVIVE.
+#   (4) FR-012's "seam cannot rot" property: a sha256 manifest of EVERY file
+#       under the extensions/council/ and extensions/graphify/ SOURCE trees
+#       (never the sandbox copies) is snapshotted before step (1) and again
+#       after step (5) below, and asserted byte-identical -- deck-render's
+#       install/reinstall/uninstall dance touches the sandbox only, never the
+#       source trees of the extensions it coexists with.
+#   (5) uninstall.sh round-trips .specify/extensions.yml BYTE-IDENTICALLY to
+#       its pre-deck-render-install snapshot (captured at the end of step 1,
+#       before deck-render ever touched the file) -- proving install-then-
+#       uninstall leaves no residue in the shared registry even after two
+#       foreign extensions wrote into it in between -- and removes the
+#       payload + skill.
+#
+# No require_pptx guard: this is a pure install/uninstall lifecycle property,
+# no python-pptx toolchain involved anywhere (library-independent, like
+# SC-001/SC-005/SC-006/SC-008 above).
+SC010="$TMP/sc010"
+SC010_TARGET="$SC010/target"
+mkdir -p "$SC010_TARGET/.specify" "$SC010_TARGET/.claude/skills"
+
+SC010_COUNCIL_EXT="$REPO/extensions/council"
+SC010_GRAPHIFY_EXT="$REPO/extensions/graphify"
+
+# ---- manifest helper: sha256 of every regular file under one or more
+# LABEL:ROOTDIR arguments, sorted for a stable diffable ordering. Written to a
+# scratch file (never a `python3 -c` one-liner) purely for readability,
+# mirroring the SC-003/SC-002/SC-006 sections' own idiom above -- it never
+# ships (lives only under $TMP).
+SC010_MANIFEST_PY="$SC010/manifest.py"
+cat > "$SC010_MANIFEST_PY" <<'PYEOF'
+#!/usr/bin/env python3
+"""SC-010 source-tree manifest (T034 inline helper).
+
+Recursively hashes every regular file under one or more given root
+directories, printing one line per file: "<sha256>  <label>/<relpath>",
+sorted for a stable, diffable ordering. Used by run.sh's SC-010 section to
+snapshot the extensions/council/ and extensions/graphify/ SOURCE trees before
+and after a deck-render install/reinstall/uninstall dance, and assert
+byte-for-byte that no file anywhere in either tree was added, removed, or
+modified (FR-012's "seam cannot rot" property).
+
+Usage: manifest.py LABEL:ROOTDIR [LABEL:ROOTDIR ...]
+"""
+import hashlib
+import sys
+from pathlib import Path
+
+lines = []
+for arg in sys.argv[1:]:
+    label, root = arg.split(":", 1)
+    root_path = Path(root)
+    for path in sorted(root_path.rglob("*")):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(root_path).as_posix()
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        lines.append("%s  %s/%s" % (digest, label, rel))
+
+lines.sort()
+print("\n".join(lines))
+PYEOF
+
+# ---- BEFORE snapshot: taken before ANY install below runs, so it captures
+# the two source trees exactly as this repo's own working tree has them.
+SC010_MANIFEST_BEFORE="$SC010/manifest-before.txt"
+"$PY" "$SC010_MANIFEST_PY" "council:$SC010_COUNCIL_EXT" "graphify:$SC010_GRAPHIFY_EXT" > "$SC010_MANIFEST_BEFORE"
+
+# ---- (1) baseline ecosystem: council + graphify installed ONCE ------------
+sc010_council_rc1=0
+sh "$SC010_COUNCIL_EXT/install.sh" "$SC010_TARGET" >"$SC010/council-install-1.log" 2>&1 || sc010_council_rc1=$?
+sc010_graphify_rc1=0
+sh "$SC010_GRAPHIFY_EXT/install.sh" "$SC010_TARGET" >"$SC010/graphify-install-1.log" 2>&1 || sc010_graphify_rc1=$?
+
+if [ "$sc010_council_rc1" -eq 0 ] && [ "$sc010_graphify_rc1" -eq 0 ]; then
+  pass "SC-010 setup -- baseline council + graphify install into the throwaway sandbox both exited 0 (see $SC010_TARGET)"
+else
+  fail "SC-010 setup -- baseline council (exit $sc010_council_rc1) or graphify (exit $sc010_graphify_rc1) install failed -- see $SC010/council-install-1.log / $SC010/graphify-install-1.log -- every check below cannot be trusted"
+fi
+
+SC010_EXT_YML="$SC010_TARGET/.specify/extensions.yml"
+SC010_YML_PRE="$SC010/extensions.yml.pre-deck-render"
+if [ -f "$SC010_EXT_YML" ]; then
+  cp "$SC010_EXT_YML" "$SC010_YML_PRE"
+else
+  : > "$SC010_YML_PRE"   # council's own install.sh writes nothing to extensions.yml by design; graphify's merge is what creates the file above
+fi
+
+# ---- (2) install deck-render on top of that ecosystem ---------------------
+SC010_DECK_PAYLOAD="$SC010_TARGET/.specify/extensions/deck-render"
+SC010_DECK_SKILL="$SC010_TARGET/.claude/skills/speckit-deck-render"
+sc010_deck_install_rc=0
+sh "$DECK_EXT/install.sh" "$SC010_TARGET" >"$SC010/deck-install.log" 2>&1 || sc010_deck_install_rc=$?
+
+if [ "$sc010_deck_install_rc" -eq 0 ]; then
+  pass "SC-010 deck-render install -- install.sh exited 0 against the sandbox (see $SC010/deck-install.log)"
+else
+  fail "SC-010 deck-render install -- install.sh exited $sc010_deck_install_rc -- see $SC010/deck-install.log -- survival checks below cannot be trusted"
+fi
+
+if [ -f "$SC010_DECK_PAYLOAD/scripts/render.py" ]; then
+  pass "SC-010 payload present -- .specify/extensions/deck-render/scripts/render.py after install"
+else
+  fail "SC-010 payload MISSING -- .specify/extensions/deck-render/scripts/render.py not found after install"
+fi
+if [ -f "$SC010_DECK_SKILL/SKILL.md" ]; then
+  pass "SC-010 skill present -- .claude/skills/speckit-deck-render/SKILL.md after install"
+else
+  fail "SC-010 skill MISSING -- .claude/skills/speckit-deck-render/SKILL.md not found after install"
+fi
+# `installed:` is the top-level, zero-indent list PyYAML's default_flow_style
+# writer produces (verified against install.sh's own merge output); every
+# nested hook-list item is indented under its hooks:/<hook-name>: key, so an
+# anchored zero-indent match is unambiguous here -- deck-render is never a
+# value anywhere else in the file.
+if grep -q '^- deck-render$' "$SC010_EXT_YML" 2>/dev/null; then
+  pass "SC-010 installed: entry present -- 'deck-render' listed in .specify/extensions.yml's installed: list after install"
+else
+  fail "SC-010 installed: entry MISSING -- 'deck-render' not found in .specify/extensions.yml's installed: list after install"
+fi
+if "$PY" "$SC010_DECK_PAYLOAD/scripts/render.py" --help >"$SC010/render-help-1.log" 2>&1; then
+  pass "SC-010 command resolves -- the installed render.py --help exits 0 right after install (see $SC010/render-help-1.log)"
+else
+  fail "SC-010 command does not resolve -- the installed render.py --help failed right after install -- see $SC010/render-help-1.log"
+fi
+
+# ---- (3) THE regression: reinstall council + graphify, then re-check ------
+sc010_council_rc2=0
+sh "$SC010_COUNCIL_EXT/install.sh" "$SC010_TARGET" >"$SC010/council-install-2.log" 2>&1 || sc010_council_rc2=$?
+sc010_graphify_rc2=0
+sh "$SC010_GRAPHIFY_EXT/install.sh" "$SC010_TARGET" >"$SC010/graphify-install-2.log" 2>&1 || sc010_graphify_rc2=$?
+
+if [ "$sc010_council_rc2" -eq 0 ] && [ "$sc010_graphify_rc2" -eq 0 ]; then
+  pass "SC-010 reinstall -- council + graphify install.sh both exited 0 a SECOND time against the same sandbox (the S17 reinstall-survival class)"
+else
+  fail "SC-010 reinstall -- council (exit $sc010_council_rc2) or graphify (exit $sc010_graphify_rc2) reinstall failed -- see $SC010/council-install-2.log / $SC010/graphify-install-2.log -- survival checks below cannot be trusted"
+fi
+
+if [ -f "$SC010_DECK_PAYLOAD/scripts/render.py" ]; then
+  pass "SC-010 payload SURVIVED council + graphify reinstall"
+else
+  fail "SC-010 payload WIPED by council + graphify reinstall -- the S17 hazard, FR-012"
+fi
+if [ -f "$SC010_DECK_SKILL/SKILL.md" ]; then
+  pass "SC-010 skill SURVIVED council + graphify reinstall"
+else
+  fail "SC-010 skill WIPED by council + graphify reinstall -- the S17 hazard, FR-012"
+fi
+if grep -q '^- deck-render$' "$SC010_EXT_YML" 2>/dev/null; then
+  pass "SC-010 installed: entry SURVIVED council + graphify reinstall"
+else
+  fail "SC-010 installed: entry LOST after council + graphify reinstall -- the S17 hazard, FR-012"
+fi
+if "$PY" "$SC010_DECK_PAYLOAD/scripts/render.py" --help >"$SC010/render-help-2.log" 2>&1; then
+  pass "SC-010 command SURVIVED reinstall -- the installed render.py --help still exits 0 after council + graphify reinstall (see $SC010/render-help-2.log)"
+else
+  fail "SC-010 command no longer resolves -- the installed render.py --help failed after council + graphify reinstall -- see $SC010/render-help-2.log"
+fi
+
+# ---- (5) uninstall deck-render; byte-identical registry round-trip --------
+sc010_deck_uninstall_rc=0
+sh "$DECK_EXT/uninstall.sh" "$SC010_TARGET" >"$SC010/deck-uninstall.log" 2>&1 || sc010_deck_uninstall_rc=$?
+
+if [ "$sc010_deck_uninstall_rc" -eq 0 ]; then
+  pass "SC-010 deck-render uninstall -- uninstall.sh exited 0 (see $SC010/deck-uninstall.log)"
+else
+  fail "SC-010 deck-render uninstall -- uninstall.sh exited $sc010_deck_uninstall_rc -- see $SC010/deck-uninstall.log -- round-trip checks below cannot be trusted"
+fi
+
+if cmp -s "$SC010_YML_PRE" "$SC010_EXT_YML"; then
+  pass "SC-010 byte-identical round-trip -- .specify/extensions.yml after uninstall is BYTE-IDENTICAL to its pre-deck-render-install snapshot ($(wc -c < "$SC010_YML_PRE" | tr -d ' ') bytes) -- install-then-uninstall leaves no residue in the shared registry even after two foreign extensions wrote into it in between"
+else
+  fail "SC-010 byte-identical round-trip -- .specify/extensions.yml after uninstall DIFFERS from its pre-deck-render-install snapshot (diff: $(diff "$SC010_YML_PRE" "$SC010_EXT_YML" | head -10))"
+fi
+if [ -d "$SC010_DECK_PAYLOAD" ]; then
+  fail "SC-010 payload NOT removed -- .specify/extensions/deck-render/ still present after uninstall"
+else
+  pass "SC-010 payload removed -- .specify/extensions/deck-render/ absent after uninstall"
+fi
+if [ -d "$SC010_DECK_SKILL" ]; then
+  fail "SC-010 skill NOT removed -- .claude/skills/speckit-deck-render/ still present after uninstall"
+else
+  pass "SC-010 skill removed -- .claude/skills/speckit-deck-render/ absent after uninstall"
+fi
+
+# ---- (4) FR-012: the two SOURCE trees are byte-for-byte untouched ---------
+# Taken AFTER the whole dance (baseline install, deck-render install,
+# reinstall, uninstall) -- the strongest available window, since it covers
+# every filesystem-mutating step this section runs, not just the reinstall.
+SC010_MANIFEST_AFTER="$SC010/manifest-after.txt"
+"$PY" "$SC010_MANIFEST_PY" "council:$SC010_COUNCIL_EXT" "graphify:$SC010_GRAPHIFY_EXT" > "$SC010_MANIFEST_AFTER"
+
+if cmp -s "$SC010_MANIFEST_BEFORE" "$SC010_MANIFEST_AFTER"; then
+  pass "SC-010 source trees untouched -- sha256 manifest of every file under extensions/council/ and extensions/graphify/ (SOURCE, never the sandbox copies) is byte-identical before vs. after the whole install/reinstall/uninstall dance -- FR-012's 'seam cannot rot' property"
+else
+  fail "SC-010 source trees MODIFIED -- the sha256 manifest of extensions/council/ and/or extensions/graphify/ changed across the dance (diff: $(diff "$SC010_MANIFEST_BEFORE" "$SC010_MANIFEST_AFTER" | head -10)) -- deck-render's install/reinstall/uninstall must never write into another extension's source tree (FR-012)"
+fi
+
+# ---------------------------------------------------------------------------
+section "11. S11 co-install -- realistic multi-extension installed: list survives a round-trip (FR-012/FR-013)"
+# The guarantee under test (S11, plan.md's SC-010 paragraph): the
+# `.specify/extensions.yml` `installed:` list is a SHARED-mutation point --
+# every extension's install.sh/uninstall.sh merges into the SAME file, and
+# deck-render's own install.sh header comments name this merge point as
+# otherwise un-instrumented. SC-010 above already proves deck-render
+# SURVIVES being reinstalled AROUND BY council/graphify; this section proves
+# the reverse direction: deck-render's OWN install/uninstall, run against a
+# manifest that ALREADY carries several other extensions' entries, never
+# disturbs, reorders, or corrupts what was there first.
+#
+# The baseline is not a hand-authored fixture -- it is a byte-for-byte COPY
+# of THIS repo's own real .specify/extensions.yml (opened for reading
+# exactly once, to make the copy; never written to), the actual "graphify +
+# git + workforce + testing" installed state a real checkout of this repo
+# carries today -- a realistic combined manifest, not an invented one (the
+# same reason SC-003/SC-002 above read fixtures from $FIXTURES rather than
+# inlining invented markdown). Everything else happens in a throwaway
+# sandbox under $TMP.
+#
+# No require_pptx guard: this is a pure registry-merge lifecycle property,
+# no python-pptx toolchain involved anywhere -- library-independent, like
+# SC-001/SC-005/SC-006/SC-008/SC-010 above, so it PASSES on this host.
+S11="$TMP/s11"
+S11_TARGET="$S11/target"
+mkdir -p "$S11_TARGET/.specify"
+
+S11_REAL_EXT_YML="$REPO/.specify/extensions.yml"
+S11_EXT_YML="$S11_TARGET/.specify/extensions.yml"
+
+if [ -f "$S11_REAL_EXT_YML" ]; then
+  cp "$S11_REAL_EXT_YML" "$S11_EXT_YML"
+  pass "S11 setup -- combined baseline manifest copied from this repo's own .specify/extensions.yml (read-only source) into the throwaway sandbox"
+else
+  : > "$S11_EXT_YML"   # keep the rest of this section running on an (empty) file rather than crashing the whole suite
+  fail "S11 setup -- this repo's own .specify/extensions.yml is missing -- cannot build a realistic combined baseline; every check below cannot be trusted"
+fi
+
+# ---- (1) snapshot the combined baseline, BEFORE deck-render ever touches it
+S11_YML_PRE="$S11/extensions.yml.pre-deck-render"
+cp "$S11_EXT_YML" "$S11_YML_PRE"
+
+# `installed:` is the top-level, zero-indent list (see SC-010's own note
+# above); every foreign extension id this repo's real manifest lists today
+# must be present in the baseline for this to be a REALISTIC co-install
+# fixture, per S11's own requirement (at least graphify, git, workforce,
+# testing).
+s11_missing_baseline=""
+for s11_ext in graphify git workforce testing; do
+  if ! grep -q "^- ${s11_ext}\$" "$S11_YML_PRE"; then
+    s11_missing_baseline="$s11_missing_baseline $s11_ext"
+  fi
+done
+if [ -z "$s11_missing_baseline" ]; then
+  pass "S11 baseline realism -- the combined manifest's installed: list already carries graphify, git, workforce, and testing (this repo's real co-install state) before deck-render is ever installed"
+else
+  fail "S11 baseline realism --$s11_missing_baseline missing from the copied manifest's installed: list -- this repo's own .specify/extensions.yml no longer matches the S11 baseline this test assumes"
+fi
+
+# The pre-existing installed: entries, in order -- extracted once here so
+# both the install-time and uninstall-time assertions below compare against
+# the SAME expected ordering, never a second, drift-prone re-derivation.
+S11_PRE_INSTALLED="$S11/installed-pre.txt"
+awk '/^installed:$/ { flag=1; next } /^[^ -]/ { flag=0 } flag' "$S11_YML_PRE" > "$S11_PRE_INSTALLED"
+
+# ---- (2) install deck-render on top of the combined baseline --------------
+S11_INSTALL_LOG="$S11/install.log"
+s11_install_rc=0
+sh "$DECK_EXT/install.sh" "$S11_TARGET" >"$S11_INSTALL_LOG" 2>&1 || s11_install_rc=$?
+
+if [ "$s11_install_rc" -eq 0 ]; then
+  pass "S11 install -- deck-render's install.sh exited 0 against the combined multi-extension sandbox (see $S11_INSTALL_LOG)"
+else
+  fail "S11 install -- deck-render's install.sh exited $s11_install_rc against the combined multi-extension sandbox -- see $S11_INSTALL_LOG -- checks below cannot be trusted"
+fi
+
+if grep -q '^- deck-render$' "$S11_EXT_YML" 2>/dev/null; then
+  pass "S11 installed: entry added -- 'deck-render' now listed in the combined manifest's installed: list"
+else
+  fail "S11 installed: entry MISSING -- 'deck-render' not found in the combined manifest's installed: list after install"
+fi
+
+# The pre-existing entries survive, IN ORDER, with deck-render appended as
+# the sole new entry -- never reordered, dropped, or duplicated.
+S11_EXPECTED_POST_INSTALLED="$S11/installed-post-expected.txt"
+cat "$S11_PRE_INSTALLED" > "$S11_EXPECTED_POST_INSTALLED"
+printf -- '- deck-render\n' >> "$S11_EXPECTED_POST_INSTALLED"
+S11_POST_INSTALLED="$S11/installed-post-actual.txt"
+awk '/^installed:$/ { flag=1; next } /^[^ -]/ { flag=0 } flag' "$S11_EXT_YML" > "$S11_POST_INSTALLED" 2>/dev/null || : > "$S11_POST_INSTALLED"
+
+if cmp -s "$S11_EXPECTED_POST_INSTALLED" "$S11_POST_INSTALLED"; then
+  pass "S11 install doesn't disturb others -- every pre-existing installed: entry (graphify, git, workforce, testing) is present in the SAME order after install, with deck-render appended as the sole new line"
+else
+  fail "S11 install DISTURBED the pre-existing installed: entries -- expected [$(tr '\n' ' ' < "$S11_EXPECTED_POST_INSTALLED")] but got [$(tr '\n' ' ' < "$S11_POST_INSTALLED")]"
+fi
+
+# The strongest form of the same claim, at the whole-FILE level rather than
+# just the installed: block: a diff between the pre-install snapshot and the
+# post-install file must show EXACTLY one added line (deck-render's row) and
+# ZERO removed/changed lines anywhere else in the file -- hooks: blocks,
+# settings:, every other extension's rows included. This is what "byte-for-
+# byte unchanged except for the single added line" (this task's own wording)
+# means mechanically: not merely that the installed: list still contains the
+# same ids, but that no other byte in the file moved.
+S11_INSTALL_DIFF="$S11/diff-after-install.txt"
+diff "$S11_YML_PRE" "$S11_EXT_YML" > "$S11_INSTALL_DIFF" 2>&1 || true
+S11_ADDED="$S11/diff-added.txt"
+S11_REMOVED="$S11/diff-removed.txt"
+grep '^> ' "$S11_INSTALL_DIFF" > "$S11_ADDED" 2>/dev/null || : > "$S11_ADDED"
+grep '^< ' "$S11_INSTALL_DIFF" > "$S11_REMOVED" 2>/dev/null || : > "$S11_REMOVED"
+s11_added_count=$(wc -l < "$S11_ADDED" | tr -d ' ')
+s11_removed_count=$(wc -l < "$S11_REMOVED" | tr -d ' ')
+
+if [ "$s11_removed_count" -eq 0 ] && [ "$s11_added_count" -eq 1 ] && grep -q '^> - deck-render$' "$S11_INSTALL_DIFF"; then
+  pass "S11 whole-file diff -- install added EXACTLY one line ('- deck-render') and changed/removed NOTHING else in the file (0 removed, 1 added) -- the shared installed:-merge point left every other extension's hooks/rows byte-for-byte untouched"
+else
+  fail "S11 whole-file diff -- install's diff against the pre-install snapshot shows $s11_removed_count removed line(s) and $s11_added_count added line(s), not the expected 0 removed / 1 added -- see $S11_INSTALL_DIFF"
+fi
+
+# ---- (3) uninstall deck-render; the combined manifest round-trips ---------
+S11_UNINSTALL_LOG="$S11/uninstall.log"
+s11_uninstall_rc=0
+sh "$DECK_EXT/uninstall.sh" "$S11_TARGET" >"$S11_UNINSTALL_LOG" 2>&1 || s11_uninstall_rc=$?
+
+if [ "$s11_uninstall_rc" -eq 0 ]; then
+  pass "S11 uninstall -- deck-render's uninstall.sh exited 0 against the combined multi-extension sandbox (see $S11_UNINSTALL_LOG)"
+else
+  fail "S11 uninstall -- deck-render's uninstall.sh exited $s11_uninstall_rc -- see $S11_UNINSTALL_LOG -- the round-trip check below cannot be trusted"
+fi
+
+if cmp -s "$S11_YML_PRE" "$S11_EXT_YML"; then
+  pass "S11 byte-identical round-trip -- the combined manifest after uninstall is BYTE-IDENTICAL to its pre-deck-render-install snapshot ($(wc -c < "$S11_YML_PRE" | tr -d ' ') bytes) -- graphify/git/workforce/testing's entries are perfectly restored, undisturbed by deck-render's own install-then-uninstall"
+else
+  fail "S11 byte-identical round-trip -- the combined manifest after uninstall DIFFERS from its pre-deck-render-install snapshot (diff: $(diff "$S11_YML_PRE" "$S11_EXT_YML" | head -10))"
+fi
+
 report
