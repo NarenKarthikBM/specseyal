@@ -28,7 +28,7 @@ The skill/script split matches `/speckit-git-cleanup` → `cleanup.sh`: the mode
 | *(none)* | Render exactly what the feature's `profile.yaml` selects (`deck_render`). Absent or `none` ⇒ render nothing, exit 0. |
 | `technical` \| `overview` \| `both` | **Explicit selection — overrides the profile entirely** (FR-016), including when the profile says `none`. Config declares what the pipeline does on its own; an explicit human invocation is an explicit act. |
 | `--feature <dir>` | Target a specific feature directory. Defaults to the active feature (`.specify/feature.json`, then the current branch). Enables the I-6 lineage: render a past feature's overview without rewriting its settled profile. |
-| `--validate-profile` | Validate the profile's `deck_render` key and exit. Renders nothing. Exit 0 = valid (including absent); exit 3 = out-of-enum. |
+| `--validate-profile` | Validate the profile's `deck_render` key and exit. Renders nothing. Exit 0 = valid (including absent); exit 3 = out-of-enum **or unreadable/unparseable YAML** (plan I-B1). |
 
 **The boundary is unchanged by an explicit invocation.** A deck rendered via an explicit argument is still derived, still un-bound, still un-traced, still gitignored (FR-001, FR-014).
 
@@ -39,6 +39,7 @@ The skill/script split matches `/speckit-git-cleanup` → `cleanup.sh`: the mode
 1. **Resolve the feature directory** — `--feature`, else `.specify/feature.json`, else the current branch.
 2. **Resolve the selection** — explicit argument (§1) wins; else `profile.yaml`'s `deck_render`; else `none`.
    - An **out-of-enum** `deck_render` is a hard failure: **exit 3**, nothing rendered, nothing written (FR-006, SC-008). It never degrades to `none`.
+   - An **unreadable/unparseable `profile.yaml`** (bad YAML) is likewise a hard failure: **exit 3**, nothing written (plan I-B1). It is **not** folded into the `none` branch — the worse malformed-input signal must not route to the quieter outcome (SC-008).
 3. **`none` ⇒ exit 0 immediately.** No file, no output beyond a one-line "nothing selected" notice. This is the default path, and it must be indistinguishable from the feature not existing (SC-001).
 4. **For each selected deck:**
    a. If the source markdown is absent ⇒ **`skipped`**, not an error (O4). The council phase has not run.
@@ -88,7 +89,7 @@ Following the repo's script exit-code convention (workforce's `assemble.py` / `v
 |---|---|
 | `0` | Success — every selected deck rendered, **or** nothing was selected, **or** a deck was skipped because its markdown is absent. |
 | `2` | **Partial** — at least one deck rendered, at least one failed (`both` only). Disclosed per deck. |
-| `3` | **Invalid input** — out-of-enum `deck_render` (SC-008), or an unresolvable feature directory. Nothing written. |
+| `3` | **Invalid input** — out-of-enum `deck_render` (SC-008), an **unreadable/unparseable `profile.yaml`** (bad YAML — plan I-B1; never degrades to `none`), or an unresolvable feature directory. Nothing written. |
 | `4` | **All selected renders failed** — e.g. the toolchain is absent. Nothing written. Disclosed. |
 
 **No non-zero exit from this command blocks anything** (I5). The codes are for the human and for the test harness; no pipeline phase reads them. This is the deliberate difference from `verify-gate.sh`, whose non-zero exit *is* a hard block.

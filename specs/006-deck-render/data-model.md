@@ -20,14 +20,16 @@ The per-feature render selector, admitted to `profile.yaml` by amendment (`profi
 | V2 | An **out-of-enum** value is a hard failure: non-zero exit, nothing rendered, nothing written. It **never** falls back to `none`. | FR-006, SC-008 |
 | V3 | A `deck_render` key that is a mapping, list, or empty is out-of-enum ⇒ V2. | FR-005 |
 | V4 | `deck_render` is a **default selection, not a hard gate.** An explicit deck argument renders that deck regardless of the profile's value — including when the profile says `none`. | FR-016 |
+| V5 | An **unreadable/unparseable** `profile.yaml` (bad YAML — a merge-conflict marker, a stray tab) is a **hard failure**: non-zero exit (**exit 3**, `contracts/commands.md` §4), nothing rendered, nothing written. It is **never** folded into the absent/`none` branch — routing the *worse* malformed-input signal to the *quieter* outcome is exactly what SC-008 forbids. | FR-006, SC-008, plan I-B1 |
 
-**Scope of enforcement (the honest boundary — see research.md R4).** V1–V4 are enforced by the deck-render extension when it reads the profile. No general `profile.yaml` validator exists in this repo, so a malformed `deck_render` is caught at **render time**, not at profile-author time. The remaining keys (`full_auto`, `gates.*`, `council_tier`) are **not** validated by this feature and remain as unenforced as they are today.
+**Scope of enforcement (the honest boundary — see research.md R4).** V1–V5 are enforced by the deck-render extension when it reads the profile. No general `profile.yaml` validator exists in this repo, so a malformed `deck_render` is caught at **render time**, not at profile-author time. The remaining keys (`full_auto`, `gates.*`, `council_tier`) are **not** validated by this feature and remain as unenforced as they are today.
 
 **Resolution ladder** (deliberately shorter than `council_tier`'s):
 
 1. An explicit deck argument on the command line ⇒ **that deck** (V4). The profile is not consulted for selection.
 2. Else `profile.yaml`'s `deck_render`, validated per V2/V3.
-3. Else (file absent, unreadable, or key absent) ⇒ **`none`**.
+3. Else, if the profile is **absent** or is present-and-parseable but names **no `deck_render` key** ⇒ **`none`** (V1).
+4. But an **unparseable** profile (bad YAML) is *not* an absent one: it is a **hard failure per V5**, never `none`. Absence is a silence; a corrupt file is a signal, and it must not be routed to the quiet default.
 
 There is deliberately **no repo-global config fallback**. `council_tier` has one (`council-config.yml`); `deck_render` must not, because `profile-schema.md` §6 forbids a repo-level default profile, and FR-006's "absent ⇒ `none`" already gives the safe default directly. A repo-global `deck_render: both` would render decks for features that never asked — the exact thing US2 exists to prevent.
 
