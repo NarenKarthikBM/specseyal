@@ -1,0 +1,25 @@
+# Fixture: UNPARSEABLE YAML branch (V5) -- distinct from invalid.yaml.
+# This file must NOT parse as YAML at all: a git merge-conflict marker left in
+# place corrupts the document structure so yaml.safe_load() raises before any
+# deck_render value could even be inspected. profile_key.py's _probe_yaml()
+# catches the parse exception and reports status "parse_error"; _decide()
+# raises ProfileKeyError (exit 3) via the branch-3 path -- never routed to the
+# quieter absent/'none' outcome (SC-008).
+schema_version: "1.0"
+feature: "006-deck-render-fixture-unreadable"
+
+full_auto: false
+council_tier: standard
+<<<<<<< HEAD
+deck_render: none
+=======
+deck_render: both
+>>>>>>> feature-branch
+
+gates:
+  council:
+    mode: human
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: human

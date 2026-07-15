@@ -1,0 +1,19 @@
+# Fixture: deck_render explicit 'none' branch (V1, explicit form).
+# Resolver: profile_key.py branch 3 ("parsed" + present + in-enum) -> resolves to 'none'.
+# Distinct from absent-key.yaml, which reaches the same 'none' value via the
+# ABSENT branch (branch 1) instead -- this fixture proves the explicit spelling
+# also lands correctly, not just the silent default.
+schema_version: "1.0"
+feature: "006-deck-render-fixture-none"
+
+full_auto: false
+council_tier: standard
+deck_render: none            # renders nothing; explicit, not the absent default.
+
+gates:
+  council:
+    mode: human
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: human

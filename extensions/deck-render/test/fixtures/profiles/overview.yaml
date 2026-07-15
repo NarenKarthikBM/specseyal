@@ -1,0 +1,16 @@
+# Fixture: deck_render 'overview' branch.
+# Resolver: profile_key.py branch 3 ("parsed" + present + in-enum) -> resolves to 'overview'.
+schema_version: "1.0"
+feature: "006-deck-render-fixture-overview"
+
+full_auto: false
+council_tier: standard
+deck_render: overview        # renders only the overview defense deck.
+
+gates:
+  council:
+    mode: human
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: human

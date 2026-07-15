@@ -1,0 +1,21 @@
+# Fixture: deck_render OUT-OF-ENUM branch (V2/V3) -- distinct from unreadable.yaml.
+# This file is valid, parseable YAML. It PARSES cleanly, but its deck_render
+# scalar ('sparkle') is not one of the closed enum {none, technical, overview,
+# both}. profile_key.py's _decide() reaches the "parsed" status, finds the key
+# present with a str value, but the value is outside DECK_RENDER_ENUM -- so it
+# raises ProfileKeyError (exit 3). It must NEVER be confused with a YAML syntax
+# failure (see unreadable.yaml for that, genuinely-different, branch).
+schema_version: "1.0"
+feature: "006-deck-render-fixture-invalid"
+
+full_auto: false
+council_tier: standard
+deck_render: sparkle         # out-of-enum: not none|technical|overview|both.
+
+gates:
+  council:
+    mode: human
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: human

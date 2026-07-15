@@ -1,0 +1,20 @@
+# Fixture: ABSENT-KEY branch (V1, silent form) -- distinct from none.yaml.
+# This file is valid, parseable YAML with NO deck_render key at all. It
+# exercises the same 'none' resolution as none.yaml but via profile_key.py's
+# branch 1 (present-and-parseable, key absent) rather than branch 3
+# (present, in-enum, value == 'none'). Two different code paths reaching the
+# same value -- both must be proven independently.
+schema_version: "1.0"
+feature: "006-deck-render-fixture-absent-key"
+
+full_auto: false
+council_tier: standard
+# deck_render intentionally omitted -- resolves to the default ('none').
+
+gates:
+  council:
+    mode: human
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: human

@@ -1,0 +1,16 @@
+# Fixture: deck_render 'both' branch.
+# Resolver: profile_key.py branch 3 ("parsed" + present + in-enum) -> resolves to 'both'.
+schema_version: "1.0"
+feature: "006-deck-render-fixture-both"
+
+full_auto: false
+council_tier: full
+deck_render: both            # renders technical and overview defense decks.
+
+gates:
+  council:
+    mode: human
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: human
