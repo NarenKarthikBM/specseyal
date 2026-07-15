@@ -44,7 +44,7 @@ The skill/script split matches `/speckit-git-cleanup` → `cleanup.sh`: the mode
 4. **For each selected deck:**
    a. If the source markdown is absent ⇒ **`skipped`**, not an error (O4). The council phase has not run.
    b. Compute the source's **sha256** (content hash, of the bytes as they exist now).
-   c. **Remove any existing target render** before attempting, so a failure can never leave a stale file to be mistaken for fresh output (O5).
+   c. **Write atomically — never pre-delete the target.** `render.py` writes the new render to a temp file in the target directory, then `os.replace()`s it into `renders/<deck>.pptx` only on full success (plan I-B3). No existing target is removed up front: if the attempt fails at any point, a prior good render at that path is left completely untouched, never a partial or missing file (O5).
    d. Lazily `import pptx`. **`ImportError` ⇒ `failed (toolchain absent)`** — degrade and disclose, do not halt (FR-015).
    e. Transform per the deterministic rules (data-model.md §4) and write `renders/<deck>.pptx`.
    f. Any other failure ⇒ **`failed (<reason>)`**. Never a partial or "fixed-up" file.
@@ -87,12 +87,25 @@ Following the repo's script exit-code convention (workforce's `assemble.py` / `v
 
 | Code | Meaning |
 |---|---|
-| `0` | Success — every selected deck rendered, **or** nothing was selected, **or** a deck was skipped because its markdown is absent. |
-| `2` | **Partial** — at least one deck rendered, at least one failed (`both` only). Disclosed per deck. |
+| `0` | Success — every selected deck rendered, **or** nothing was selected, **or** every selected deck that lacked source markdown was skipped (skip is not a failure). |
+| `2` | **Partial** — at least one selected deck rendered or was skipped, and at least one other selected deck failed (`both` only). Disclosed per deck. |
 | `3` | **Invalid input** — out-of-enum `deck_render` (SC-008), an **unreadable/unparseable `profile.yaml`** (bad YAML — plan I-B1; never degrades to `none`), or an unresolvable feature directory. Nothing written. |
-| `4` | **All selected renders failed** — e.g. the toolchain is absent. Nothing written. Disclosed. |
+| `4` | **All selected decks that had a render attempted failed** — e.g. the toolchain is absent. Nothing written. Disclosed. |
 
 **No non-zero exit from this command blocks anything** (I5). The codes are for the human and for the test harness; no pipeline phase reads them. This is the deliberate difference from `verify-gate.sh`, whose non-zero exit *is* a hard block.
+
+### The `both` outcome matrix (I-B4)
+
+Under `deck_render: both`, two per-deck outcomes combine. Order does not matter — `technical` and `overview` are interchangeable in this table. All six unordered pairs of `{rendered, failed, skipped}` are mapped; none is left to whatever `render.py` happens to do.
+
+| Deck A | Deck B | Exit | Why |
+|---|---|---|---|
+| `rendered` | `rendered` | `0` | Both selected decks rendered. |
+| `rendered` | `failed` | `2` | Partial — one succeeded, one failed. |
+| `rendered` | `skipped` | `0` | A skip is not a failure — one deck rendered, the other simply had no source markdown yet (O4). |
+| `failed` | `failed` | `4` | Every selected deck that was attempted failed. |
+| `failed` | `skipped` | `2` | **Partial**, treated exactly like `rendered`+`failed` — a skip never counts toward "all attempted renders failed," so this is never exit `4`. |
+| `skipped` | `skipped` | `0` | Neither selected deck has source markdown yet. Nothing was attempted and nothing failed. |
 
 ---
 

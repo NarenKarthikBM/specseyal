@@ -1,0 +1,43 @@
+schema_version: "1.0"
+
+extension:
+  id: deck-render
+  name: "Defense Deck pptx Render"
+  version: "0.1.0"
+  description: "Optional, on-demand pptx render of a council defense deck's markdown for human review. A deterministic, model-free transform (no AI role, no traces.jsonl record, FR-011): reads council/defense-deck/{technical,overview}.md as they exist at invocation time and writes renders/*.pptx (gitignored, never gate-bound, FR-014). Default-off via the profile.yaml `deck_render` key; a render failure degrades and discloses per-deck rather than blocking the council gate (FR-009/FR-010). Interim-by-design (D15's deferral clause landing early), superseded cheaply by the M5 platform gate view."
+  author: narenkarthikbm
+  license: MIT
+
+requires:
+  speckit_version: ">=0.2.0"
+
+provides:
+  commands:
+    - name: speckit.deck-render
+      file: commands/speckit.deck-render.md
+      description: "Standalone, on-demand render of the selected defense deck(s) to .pptx — the profile's `deck_render` selection by default, or an explicit deck argument overriding it regardless of profile (FR-016); renders whatever markdown exists at invocation time, so staleness is structurally rather than procedurally avoided (FR-008)"
+
+# ── Hooks ────────────────────────────────────────────────────────────────────
+# Deliberately NO `hooks:` key on this manifest — this extension registers ZERO
+# hooks (FR-008/FR-012). The render is triggered exclusively by the standalone,
+# on-demand `speckit.deck-render` command above; it is never wired into any
+# pipeline phase's execution. The registered hook set cannot serve the council
+# gate anyway (`after_plan` fires before the deck exists, `after_council_approve`
+# fires after the human has already signed), and adding a new `after_council`
+# seam would require a source edit into the council extension's installer-
+# overwritten tree — exactly what FR-012 (D57, artifact-layout.md §9) forbids:
+# cross-extension coupling attaches at a hook point, never a source edit into
+# another extension's tree. Zero hooks is the strongest available form of that
+# rule: this extension cannot rot the council or graphify trees because it never
+# reaches into them, which keeps it disjoint from 005's concurrent rewrite of
+# both by construction, not by luck (SC-010). install.sh still runs the standard
+# manifest-driven hook merge against whatever this key holds (none today), so a
+# hook, if one is ever deliberately added later, would register with zero
+# installer changes — but none is added here, and none should be.
+
+tags:
+  - "deck-render"
+  - "pptx"
+  - "presentation"
+  - "on-demand"
+  - "zero-hook"

@@ -5,6 +5,7 @@ feature: "000-sample"
 
 full_auto: false
 council_tier: full
+deck_render: none            # renders nothing; the default (D73(3), profile-schema.md 1.2).
 
 gates:
   council:

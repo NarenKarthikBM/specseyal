@@ -17,3 +17,7 @@ node_modules/
 # workforce installer flock target (install.sh S06): a persistent, empty lock
 # handle re-flocked by every reinstall — a runtime artifact, never meaningful state.
 .specify/extensions.yml.lock
+
+# rendered defense decks are derived build products, never the artifact of
+# record (FR-014); SC-005 asserts git ls-files returns none.
+specs/*/renders/

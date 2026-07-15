@@ -24,7 +24,7 @@ Single project, `extensions/` layout (plan.md §Project Structure). The entire f
 
 **Purpose**: Scaffold the zero-hook extension and land the contract amendments that admit the `deck_render` key. Plan Phase A: "must land first; everything else depends on the key existing."
 
-- [ ] **T001** Scaffold the extension tree `extensions/deck-render/` (dirs: `extension/{commands,scripts}`, `skills/speckit-deck-render/`, `test/fixtures/`) and author `extensions/deck-render/README.md` describing the feature, the zero-hook seam (FR-008/FR-012), and the optional/lazy `python-pptx` posture (FR-015).
+- [X] **T001** Scaffold the extension tree `extensions/deck-render/` (dirs: `extension/{commands,scripts}`, `skills/speckit-deck-render/`, `test/fixtures/`) and author `extensions/deck-render/README.md` describing the feature, the zero-hook seam (FR-008/FR-012), and the optional/lazy `python-pptx` posture (FR-015).
 - [ ] **T002** [P] Author `extensions/deck-render/extension/extension.yml` — the manifest declaring **zero hooks** (R8/FR-012), following the `extensions/testing/extension/extension.yml` precedent.
 - [ ] **T003** [P] Author `extensions/deck-render/install.sh` — copies payload → `.specify/extensions/deck-render/`, skill → `.claude/skills/`, and registers in `.specify/extensions.yml`'s `installed:` list using **`testing`'s flock + tempfile + `os.replace` atomic merge** (NOT git's unlocked write). Never requires `python-pptx`.
 - [ ] **T004** [P] Author `extensions/deck-render/uninstall.sh` — **deregister from `installed:` FIRST**, then remove payload + skill; must round-trip `.specify/extensions.yml` byte-identically (the `testing` model; verified by T034).

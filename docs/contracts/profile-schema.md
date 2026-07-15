@@ -1,7 +1,7 @@
 # Contract — `profile.yaml` (autonomy profile)
 
-> **Status:** 1.1 (M0, amended 2026-07-10 by **D56**). Normative.
-> **Implements:** D8 (per-feature automation posture), D9 (two gate-capable checkpoints), D13, D14, D33, **D56** (council ceremony tier).
+> **Status:** 1.2 (M0, amended 2026-07-15 by **D73(3)** / `006-deck-render` FR-005 — admits `deck_render`). Normative.
+> **Implements:** D8 (per-feature automation posture), D9 (two gate-capable checkpoints), D13, D14, D33, **D56** (council ceremony tier), **D73(3)** (per-deck render selector).
 > **Location:** `specs/NNN-feature/profile.yaml` — one per feature.
 
 A profile declares, for one feature, which pipeline checkpoints stop for a human. v1 has exactly two gate-capable checkpoints (D9): the **council gate** (post-plan) and the **workforce gate** (post-tasks + agent assignment, before implementation spends tokens). Nothing else is gateable, and adding a third gate is a decision, not a config change.
@@ -18,6 +18,9 @@ full_auto: false             # required. See §2 — the safety handshake.
 
 council_tier: full           # optional, default full (D56). full | standard.
                              # Selects the council-phase ceremony (see §7).
+
+deck_render: none            # optional, default none (D73(3)). none | technical | overview | both.
+                             # Selects which defense-deck(s) get a derived pptx render (see §8).
 
 gates:                       # required
   council:                   # required
@@ -52,6 +55,7 @@ P2 ∧ P3 ⟹ `full_auto: true` ⟺ both gates `auto`. The field is therefore re
 | `feature` | string | — | Required. Must equal the directory name. A profile that names another feature is invalid — this catches copy-paste. |
 | `full_auto` | bool | `false` | §2. |
 | `council_tier` | enum | `full` | `full` \| `standard` (D56). Selects the council-phase ceremony — §7. Absent ⇒ `full`, resolved against `council-config.yml`'s own `council_tier` default. Not a gate mode and not a model override (§6): it changes how many council sessions run and how they load context, never who signs or which model runs (D18 stays global). |
+| `deck_render` | enum scalar | `none` | One of `none` \| `technical` \| `overview` \| `both` (D73(3)); out-of-enum ⇒ **validation error**, never a silent fallback to `none` — §8. **Default selection, not a gate**: an explicit render-command deck argument overrides it in either direction, including overriding a profile's `none`. |
 | `gates.council.mode` | enum | `human` | `human` \| `auto`. |
 | `gates.council.max_rounds` | int | `1` | v1: must be `1`. The field exists so profiles that allow a second full round (docs/10 §5, "later") need no schema change. Validators reject `> 1` until the convergence rule is revised. |
 | `gates.council.reopen_tier` | enum | `auto` | `auto` \| `delta` \| `full` (D14). `auto` = triage proposes, human gate confirms. `delta`/`full` pin the tier and skip the proposal. Pinning `delta` with `gates.council.mode: auto` means a reopened plan never sees a human — allowed only under `full_auto`. |
@@ -82,6 +86,7 @@ feature: "000-sample"
 
 full_auto: false
 council_tier: full            # the fullest review; the default (D56).
+deck_render: none             # no pptx render requested; the default (D73(3)).
 
 gates:
   council:
@@ -104,6 +109,7 @@ feature: "014-dependency-bump"
 
 full_auto: true
 council_tier: standard        # a mechanical bump has little to defend — the cheap tier fits.
+deck_render: overview         # the human gate is reachable from a phone via the rendered overview (D21).
 
 gates:
   council:
@@ -140,3 +146,28 @@ Rules:
 | T4 | **Measured before adopted as default.** `standard` is opt‑in until a real feature's `council_spend` proves it (docs/05 "tune only after SC-002"); M3 is that first measurement, reported per‑stage against the `full` 5.25M baseline. A later D‑row may flip the default. |
 
 The tier's mechanics (session structure, lazy dispatch, caps) live in the council extension (`council-config.yml` `tiers` block + the `/speckit-council` orchestrator); this contract only defines the field, its default, and its meaning.
+
+## 8. Deck render selector (`deck_render`, D73(3))
+
+`deck_render` selects which of the two defense decks — `technical` and/or `overview` — get an **optional, derived pptx render** for this feature (`006-deck-render` FR-004/FR-005). It is a **default selection, not a hard gate** (FR-016): it names what a bare, argument-less invocation of the render command renders; an invocation that explicitly names a deck renders that deck regardless of what this key says, in either direction — including overriding a profile's `none` and skipping a profile's `both`. This key never touches the D15 boundary — markdown stays the artifact of record, the pptx is never reviewed, never gate-bound, never traced — either way; `deck_render` only ever decides whether a derived convenience file gets written.
+
+**The closed enum.**
+
+| Value | Effect |
+|---|---|
+| `none` (default) | No render fires on a bare invocation. |
+| `technical` | The technical deck renders on a bare invocation. |
+| `overview` | The overview deck renders on a bare invocation. |
+| `both` | Both decks render on a bare invocation. |
+
+Rules:
+
+| # | Rule |
+|---|---|
+| R1 | **Absent ⇒ `none`.** A profile naming no `deck_render` renders nothing — the same "absent is the safest posture" ethos as P1, but note the direction here is the *opposite* of `council_tier`'s (T1: absent ⇒ the *fullest* review). For a gate, absent means the most review; for this optional derived output, absent means off. Both are the same underlying rule — a missing key never buys a feature something it did not ask for — applied to two different "safe" directions. |
+| R2 | **Closed enum, out-of-enum ⇒ validation error.** Only `none`, `technical`, `overview`, `both` are valid, spelled exactly. A value outside this set — `sparkle`, a typo, a mapping, a list, an empty value — is a **hard failure**, never a silent fallback to `none` or to any other value. Routing a malformed value to the safe default is exactly the failure mode §3's "unknown keys are a validation error, not a warning" ethos exists to prevent. |
+| R3 | **Default selection, never a gate.** `deck_render` controls what a bare render-command invocation does by default; it never forbids an explicit invocation. `deck_render: none` does not block a human from explicitly rendering a deck on demand — it only means nothing renders *unasked*. |
+
+**Scope of enforcement — the honest boundary.** As I-27 records, **no general `profile.yaml` validator exists anywhere in this repo**: the closed enums and handshakes this contract describes (§2's P1–P5, `council_tier`'s `full`/`standard`) are enforced only by prose and by whichever session happens to read the file. R1–R3 are no exception: `deck_render` is validated by a **scoped validator inside the deck-render extension**, checked only when the render command actually reads the profile (D79(2)). This means an out-of-enum `deck_render` is caught at **render time**, not at profile-author time — a profile can carry an invalid `deck_render` and pass every other phase of the pipeline undetected until someone runs the render command. This is a deliberate, booked scope limit (`006-deck-render` plan, Complexity Tracking; I-27), not an oversight: building a general validator would touch the `full_auto` handshake — the council gate's correctness guard — and is out of scope for adding one optional, default-off key.
+
+This key changes nothing about who signs a gate, which model runs, or what the council reviews (D18, §6 stays global); it only decides whether a derived, gitignored, never-committed presentation copy of an already-written markdown deck gets produced.

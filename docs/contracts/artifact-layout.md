@@ -1,8 +1,8 @@
 # Contract — Feature Artifact Layout
 
-> **Status:** 1.4 (M3, amended 2026-07-10 by **D57**, **D58**). Normative.
+> **Status:** 1.5 (M-α, amended 2026-07-15 by **D73(3)**, **D79**). Normative.
 > **Implements:** principle 1 (artifacts are the contract), principle 3 (resumability).
-> **Sources:** docs/00 §3, docs/10 §3, D4, D9, D25, D32, D37, D38, D41, D44, D49, D50, D51, **D57** (cross-extension seams), **D58** (analyze-before-categorize order).
+> **Sources:** docs/00 §3, docs/10 §3, D4, D9, D25, D32, D37, D38, D41, D44, D49, D50, D51, D57 (cross-extension seams), D58 (analyze-before-categorize order), **D73(3)** (`006-deck-render` scope: per-deck pptx render, markdown stays the artifact of record), **D79** (`006` plan positions; FR-014's gitignored, derived-only render path).
 
 Every feature is one directory under `specs/`. Every pipeline phase reads artifacts and writes **exactly one** artifact. Both the CLI layer and the platform layer (M5+) read and write this same tree — it is the only interface between them.
 
@@ -31,6 +31,10 @@ specs/NNN-feature-slug/
 │   │   │   └── peer/ A.md  B.md  C.md   ← stage 2, anonymized peer review
 │   │   └── suggestions.md    ← stage 3, chairman. The ONLY file the main thread reads.
 │   └── decision-record.md    ← append-per-round; permanent audit trail
+│
+├── renders/                  ← deck-render, on demand; derived .pptx  GITIGNORED, never tracked
+│   ├── technical.pptx        ← rendered from council/defense-deck/technical.md
+│   └── overview.pptx         ← rendered from council/defense-deck/overview.md
 │
 ├── tasks.md                  ← /speckit-tasks-graph (stock format + `## Execution Waves`)
 ├── categorization.md         ← speckit-ext-categorize    [taxonomy.md]  (M3)
@@ -116,6 +120,7 @@ The collision is inherited from spec-kit. It is documented rather than renamed (
 | graphify extension | `graphify-context.md`, `## Execution Waves` in `tasks.md` |
 | Council extension | everything under `council/` |
 | Categorize extension | `categorization.md` — and **nothing else** (D37) |
+| Deck-render extension | `renders/` — and **nothing else**; never under `council/`, never a `.md` (FR-014) |
 | Agents extension | `agents/assignment.md` |
 | Implement-parallel | `implement.log.md`, source code |
 | Complete | `completion-report.md` |
