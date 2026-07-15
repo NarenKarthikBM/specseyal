@@ -108,7 +108,7 @@ The whole feature. Same input bytes ⇒ same output slides, always. No model, no
 | T4 | **H3 becomes a bold lead line** inside the current slide's body — never its own slide (H3 is a sub-label, and the corpus shows at most 5 per deck). |
 | T5 | Paragraphs, bullets, numbered items, blockquotes, and tables render in **source order** into the current slide's body. Order is never rearranged. |
 | T6 | **Fenced code renders in a monospace box with no wrapping and no reflow.** Box-drawing diagrams and directory trees must survive visually intact. |
-| T7 | **Overflow:** when a slide's content exceeds a fixed line budget, it continues on a `(cont.)` slide. The budget is a constant, so the split is deterministic. `(cont.)` is the only invented text besides the stamp, and it is on the FR-002 allowlist. |
+| T7 | **Overflow:** when a slide's content exceeds a fixed line budget, it continues on a `(cont.)` slide. The budget is a constant, so the split is deterministic. `(cont.)` is invented structural text on the FR-002 allowlist (alongside the stamp, slide numbers, and the T3 `Preamble` title — see §"Fidelity" below). |
 | T8 | `---` horizontal rules are consumed as structure. They carry no text, so dropping them drops no content. |
 | T9 | Inline markers are stripped to plain text (`**bold**` → bold text, `` `code` `` → monospace text). The *text* is preserved exactly; only the markdown syntax is consumed. |
 | T10 | **The renderer never authors.** It has no path that adds, re-words, summarizes, or omits content. Anything it cannot lay out is a **failure** (degrade + disclose), never a silent simplification. |
@@ -120,7 +120,7 @@ Bidirectional text containment, asserted mechanically on the committed fixture d
 - **(a) Nothing dropped.** Every source block's normalized plain text is a substring of the render's extracted text.
 - **(b) Nothing invented.** Every extracted shape's text, minus the allowlist, is a substring of the source's normalized plain text.
 - **Extraction is independent of the writer:** text is pulled from the raw OOXML (`zipfile` + `xml.etree` over `ppt/slides/*.xml`, every `<a:t>` run) — **not** by reading the file back through the rendering library, which would only prove the library round-trips itself.
-- **Allowlist** — the complete set of text the render may add: the stamp lines, `(cont.)`, and slide numbers. Nothing else. Anything else appearing is a failure, and that is direction (b) doing its job.
+- **Allowlist** — the complete set of text the render may add: the stamp lines, `(cont.)`, slide numbers, and the **`Preamble` slide title** (the T3 slide that carries pre-first-H2 content — structural chrome in the same category as `(cont.)`, never a content claim). Nothing else. Anything else appearing is a failure, and that is direction (b) doing its job.
 - **Normalization is whitespace-only.** Unicode is never folded — curly quotes, arrows, and box-drawing must match exactly, or a real drop could hide behind a fold.
 
 Direction (b) is the load-bearing half: a render that could add or re-word content could make the pptx say what the reviewed markdown does not — the precise failure FR-001 exists to prevent.
