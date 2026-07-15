@@ -79,10 +79,10 @@ Single project, `extensions/` layout (plan.md §Project Structure). The entire f
 **Independent Test**: Run against a no-key profile and a `none` profile → zero files, `council/` byte-identical; run against `sparkle` → exit 3.
 
 - [X] **T022** [P] [US2] Commit the profile fixtures `extensions/deck-render/test/fixtures/profiles/{none,overview,both,invalid,unreadable,absent-key}.yaml` — `invalid` = out-of-enum, `unreadable` = unparseable YAML (distinct fixtures, per I-B1/S01).
-- [ ] **T023** [US2] Add the **SC-001 default-path** section to `test/run.sh`: `none` and absent-key both produce zero files, zero output difference, and a `council/` subtree byte-identical to pre-006 (FR-007/FR-013/FR-016). (Depends on T015, T017, T022.)
-- [ ] **T024** [US2] Add the **SC-008 enum** section to `test/run.sh`: out-of-enum ⇒ exit 3, nothing written; **unreadable/unparseable ⇒ loud non-`none` failure, nothing written** (I-B1); `--validate-profile` returns the same codes. (Depends on T014, T015, T017, T022.)
-- [ ] **T025** [US2] Add the **FR-016 explicit-override** section to `test/run.sh`: an explicit deck argument renders regardless of the profile, **including when the profile says `none`** — the boundary (derived/un-bound/un-traced/gitignored) unchanged. (Depends on T015, T017, T022.)
-- [ ] **T026** [US2] Add the **enum SSOT drift** section to `test/run.sh`: read `profile_key.py`'s exported enum and assert `profile-schema.md`'s §1/§3 list and `contracts/commands.md`'s exit table match it; **fail on divergence** (S12 — closes the `council_tier: standrad` drift shape). (Depends on T014, T017, T008, T011.)
+- [X] **T023** [US2] Add the **SC-001 default-path** section to `test/run.sh`: `none` and absent-key both produce zero files, zero output difference, and a `council/` subtree byte-identical to pre-006 (FR-007/FR-013/FR-016). (Depends on T015, T017, T022.)
+- [X] **T024** [US2] Add the **SC-008 enum** section to `test/run.sh`: out-of-enum ⇒ exit 3, nothing written; **unreadable/unparseable ⇒ loud non-`none` failure, nothing written** (I-B1); `--validate-profile` returns the same codes. (Depends on T014, T015, T017, T022.)
+- [X] **T025** [US2] Add the **FR-016 explicit-override** section to `test/run.sh`: an explicit deck argument renders regardless of the profile, **including when the profile says `none`** — the boundary (derived/un-bound/un-traced/gitignored) unchanged. (Depends on T015, T017, T022.)
+- [X] **T026** [US2] Add the **enum SSOT drift** section to `test/run.sh`: read `profile_key.py`'s exported enum and assert `profile-schema.md`'s §1/§3 list and `contracts/commands.md`'s exit table match it; **fail on divergence** (S12 — closes the `council_tier: standrad` drift shape). (Depends on T014, T017, T008, T011.)
 
 **Checkpoint**: The default path is provably inert; the enum is closed and single-sourced.
 

@@ -1743,4 +1743,695 @@ if [ "$s12_result_count" -eq 0 ] && [ "$s12_check_rc" -eq 0 ]; then
   fail "S12 enum SSOT-drift checker produced zero result lines -- a silent 0-assertion pass, which S10's discipline forbids"
 fi
 
+# ---------------------------------------------------------------------------
+section "4. SC-004 degrade-and-disclose under a forced toolchain-absent failure (FR-009/FR-010, R6)"
+# The guarantee under test (SC-004, data-model.md Sec 5 O1/O2/O3): when the
+# render toolchain is absent, render.py DEGRADES rather than crashing -- the
+# council phase completes, the gate stays reachable/approvable, EVERY .md
+# under council/ stays byte-identical, and a per-deck failure notice
+# (naming the deck and the reason) reaches the human, who is told the
+# markdown is unaffected (FR-009 and FR-010 together, per SC-004's own
+# wording -- "the phase survives and the human is told, per deck").
+#
+# Forcing the failure (research.md R6): a PYTHONPATH SHADOW, never a
+# production-code backdoor. A temp dir holding pptx/__init__.py that
+# unconditionally `raise ImportError(...)` is prepended to PYTHONPATH, so
+# render.py's OWN lazy `import pptx` (FR-015 -- the ONE import site, inside
+# `_render_deck()`'s try block) hits a REAL ImportError -- the exact
+# exception class the production degrade path already catches -- rather
+# than a simulated failure behind an env-var flag that would ship to users
+# and could be tripped in the field (R6's own rejected alternative). Because
+# the shadow forces the failure regardless of whether real python-pptx
+# happens to be installed on this host, this section is deliberately
+# INDEPENDENT of ambient pptx -- expect_no_pptx (informational only), never
+# require_pptx; it must PASS on a pptx-absent host and identically on a
+# pptx-equipped one.
+expect_no_pptx "SC-004 degrade-and-disclose (toolchain-absent failure forced via a PYTHONPATH shadow)"
+
+SC004="$TMP/sc004"
+SC004_SHADOW="$SC004/shadow"
+mkdir -p "$SC004_SHADOW/pptx"
+cat > "$SC004_SHADOW/pptx/__init__.py" <<'PYEOF'
+raise ImportError("shadowed python-pptx for SC-004 test (research.md R6) -- this package intentionally always fails to import")
+PYEOF
+
+# Sanity-check the shadow mechanism itself BEFORE relying on it for the real
+# assertions below: prepending $SC004_SHADOW to PYTHONPATH must make a bare
+# `import pptx` raise, on THIS host, regardless of whether real python-pptx
+# is also installed (sys.path resolves in order; PYTHONPATH entries are
+# prepended ahead of any site-packages entry, so the shadow package wins).
+sc004_shadow_rc=0
+PYTHONPATH="$SC004_SHADOW:${PYTHONPATH:-}" "$PY" -c 'import pptx' >"$SC004/shadow_check.log" 2>&1 || sc004_shadow_rc=$?
+if [ "$sc004_shadow_rc" -ne 0 ]; then
+  pass "SC-004 setup -- the PYTHONPATH shadow (research.md R6) genuinely forces \"import pptx\" to raise, confirmed via a standalone $PY -c 'import pptx' before relying on it for the render below"
+else
+  fail "SC-004 setup -- the PYTHONPATH shadow did NOT force \"import pptx\" to fail (exited 0) -- the degrade assertions below cannot be trusted; see $SC004/shadow_check.log"
+fi
+
+# ---- the fixture feature directory: a GOOD deck pair (both fixtures, so
+# `both` attempts and fails BOTH decks), plus a pre-existing gates.yml stub
+# so this section can prove BOTH "not created" and "not modified" with one
+# before/after comparison rather than only proving absence -----------------
+SC004_FEATURE="$SC004/feature"
+mkdir -p "$SC004_FEATURE/council/defense-deck"
+cp "$FIXTURES/deck/technical.md" "$SC004_FEATURE/council/defense-deck/technical.md"
+cp "$FIXTURES/deck/overview.md" "$SC004_FEATURE/council/defense-deck/overview.md"
+cat > "$SC004_FEATURE/gates.yml" <<'YAMLEOF'
+# pre-existing gate stub for the SC-004 harness -- a render failure must
+# never create OR modify this file (FR-009: "the phase survives"; the gate
+# stays reachable/approvable exactly as it was before the render attempt).
+schema_version: "1.0"
+gates: {}
+YAMLEOF
+
+# The sha256 manifest technique: an independently-computed fingerprint
+# (relpath -> hashlib.sha256 of the file's bytes, sorted), never a mtime or
+# file-count proxy -- mirrors SC-001/SC-008/FR-016's own manifest.py idiom
+# above, kept section-local per the harness's per-section "$TMP/<name>"
+# isolation convention.
+SC004_MANIFEST_PY="$SC004/manifest.py"
+cat > "$SC004_MANIFEST_PY" <<'PYEOF'
+#!/usr/bin/env python3
+"""SC-004 sha256 manifest (T028 inline helper) -- mirrors SC-001/SC-008/
+FR-016's own manifest.py idiom above. Prints one "<sha256>  <relpath>" line
+per regular file under ROOT_DIR, sorted by relpath, to stdout.
+
+Usage: manifest.py ROOT_DIR [EXCLUDE_TOPLEVEL_NAME ...]
+"""
+import hashlib
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+excluded = set(sys.argv[2:])
+
+lines = []
+if root.is_dir():
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(root)
+        if rel.parts and rel.parts[0] in excluded:
+            continue
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        lines.append("%s  %s" % (digest, rel.as_posix()))
+
+for line in lines:
+    print(line)
+PYEOF
+
+SC004_SHA_PY="$SC004/sha_one.py"
+cat > "$SC004_SHA_PY" <<'PYEOF'
+#!/usr/bin/env python3
+"""SC-004 single-file sha256 (T028 inline helper) -- used only for the
+gates.yml before/after comparison, which is checked independently of (and
+in addition to) the council/ subtree manifest above.
+
+Usage: sha_one.py FILE
+"""
+import hashlib
+import sys
+
+print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())
+PYEOF
+
+sc004_council_before="$SC004/council-before.manifest"
+sc004_council_after="$SC004/council-after.manifest"
+sc004_gates_sha_before="$SC004/gates-before.sha256"
+sc004_gates_sha_after="$SC004/gates-after.sha256"
+"$PY" "$SC004_MANIFEST_PY" "$SC004_FEATURE/council" > "$sc004_council_before"
+"$PY" "$SC004_SHA_PY" "$SC004_FEATURE/gates.yml" > "$sc004_gates_sha_before"
+
+# ---- the render itself: PYTHONPATH-shadowed, so the toolchain-absent
+# degrade path is forced regardless of ambient pptx -------------------------
+SC004_LOG="$SC004/render.log"
+sc004_rc=0
+PYTHONPATH="$SC004_SHADOW:${PYTHONPATH:-}" "$PY" "$RENDER_PY" both --feature "$SC004_FEATURE" >"$SC004_LOG" 2>&1 || sc004_rc=$?
+
+"$PY" "$SC004_MANIFEST_PY" "$SC004_FEATURE/council" > "$sc004_council_after"
+if [ -f "$SC004_FEATURE/gates.yml" ]; then
+  "$PY" "$SC004_SHA_PY" "$SC004_FEATURE/gates.yml" > "$sc004_gates_sha_after"
+else
+  : > "$sc004_gates_sha_after"
+fi
+
+# ---- (1) phase completes: no hang (the run above already returned), no
+# uncaught traceback, and the contract's degraded exit code (commands.md
+# Sec 4: EXIT_ALL_FAILED=4 -- every SELECTED deck failed, none rendered or
+# skipped, since BOTH decks hit the toolchain-absent branch here) ----------
+if [ "$sc004_rc" -eq 4 ]; then
+  pass "SC-004 phase completes -- render.py both --feature <dir> (PYTHONPATH-shadowed) returned exit 4 (EXIT_ALL_FAILED, commands.md Sec 4 -- both selected decks failed, none rendered/skipped), never a hang or an uncaught crash (see $SC004_LOG)"
+else
+  fail "SC-004 phase completes -- render.py both exited $sc004_rc, expected 4 (EXIT_ALL_FAILED) when both selected decks hit the toolchain-absent branch (see $SC004_LOG)"
+fi
+
+if grep -q "Traceback (most recent call last)" "$SC004_LOG"; then
+  fail "SC-004 phase completes -- render.py's own stdout/stderr contains an uncaught Python traceback -- the toolchain-absent ImportError must be CAUGHT and turned into a disclosed per-deck failure, never allowed to crash the process (see $SC004_LOG)"
+else
+  pass "SC-004 phase completes -- no uncaught Python traceback in render.py's output -- the forced ImportError was caught and degraded, not crashed"
+fi
+
+# ---- (2) gate reachable / never blocks: no gates.yml created or modified,
+# nothing under council/ touched --------------------------------------------
+if [ -f "$SC004_FEATURE/gates.yml" ]; then
+  pass "SC-004 gate reachable -- gates.yml still exists after the forced-failure render (never deleted)"
+else
+  fail "SC-004 gate reachable -- gates.yml is MISSING after the forced-failure render -- a render failure must never remove/block the gate"
+fi
+
+if cmp -s "$sc004_gates_sha_before" "$sc004_gates_sha_after"; then
+  pass "SC-004 gate never blocks -- gates.yml's sha256 is unchanged before/after the forced-failure render (FR-009: 'the phase survives' -- the gate stays exactly as it was, never created fresh and never edited)"
+else
+  fail "SC-004 gate never blocks -- gates.yml's sha256 CHANGED across the forced-failure render -- a render failure must never create or modify the gate binding"
+fi
+
+sc004_gates_count=$(find "$SC004_FEATURE" -name 'gates.yml' | wc -l | tr -d ' ')
+if [ "$sc004_gates_count" -eq 1 ]; then
+  pass "SC-004 gate never blocks -- exactly 1 gates.yml under the feature dir after the run (the one pre-existing stub -- no second/stray gates.yml was written anywhere else)"
+else
+  fail "SC-004 gate never blocks -- found $sc004_gates_count gates.yml file(s) under the feature dir, expected exactly 1 (the pre-existing stub)"
+fi
+
+# ---- (3) every council/ .md byte-identical ---------------------------------
+if cmp -s "$sc004_council_before" "$sc004_council_after"; then
+  pass "SC-004 council/ byte-identical -- council/ subtree sha256 manifest unchanged before/after the forced-failure render -- the renderer never modifies a markdown artifact even when it fails (FR-009)"
+else
+  fail "SC-004 council/ byte-identical -- council/ subtree changed by the forced-failure render (manifest diff: $(diff "$sc004_council_before" "$sc004_council_after" | head -10))"
+fi
+
+# ---- (4) no partial .pptx: the atomic write (I-B3) never produced a file
+# at all -- the ImportError trips before assembly, let alone the atomic
+# os.replace() ---------------------------------------------------------------
+if [ -d "$SC004_FEATURE/renders" ]; then
+  sc004_pptx_count=$(find "$SC004_FEATURE/renders" -name '*.pptx' | wc -l | tr -d ' ')
+else
+  sc004_pptx_count=0
+fi
+if [ "$sc004_pptx_count" -eq 0 ]; then
+  pass "SC-004 no partial .pptx -- zero .pptx files under renders/ (dir is absent or contains none) -- the atomic write never landed a partial or finished render for either deck"
+else
+  fail "SC-004 no partial .pptx -- found $sc004_pptx_count .pptx file(s) under renders/, expected 0 -- a forced toolchain-absent failure must never leave a rendered (or partially-rendered) file behind"
+fi
+
+# ---- (5) per-deck disclosure reaches the human -----------------------------
+# Both decks named individually as FAILED with the toolchain-absent reason
+# (never a folded/summary line) -- the grep patterns are column-width
+# tolerant (technical/overview differ in length, and _print_disclosure()
+# left-pads the shorter label to match), so each matches the label + FAILED
+# + reason regardless of the exact inter-column spacing.
+if grep -qE '^  technical[[:space:]]+FAILED[[:space:]]+toolchain absent \(python-pptx not installed\)' "$SC004_LOG"; then
+  pass "SC-004 per-deck disclosure -- technical is individually disclosed FAILED with the toolchain-absent reason (see $SC004_LOG)"
+else
+  fail "SC-004 per-deck disclosure -- expected a 'technical ... FAILED ... toolchain absent (python-pptx not installed)' line -- got: $(cat "$SC004_LOG")"
+fi
+
+if grep -qE '^  overview[[:space:]]+FAILED[[:space:]]+toolchain absent \(python-pptx not installed\)' "$SC004_LOG"; then
+  pass "SC-004 per-deck disclosure -- overview is individually disclosed FAILED with the toolchain-absent reason (see $SC004_LOG)"
+else
+  fail "SC-004 per-deck disclosure -- expected an 'overview ... FAILED ... toolchain absent (python-pptx not installed)' line -- got: $(cat "$SC004_LOG")"
+fi
+
+if grep -qF "The markdown decks are unaffected and remain the artifact of record." "$SC004_LOG"; then
+  pass "SC-004 per-deck disclosure -- the disclosure states the markdown is unaffected and remains the artifact of record (FR-010)"
+else
+  fail "SC-004 per-deck disclosure -- expected the 'markdown decks are unaffected' sentence, got: $(cat "$SC004_LOG")"
+fi
+
+if grep -qiE 'install.*python-pptx' "$SC004_LOG"; then
+  pass "SC-004 per-deck disclosure -- the disclosure additionally hints how to install the optional toolchain, since every failure here is toolchain-absent"
+else
+  fail "SC-004 per-deck disclosure -- expected an 'install ... python-pptx' hint since every failure here is toolchain-absent, got: $(cat "$SC004_LOG")"
+fi
+
+# ---------------------------------------------------------------------------
+section "29. Partial-failure exit 2 -- per-deck isolation under deck_render: both (I-B2, S02/S03)"
+# The guarantee under test (plan.md I-B2): "an exception rendering deck N
+# MUST NOT prevent deck N+1 from being attempted and reported." S02/S03's
+# committed asymmetric fixture (test/fixtures/deck-broken/, T027,
+# PROVENANCE.md) pairs one GOOD deck (technical.md -- parses clean, 14
+# blocks) with one deliberately BROKEN deck (overview.md -- an out-of-census
+# markdown link on line 17 makes deck_md.parse() raise DeckMdError) under
+# the SAME `both` invocation. render.py's per-deck loop
+# (`ordered = (technical, overview)`, RENDERABLE_DECKS' canonical order --
+# profile_key.py) attempts technical first (succeeds) and overview second
+# (raises internally, caught inside _render_deck()'s own try/except and
+# turned into a Result(OUTCOME_FAILED, ...) rather than propagating). This
+# proves the SECOND deck's internal exception can never retroactively
+# swallow or un-disclose the FIRST deck's already-completed render -- an
+# uncaught exception mid-list-comprehension (`results = [_render_deck(deck,
+# feature_dir) for deck in ordered]`, render.py's main()) would crash the
+# process before _print_disclosure()/_compute_exit_code() ever ran, losing
+# technical's already-good render along with overview's failure, and
+# collapsing what should be exit 2 into an uncaught-traceback exit. Needs a
+# REAL render for the outcome to be meaningful (contracts/commands.md Sec 4
+# "rendered + failed -> 2" row of the `both` outcome matrix, I-B4) --
+# without python-pptx BOTH decks would instead hit the toolchain-absent
+# branch and collapse to exit 4, the wrong assertion (PROVENANCE.md's own
+# "what T029 still needs to observe end-to-end" note) -- so the entire body
+# is guarded by require_pptx, mirroring the SC-003/SC-002/T7/SC-004 sections
+# above.
+if require_pptx "partial-failure exit 2 (render-good / fail-broken / disclose-both)"; then
+  EXIT2="$TMP/exit2"
+  EXIT2_FEATURE="$EXIT2/feature"
+  mkdir -p "$EXIT2_FEATURE/council/defense-deck"
+  cp "$FIXTURES/deck-broken/technical.md" "$EXIT2_FEATURE/council/defense-deck/technical.md"
+  cp "$FIXTURES/deck-broken/overview.md" "$EXIT2_FEATURE/council/defense-deck/overview.md"
+
+  EXIT2_LOG="$EXIT2/render.log"
+  exit2_rc=0
+  "$PY" "$RENDER_PY" both --feature "$EXIT2_FEATURE" >"$EXIT2_LOG" 2>&1 || exit2_rc=$?
+
+  # ---- exit 2, never 4 (or any other code) -- commands.md Sec 4's
+  # rendered+failed -> 2 row, I-B4's outcome matrix --------------------------
+  if [ "$exit2_rc" -eq 2 ]; then
+    pass "partial-failure exit 2 -- render.py both --feature <asymmetric fixture> exited 2 (EXIT_PARTIAL), never 4 (see $EXIT2_LOG)"
+  else
+    fail "partial-failure exit 2 -- render.py both exited $exit2_rc, expected 2 (EXIT_PARTIAL) -- collapsing to 4 (or crashing) would mean the broken deck's exception was NOT isolated from the good deck's already-completed result (I-B2) (see $EXIT2_LOG)"
+  fi
+
+  if grep -q "Traceback (most recent call last)" "$EXIT2_LOG"; then
+    fail "partial-failure exit 2 -- render.py's own stdout/stderr contains an uncaught Python traceback -- overview's DeckMdError must be CAUGHT and turned into a disclosed per-deck failure, never allowed to crash the process (I-B2) (see $EXIT2_LOG)"
+  else
+    pass "partial-failure exit 2 -- no uncaught Python traceback in render.py's output -- overview's DeckMdError was caught and degraded, not crashed"
+  fi
+
+  # ---- technical (good) -- actually rendered, a real .pptx on disk --------
+  if [ -f "$EXIT2_FEATURE/renders/technical.pptx" ]; then
+    pass "partial-failure exit 2 -- technical (the good deck) actually rendered: renders/technical.pptx exists on disk"
+  else
+    fail "partial-failure exit 2 -- technical (the good deck) did NOT render: renders/technical.pptx is missing -- the broken sibling must never prevent the good deck from rendering (I-B2) (see $EXIT2_LOG)"
+  fi
+
+  # Captured via a subshell '|| true' rather than a bare command
+  # substitution: under 'set -e', a var=$(grep ...) assignment whose grep
+  # finds nothing (exit 1) would otherwise abort the whole suite -- mirrors
+  # the file-vs-pipe discipline the SC-003/SC-002/T7/S12 checkers use for
+  # the identical reason (a subshell's own exit status must never propagate
+  # and silently truncate the run).
+  exit2_technical_line=$(grep -E '^  technical[[:space:]]+rendered[[:space:]]' "$EXIT2_LOG" || true)
+  if [ -n "$exit2_technical_line" ]; then
+    pass "partial-failure exit 2 -- technical is individually disclosed 'rendered' (see: $exit2_technical_line)"
+  else
+    fail "partial-failure exit 2 -- expected a 'technical ... rendered ...' disclosure line -- got: $(cat "$EXIT2_LOG")"
+  fi
+
+  # ---- overview (broken) -- NOT rendered, disclosed FAILED (never
+  # skipped, never silently dropped) with the actual deck_md parse-error
+  # reason (line 17's out-of-census link, PROVENANCE.md) --------------------
+  if [ -f "$EXIT2_FEATURE/renders/overview.pptx" ]; then
+    fail "partial-failure exit 2 -- overview (the broken deck) has a renders/overview.pptx on disk -- a deck whose source fails deck_md.parse() must never produce a render file"
+  else
+    pass "partial-failure exit 2 -- overview (the broken deck) has no renders/overview.pptx -- the failed parse never produced a file"
+  fi
+
+  exit2_overview_line=$(grep -E '^  overview[[:space:]]+FAILED[[:space:]]' "$EXIT2_LOG" || true)
+  if [ -n "$exit2_overview_line" ]; then
+    pass "partial-failure exit 2 -- overview is individually disclosed FAILED, not skipped and not silently dropped (see: $exit2_overview_line)"
+  else
+    fail "partial-failure exit 2 -- expected an 'overview ... FAILED ...' disclosure line -- got: $(cat "$EXIT2_LOG")"
+  fi
+
+  if [ -n "$exit2_overview_line" ] \
+     && printf '%s\n' "$exit2_overview_line" | grep -qF 'line 17' \
+     && printf '%s\n' "$exit2_overview_line" | grep -qF 'link syntax is out of census'; then
+    pass "partial-failure exit 2 -- overview's FAILED reason names the actual deck_md parse error (line 17's out-of-census markdown link), not a generic message"
+  else
+    fail "partial-failure exit 2 -- overview's FAILED reason does not name line 17's out-of-census link parse error -- got: $exit2_overview_line"
+  fi
+
+  if grep -qE '^  overview[[:space:]]+skipped' "$EXIT2_LOG"; then
+    fail "partial-failure exit 2 -- overview is disclosed 'skipped', not 'FAILED' -- a deck whose source exists but fails to parse must be FAILED, never skipped (skipped is reserved for absent source, O4)"
+  else
+    pass "partial-failure exit 2 -- overview is never disclosed as 'skipped' -- skipped is reserved for absent source (O4); a present-but-broken deck is FAILED"
+  fi
+
+  # ---- both disclosed together (I-B2 isolation, not just two independent
+  # facts checked separately above) -- one render.py invocation, one log,
+  # both deck names present with their correct, differing outcomes ----------
+  if [ -n "$exit2_technical_line" ] && [ -n "$exit2_overview_line" ]; then
+    pass "partial-failure exit 2 -- both decks disclosed by the SAME render.py both invocation (technical rendered + overview FAILED in one run) -- the broken deck's failure did not prevent the good deck from being attempted, rendered, AND disclosed (I-B2 per-deck isolation)"
+  else
+    fail "partial-failure exit 2 -- expected BOTH technical and overview disclosure lines from a single 'both' invocation, got only: technical=[$exit2_technical_line] overview=[$exit2_overview_line]"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+section "30. I-B3 atomic write -- mid-write failure leaves no partial .pptx, prior good render untouched (O5, plan.md I-B3/S04)"
+# The guarantee under test (data-model.md Sec 5 O5 / plan.md I-B3, S04): the
+# write is atomic -- render.py writes the new render to a temp file INSIDE
+# the target directory, then os.replace()s it into renders/<deck>.pptx only
+# on full success. No target is ever pre-deleted, so a mid-write failure
+# must leave a prior good render completely untouched. This is the ONLY
+# failure mode that would actually violate O5, so plan.md's Phase C
+# requires it be forced by a committed test -- exactly this section.
+#
+# How this differs from SC-004 (the section immediately above): SC-004
+# shadows `import pptx` itself via a PYTHONPATH trick, so ITS failure trips
+# BEFORE the write begins -- python-pptx is never actually imported, the
+# deck is never parsed or assembled, and no temp file is ever attempted
+# (plan.md is explicit: "This trips before the write begins; it is not the
+# same as I-B3's mid-write failure test below"). THIS section does the
+# opposite: guarded by require_pptx (not expect_no_pptx), python-pptx REALLY
+# imports, the deck REALLY parses and assembles into a real `Presentation`,
+# and the failure is forced squarely INSIDE the atomic-write step itself --
+# render.py's `tempfile.mkstemp(dir=<renders/>)` call, the first move of
+# I-B3's temp-file-in-target-dir mechanism, immediately before its
+# `prs.save(tmp_name)` / `os.replace(tmp_name, target_path)` pair. Forced by
+# making `renders/` itself READ-ONLY (chmod 500 -- r-x, no write) AFTER a
+# prior good render already sits there: creating a NEW file inside a
+# non-writable directory is a real OSError from the OS (render.py's own
+# `except OSError as exc: return Result(..., f"cannot prepare the renders/
+# directory: {exc}")`), no production-code backdoor of any kind. Permissions
+# are restored IMMEDIATELY after the forced-failure invocation, before any
+# assertion below runs, so the harness's own EXIT trap (`rm -rf "$TMP"`,
+# near the top of this file) can still clean up even if an assertion below
+# were to fail.
+if require_pptx "I-B3 atomic mid-write failure (no partial .pptx + prior good render untouched)"; then
+  MIDWRITE="$TMP/midwrite"
+  MIDWRITE_FEATURE="$MIDWRITE/feature"
+  MIDWRITE_RENDERS="$MIDWRITE_FEATURE/renders"
+  MIDWRITE_TARGET="$MIDWRITE_RENDERS/technical.pptx"
+  mkdir -p "$MIDWRITE_FEATURE/council/defense-deck"
+  cp "$FIXTURES/deck/technical.md" "$MIDWRITE_FEATURE/council/defense-deck/technical.md"
+
+  # A single-file sha256 helper, mirrors SC-004's own sha_one.py idiom above
+  # -- an INDEPENDENTLY recomputed fingerprint, never a trust-render.py's-
+  # own-arithmetic shortcut, and never a byte-for-byte `cmp` of the whole
+  # .pptx zip alone (a zip's own member metadata carries no promise here;
+  # sha256-of-bytes is the same "prior render untouched" oracle SC-004's
+  # gates.yml before/after check already relies on).
+  MIDWRITE_SHA_PY="$MIDWRITE/sha_one.py"
+  cat > "$MIDWRITE_SHA_PY" <<'PYEOF'
+#!/usr/bin/env python3
+"""I-B3 atomic mid-write failure: single-file sha256 (T030 inline helper) --
+mirrors SC-004's sha_one.py idiom above.
+
+Usage: sha_one.py FILE
+"""
+import hashlib
+import sys
+
+print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())
+PYEOF
+
+  # ---- step 1: a PRIOR GOOD render, established for real -------------------
+  MIDWRITE_LOG_GOOD="$MIDWRITE/render_1_good.log"
+  midwrite_rc_good=0
+  "$PY" "$RENDER_PY" technical --feature "$MIDWRITE_FEATURE" >"$MIDWRITE_LOG_GOOD" 2>&1 || midwrite_rc_good=$?
+
+  if [ "$midwrite_rc_good" -eq 0 ] && [ -f "$MIDWRITE_TARGET" ]; then
+    pass "I-B3 setup -- render.py technical --feature <fixture dir> exited 0 and wrote a PRIOR GOOD render at renders/technical.pptx (see $MIDWRITE_LOG_GOOD)"
+  else
+    fail "I-B3 setup -- render.py technical exited $midwrite_rc_good or renders/technical.pptx is missing -- the mid-write failure assertions below cannot be trusted (see $MIDWRITE_LOG_GOOD)"
+  fi
+
+  MIDWRITE_SHA_BEFORE="$MIDWRITE/prior.sha256"
+  "$PY" "$MIDWRITE_SHA_PY" "$MIDWRITE_TARGET" > "$MIDWRITE_SHA_BEFORE"
+  midwrite_files_before=$(find "$MIDWRITE_RENDERS" -type f | wc -l | tr -d ' ')
+
+  # ---- step 2: force the NEXT render's WRITE (post-import) to fail --------
+  # chmod 500 on renders/ AFTER the prior good render is already sitting
+  # there -- the deck's markdown source is untouched, so this retries the
+  # very same invocation that just succeeded, and this time the atomic
+  # write's own temp-file creation is what fails.
+  chmod 500 "$MIDWRITE_RENDERS"
+
+  MIDWRITE_LOG_FAIL="$MIDWRITE/render_2_forced_midwrite_fail.log"
+  midwrite_rc_fail=0
+  "$PY" "$RENDER_PY" technical --feature "$MIDWRITE_FEATURE" >"$MIDWRITE_LOG_FAIL" 2>&1 || midwrite_rc_fail=$?
+
+  # Restore perms IMMEDIATELY -- before any assertion below runs, so a
+  # read-only renders/ never outlives the one invocation it exists to break,
+  # and the harness's own EXIT trap (`rm -rf "$TMP"`) can still unlink
+  # everything under it.
+  chmod 700 "$MIDWRITE_RENDERS"
+
+  if [ "$midwrite_rc_fail" -eq 4 ]; then
+    pass "I-B3 mid-write failure -- render.py technical --feature <dir> (renders/ made read-only) exited 4 (EXIT_ALL_FAILED -- the one selected deck failed, none rendered/skipped), never a hang or a silent success (see $MIDWRITE_LOG_FAIL)"
+  else
+    fail "I-B3 mid-write failure -- render.py technical exited $midwrite_rc_fail, expected 4 (EXIT_ALL_FAILED) when the write itself fails on a read-only renders/ (see $MIDWRITE_LOG_FAIL)"
+  fi
+
+  # ---- render.py disclosed the failure (O2) and did not crash -------------
+  if grep -q "Traceback (most recent call last)" "$MIDWRITE_LOG_FAIL"; then
+    fail "I-B3 mid-write failure -- render.py's own stdout/stderr contains an uncaught Python traceback -- the mkstemp() OSError on a read-only renders/ must be CAUGHT and turned into a disclosed per-deck failure, never allowed to crash the process (see $MIDWRITE_LOG_FAIL)"
+  else
+    pass "I-B3 mid-write failure -- no uncaught Python traceback in render.py's output -- the forced mkstemp() OSError was caught and degraded, not crashed"
+  fi
+
+  if grep -qE '^  technical[[:space:]]+FAILED[[:space:]]' "$MIDWRITE_LOG_FAIL"; then
+    pass "I-B3 mid-write failure -- technical is disclosed FAILED (per-deck outcome reaches the human, O2 -- silence is never an acceptable degradation) (see $MIDWRITE_LOG_FAIL)"
+  else
+    fail "I-B3 mid-write failure -- expected a 'technical ... FAILED ...' disclosure line -- got: $(cat "$MIDWRITE_LOG_FAIL")"
+  fi
+
+  if grep -qF "cannot prepare the renders/ directory" "$MIDWRITE_LOG_FAIL"; then
+    pass "I-B3 mid-write failure -- the disclosed reason names the write-preparation failure (render.py's OWN message for the tempfile.mkstemp() OSError), not a generic/unrelated reason"
+  else
+    fail "I-B3 mid-write failure -- expected the disclosed reason to mention 'cannot prepare the renders/ directory' -- got: $(cat "$MIDWRITE_LOG_FAIL")"
+  fi
+
+  # ---- no partial .pptx and no leftover temp file --------------------------
+  midwrite_files_after=$(find "$MIDWRITE_RENDERS" -type f | wc -l | tr -d ' ')
+  if [ "$midwrite_files_after" -eq "$midwrite_files_before" ]; then
+    pass "I-B3 no partial .pptx -- renders/ holds the SAME number of files after the forced mid-write failure as before ($midwrite_files_before) -- nothing partial, nothing extra was left behind"
+  else
+    fail "I-B3 no partial .pptx -- renders/ holds $midwrite_files_after file(s) after the forced mid-write failure, expected $midwrite_files_before (unchanged) -- a mid-write failure must never leave a partial or stray file"
+  fi
+
+  midwrite_tmp_count=$(find "$MIDWRITE_RENDERS" -name '*.tmp' | wc -l | tr -d ' ')
+  if [ "$midwrite_tmp_count" -eq 0 ]; then
+    pass "I-B3 no partial .pptx -- zero leftover *.tmp file(s) under renders/ -- the atomic write's own temp-file naming (.<deck>.*.pptx.tmp) left nothing behind"
+  else
+    fail "I-B3 no partial .pptx -- found $midwrite_tmp_count leftover *.tmp file(s) under renders/, expected 0"
+  fi
+
+  if [ -f "$MIDWRITE_TARGET" ]; then
+    pass "I-B3 no partial .pptx -- renders/technical.pptx still exists at the target path (never pre-deleted, I-B3) after the forced mid-write failure"
+  else
+    fail "I-B3 no partial .pptx -- renders/technical.pptx is MISSING after the forced mid-write failure -- the prior good render must never be removed by a failed write attempt"
+  fi
+
+  # ---- the prior good render is byte-identical (sha256 unchanged) ---------
+  MIDWRITE_SHA_AFTER="$MIDWRITE/prior_after.sha256"
+  if [ -f "$MIDWRITE_TARGET" ]; then
+    "$PY" "$MIDWRITE_SHA_PY" "$MIDWRITE_TARGET" > "$MIDWRITE_SHA_AFTER"
+  else
+    : > "$MIDWRITE_SHA_AFTER"
+  fi
+
+  if cmp -s "$MIDWRITE_SHA_BEFORE" "$MIDWRITE_SHA_AFTER"; then
+    pass "I-B3 prior render untouched -- renders/technical.pptx's sha256 is UNCHANGED across the forced mid-write failure (independently recomputed both times: $(cat "$MIDWRITE_SHA_BEFORE" 2>/dev/null || echo '?')) -- never pre-deleted, never partially overwritten (O5)"
+  else
+    fail "I-B3 prior render untouched -- renders/technical.pptx's sha256 CHANGED across the forced mid-write failure (before: $(cat "$MIDWRITE_SHA_BEFORE" 2>/dev/null || echo MISSING), after: $(cat "$MIDWRITE_SHA_AFTER" 2>/dev/null || echo MISSING)) -- a failed write must never disturb a prior good render (O5)"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+section "31. SC-007 render staleness -- FRESH/STALE stateless read-and-compare (I-B6/S13)"
+# The guarantee under test (SC-007; data-model.md Sec 3; plan.md I-B6/S13): a
+# stale render -- a `.pptx` whose embedded source sha256 no longer matches
+# the CURRENT source markdown's sha256 -- must be DETECTABLE and SURFACED,
+# never silently trusted. render.py's own mechanism (`_fresh_stale_verdict()`
+# / `_read_embedded_sha256()`) is a STATELESS read-and-compare: no state file
+# is written anywhere; every invocation simply reads whatever prior render
+# already sits at the target path (via plain zipfile + xml.etree -- no
+# `python-pptx` needed to READ, only to write) and compares its embedded
+# stamp to the CURRENT source's freshly-computed sha256. Two branches, both
+# exercised here, discriminating rather than one-sided (golden-fixture
+# discipline): an UNCHANGED source must print `FRESH`; a MUTATED source must
+# print `STALE`. The verdict line (`"<deck>: FRESH"` / `"<deck>: STALE"`,
+# `render.py`'s own literal f-string) is printed to STDOUT, unconditionally,
+# BEFORE the lazy `import pptx` site is even reached -- so it fires
+# regardless of whether the render attempt that follows goes on to succeed --
+# and is asserted here to land on stdout specifically (never stderr), since
+# a silent or misrouted verdict is not the human-usable disclosure SC-007
+# requires (a reviewer on a phone can act on a plain stdout line).
+#
+# The sha-MISMATCH itself (the fact the STALE verdict is built on) is proven
+# independently of render.py's own arithmetic, mirroring SC-002's own stamp
+# section above: the still-on-disk PRIOR render's embedded 64-hex stamp is
+# extracted via `extract_pptx_text.py` (the harness's independent stdlib
+# OOXML oracle -- never `python-pptx`, and never render.py's own
+# `_read_embedded_sha256()`, which is the exact function under test here),
+# and compared against an independently, freshly recomputed
+# `hashlib.sha256()` of the MUTATED source's bytes.
+if require_pptx "SC-007 staleness detection (FRESH/STALE verdict)"; then
+  SC007="$TMP/sc007"
+  SC007_DIR="$SC007/feature"
+  mkdir -p "$SC007_DIR/council/defense-deck"
+  cp "$FIXTURES/deck/technical.md" "$SC007_DIR/council/defense-deck/technical.md"
+  SC007_SRC="$SC007_DIR/council/defense-deck/technical.md"
+  SC007_TARGET="$SC007_DIR/renders/technical.pptx"
+
+  # A single-file sha256 helper -- mirrors I-B3's/SC-004's own sha_one.py
+  # idiom above, written to a scratch file (never a `python3 -c` one-liner)
+  # purely for readability; it never ships (lives only under $TMP).
+  SC007_SHA_PY="$SC007/sha_of.py"
+  cat > "$SC007_SHA_PY" <<'PYEOF'
+#!/usr/bin/env python3
+"""SC-007 staleness: single-file sha256 (T031 inline helper) -- mirrors
+I-B3's/SC-004's own sha_one.py idiom above.
+
+Usage: sha_of.py FILE
+"""
+import hashlib
+import sys
+
+print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())
+PYEOF
+
+  # ---- step 1: baseline -- render source_v1 for the very first time -------
+  # No prior render sits at the target path yet, so `_fresh_stale_verdict()`
+  # returns `None` (I-B6) -- no FRESH/STALE line is expected on THIS
+  # invocation; it exists only to establish the on-disk v1 render the
+  # FRESH/STALE checks below compare against.
+  SC007_LOG1_OUT="$SC007/render_1_baseline.stdout"
+  SC007_LOG1_ERR="$SC007/render_1_baseline.stderr"
+  sc007_rc1=0
+  "$PY" "$RENDER_PY" technical --feature "$SC007_DIR" >"$SC007_LOG1_OUT" 2>"$SC007_LOG1_ERR" || sc007_rc1=$?
+
+  if [ "$sc007_rc1" -eq 0 ] && [ -f "$SC007_TARGET" ]; then
+    pass "SC-007 setup -- render.py technical --feature <fixture dir> exited 0 and wrote the BASELINE render at renders/technical.pptx (source_v1; see $SC007_LOG1_OUT)"
+  else
+    fail "SC-007 setup -- render.py technical exited $sc007_rc1 or renders/technical.pptx is missing -- the FRESH/STALE checks below cannot be trusted (see $SC007_LOG1_OUT, $SC007_LOG1_ERR)"
+  fi
+
+  if grep -qE '^technical: (FRESH|STALE)$' "$SC007_LOG1_OUT"; then
+    fail "SC-007 setup -- the BASELINE render (nothing to compare against yet) unexpectedly printed a FRESH/STALE verdict -- got: $(cat "$SC007_LOG1_OUT")"
+  else
+    pass "SC-007 setup -- the BASELINE render prints NO FRESH/STALE verdict (I-B6: \`_fresh_stale_verdict()\` returns None when no prior render sits at the target path -- proves the checks below are genuinely comparative, not unconditional)"
+  fi
+
+  # A path-only manifest (never content -- the STALE arm below deliberately
+  # mutates council/defense-deck/technical.md's CONTENT in place, so a
+  # content-based manifest would spuriously fail on our own test action) of
+  # every file under the feature dir, taken once the baseline render exists.
+  # Compared again at the very end of this section, after the STALE re-run:
+  # the set of file PATHS must stay identical throughout -- I-B6's "no state
+  # file is written anywhere" promise means the read-and-compare must never
+  # introduce a NEW file (e.g. a cached ".stale" marker) anywhere in the tree.
+  SC007_PATHS_BEFORE="$SC007/paths-before.txt"
+  find "$SC007_DIR" -type f | sort > "$SC007_PATHS_BEFORE"
+
+  # ---- step 2: FRESH -- immediate re-run on the UNCHANGED source ----------
+  SC007_LOG2_OUT="$SC007/render_2_fresh.stdout"
+  SC007_LOG2_ERR="$SC007/render_2_fresh.stderr"
+  sc007_rc2=0
+  "$PY" "$RENDER_PY" technical --feature "$SC007_DIR" >"$SC007_LOG2_OUT" 2>"$SC007_LOG2_ERR" || sc007_rc2=$?
+
+  if [ "$sc007_rc2" -eq 0 ]; then
+    pass "SC-007 FRESH -- render.py technical --feature <dir>, source UNCHANGED, exited 0 (see $SC007_LOG2_OUT)"
+  else
+    fail "SC-007 FRESH -- render.py technical exited $sc007_rc2, expected 0 on an unchanged source (see $SC007_LOG2_OUT, $SC007_LOG2_ERR)"
+  fi
+
+  if grep -qxF 'technical: FRESH' "$SC007_LOG2_OUT"; then
+    pass "SC-007 FRESH -- render.py prints the exact one-line 'technical: FRESH' verdict to STDOUT (the prior render's embedded sha == the current source's sha, I-B6/S13) -- see $SC007_LOG2_OUT"
+  else
+    fail "SC-007 FRESH -- expected a 'technical: FRESH' line on stdout -- got stdout: $(cat "$SC007_LOG2_OUT") / stderr: $(cat "$SC007_LOG2_ERR")"
+  fi
+
+  if grep -qxF 'technical: FRESH' "$SC007_LOG2_ERR"; then
+    fail "SC-007 FRESH -- the verdict line leaked onto STDERR instead of (or in addition to) STDOUT -- SC-007 requires it be a STDOUT disclosure a reviewer can act on"
+  else
+    pass "SC-007 FRESH -- the verdict line is NOT on stderr -- confirms it is a genuine stdout disclosure, not a diagnostic aside"
+  fi
+
+  # ---- step 3: STALE -- mutate the source, then re-run --------------------
+  # Independently recomputed sha256 of the source AS IT STILL STANDS (v1),
+  # taken before the mutation below, so it can be compared against the
+  # prior render's OWN embedded stamp as a sanity check that the extraction
+  # technique itself is trustworthy before it is relied on for the real
+  # mismatch assertion.
+  SC007_V1_SHA="$SC007/v1_source.sha256"
+  "$PY" "$SC007_SHA_PY" "$SC007_SRC" > "$SC007_V1_SHA"
+
+  # The still-on-disk v1 render's embedded 64-hex stamp, extracted via
+  # extract_pptx_text.py -- the harness's INDEPENDENT stdlib OOXML oracle
+  # (SC-002's own precedent above), never via render.py's own
+  # `_read_embedded_sha256()` (the exact function under test here -- using
+  # it to check itself would prove nothing). Taken BEFORE the source is
+  # mutated below, while the v1 render still sits untouched at the target
+  # path.
+  SC007_EXTRACTED_RUNS="$SC007/v1_render_runs.txt"
+  SC007_EXTRACT_ERR="$SC007/extract.stderr"
+  sc007_extract_rc=0
+  "$PY" "$EXTRACT_PPTX_TEXT_PY" "$SC007_TARGET" > "$SC007_EXTRACTED_RUNS" 2>"$SC007_EXTRACT_ERR" || sc007_extract_rc=$?
+
+  if [ "$sc007_extract_rc" -eq 0 ]; then
+    pass "SC-007 STALE setup -- extract_pptx_text.py (independent stdlib OOXML oracle) read the still-on-disk v1 render's runs (see $SC007_EXTRACTED_RUNS)"
+  else
+    fail "SC-007 STALE setup -- extract_pptx_text.py exited $sc007_extract_rc reading the v1 render -- see $SC007_EXTRACT_ERR"
+  fi
+
+  SC007_EMBEDDED_SHA=$(grep -oE '[0-9a-f]{64}' "$SC007_EXTRACTED_RUNS" | head -n 1)
+  if [ -n "$SC007_EMBEDDED_SHA" ] && [ "$SC007_EMBEDDED_SHA" = "$(cat "$SC007_V1_SHA")" ]; then
+    pass "SC-007 STALE setup -- the v1 render's embedded 64-hex sha256 ($SC007_EMBEDDED_SHA), extracted independently via extract_pptx_text.py, matches hashlib.sha256(<source_v1 bytes>) computed independently here -- confirms the extraction below is trustworthy"
+  else
+    fail "SC-007 STALE setup -- the v1 render's extracted embedded sha256 ('$SC007_EMBEDDED_SHA') does not match the independently computed source_v1 sha256 ($(cat "$SC007_V1_SHA")) -- the mismatch assertion below cannot be trusted"
+  fi
+
+  # Mutate the source IN PLACE (same path, new bytes -- a plain appended
+  # paragraph, safely inside deck_md.py's census: no image/link/footnote/
+  # autolink/raw-HTML construct) so the path-only manifest above stays
+  # valid, and so the STILL-ON-DISK render at renders/technical.pptx keeps
+  # pointing at the SAME source path with its OLD (v1) stamp until the next
+  # render.py invocation overwrites it.
+  printf '\nSC-007 staleness probe -- source mutated after the v1 render.\n' >> "$SC007_SRC"
+
+  SC007_V2_SHA="$SC007/v2_source.sha256"
+  "$PY" "$SC007_SHA_PY" "$SC007_SRC" > "$SC007_V2_SHA"
+
+  if [ "$(cat "$SC007_V2_SHA")" != "$(cat "$SC007_V1_SHA")" ]; then
+    pass "SC-007 STALE setup -- mutating the source produced a genuinely DIFFERENT sha256 (v1: $(cat "$SC007_V1_SHA"), v2: $(cat "$SC007_V2_SHA")) -- the mutation is real, not a no-op"
+  else
+    fail "SC-007 STALE setup -- source sha256 is UNCHANGED after the mutation ($(cat "$SC007_V1_SHA")) -- the mutation did not take effect, the STALE assertions below would be meaningless"
+  fi
+
+  # THE sha-mismatch assertion (the full 64-hex embedded stamp, both sides):
+  # the v1 render's embedded stamp -- extracted independently above, while
+  # the render still sat untouched on disk -- must NOT equal
+  # sha256(source_v2). This is the discriminating fact render.py's own STALE
+  # verdict below is built on: a stale render IS detectable by a plain
+  # recompute-and-compare (SC-007), before render.py is even asked again.
+  if [ -n "$SC007_EMBEDDED_SHA" ] && [ "$SC007_EMBEDDED_SHA" != "$(cat "$SC007_V2_SHA")" ]; then
+    pass "SC-007 STALE sha mismatch -- the still-on-disk v1 render's embedded 64-hex stamp ($SC007_EMBEDDED_SHA) != sha256(source_v2) ($(cat "$SC007_V2_SHA")), independently computed and independently extracted"
+  else
+    fail "SC-007 STALE sha mismatch -- the v1 render's embedded stamp ('$SC007_EMBEDDED_SHA') equals sha256(source_v2) ($(cat "$SC007_V2_SHA")) or was empty -- expected a mismatch after mutating the source"
+  fi
+
+  SC007_LOG3_OUT="$SC007/render_3_stale.stdout"
+  SC007_LOG3_ERR="$SC007/render_3_stale.stderr"
+  sc007_rc3=0
+  "$PY" "$RENDER_PY" technical --feature "$SC007_DIR" >"$SC007_LOG3_OUT" 2>"$SC007_LOG3_ERR" || sc007_rc3=$?
+
+  if [ "$sc007_rc3" -eq 0 ]; then
+    pass "SC-007 STALE -- render.py technical --feature <dir>, source MUTATED (v2), exited 0 (re-rendering over a prior good render; see $SC007_LOG3_OUT)"
+  else
+    fail "SC-007 STALE -- render.py technical exited $sc007_rc3, expected 0 re-rendering a mutated source over a prior good render (see $SC007_LOG3_OUT, $SC007_LOG3_ERR)"
+  fi
+
+  if grep -qxF 'technical: STALE' "$SC007_LOG3_OUT"; then
+    pass "SC-007 STALE -- render.py prints the exact one-line 'technical: STALE' verdict to STDOUT (the prior render's embedded sha != the current source's sha, I-B6/S13) -- see $SC007_LOG3_OUT"
+  else
+    fail "SC-007 STALE -- expected a 'technical: STALE' line on stdout -- got stdout: $(cat "$SC007_LOG3_OUT") / stderr: $(cat "$SC007_LOG3_ERR")"
+  fi
+
+  if grep -qxF 'technical: STALE' "$SC007_LOG3_ERR"; then
+    fail "SC-007 STALE -- the verdict line leaked onto STDERR instead of (or in addition to) STDOUT -- SC-007 requires it be a STDOUT disclosure a reviewer can act on"
+  else
+    pass "SC-007 STALE -- the verdict line is NOT on stderr -- confirms it is a genuine stdout disclosure, not a diagnostic aside"
+  fi
+
+  # ---- no state file anywhere in the feature tree (I-B6: stateless) -------
+  SC007_PATHS_AFTER="$SC007/paths-after.txt"
+  find "$SC007_DIR" -type f | sort > "$SC007_PATHS_AFTER"
+  if cmp -s "$SC007_PATHS_BEFORE" "$SC007_PATHS_AFTER"; then
+    pass "SC-007 stateless -- the set of file PATHS under the feature dir is IDENTICAL before and after the FRESH + STALE re-runs -- no cached staleness marker or state file was written anywhere (I-B6: a stateless read-and-compare against the render's OWN embedded stamp, never a state file)"
+  else
+    fail "SC-007 stateless -- the set of file paths under the feature dir CHANGED across the FRESH/STALE re-runs -- I-B6 requires FRESH/STALE be a stateless read-and-compare, never backed by a state file (diff: $(diff "$SC007_PATHS_BEFORE" "$SC007_PATHS_AFTER" | head -10))"
+  fi
+fi
+
 report
