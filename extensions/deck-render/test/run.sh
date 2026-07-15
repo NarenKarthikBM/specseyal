@@ -1037,4 +1037,710 @@ PYEOF
   fi
 fi
 
+# ---------------------------------------------------------------------------
+section "1. SC-001 default path is untouched (FR-007/FR-013/FR-016)"
+# The feature's default-off safety property: with `deck_render: none` (V1's
+# explicit spelling) OR the key entirely absent (the silent default --
+# profile_key.py's ABSENT branch 1, data-model.md Sec 1), a render.py
+# invocation with NO explicit deck argument -- so selection comes from the
+# profile alone -- must produce ZERO rendered files, leave `council/`
+# byte-identical, and write nothing else in the feature directory either
+# (FR-007/FR-013/FR-016). This is deliberately NOT the same code path as
+# O4's "skipped" outcome (data-model.md Sec 5): O4 is "a deck IS selected
+# but its source markdown is not present yet"; this section instead starts
+# from commands.md Sec 2 step 3's earlier "nothing selected at all" exit,
+# which never even enters the per-deck render loop.
+#
+# This check is entirely library-independent -- render.py's lazy `import
+# pptx` (FR-015/R2) is never reached on the nothing-selected path, since
+# `_render_deck()` is never called -- so, unlike every SC-003/SC-002/T7
+# section above, it runs (and must PASS) with NO require_pptx guard, even
+# on this pptx-absent host.
+#
+# Both fixture profiles are exercised, since they reach the SAME 'none'
+# resolution via two DIFFERENT profile_key.py branches (see each fixture's
+# own header comment in $FIXTURES/profiles/): none.yaml (explicit
+# `deck_render: none`, branch 3) and absent-key.yaml (the key entirely
+# omitted, branch 1) -- two independent code paths landing on the identical
+# observable outcome, both must be proven separately.
+#
+# Byte-identity is proven by an independently-computed sha256 manifest
+# (relpath -> hashlib.sha256 of the file's bytes, sorted) rather than a
+# mtime or file-count proxy, which could miss an in-place content rewrite.
+# Two manifests are taken per profile: one scoped to `council/` alone (the
+# artifact of record FR-007/FR-013 promise this SC exists to protect), and
+# one scoped to the WHOLE feature directory minus `renders/` (whose
+# presence/absence/emptiness is already asserted independently below) --
+# proving nothing else in the tree (e.g. profile.yaml itself) moved either.
+SC001="$TMP/sc001"
+mkdir -p "$SC001"
+
+SC001_MANIFEST_PY="$SC001/manifest_council.py"
+cat > "$SC001_MANIFEST_PY" <<'PYEOF'
+#!/usr/bin/env python3
+"""SC-001 sha256 manifest (T023 inline helper).
+
+Prints one "<sha256>  <relpath>" line per regular file under ROOT_DIR,
+sorted by relpath, to stdout -- an independently-computed byte-identity
+fingerprint of a directory subtree, never a mtime or file-count proxy
+(either of which could miss an in-place content rewrite that happens to
+land on the same size/count). Invoked twice per sc001 profile run
+(before/after a render.py invocation) by run.sh's SC-001 section, so the
+two manifests can be `cmp -s`'d.
+
+Usage: manifest_council.py ROOT_DIR [EXCLUDE_TOPLEVEL_NAME ...]
+EXCLUDE_TOPLEVEL_NAME entries are top-level child names of ROOT_DIR (not
+full paths), skipped entirely -- used to manifest a feature directory MINUS
+its own renders/, whose presence/absence/emptiness run.sh already asserts
+independently; this manifest exists only to prove nothing ELSE in the tree
+(e.g. profile.yaml itself) moved.
+"""
+import hashlib
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+excluded = set(sys.argv[2:])
+
+lines = []
+if root.is_dir():
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(root)
+        if rel.parts and rel.parts[0] in excluded:
+            continue
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        lines.append("%s  %s" % (digest, rel.as_posix()))
+
+for line in lines:
+    print(line)
+PYEOF
+
+for sc001_profile in none absent-key; do
+  # The feature directory under test lives at "$sc001_scratch/feature" --
+  # deliberately a SIBLING of, never inside, the scratch dir that holds this
+  # loop's own manifest/log files below. If the scratch files lived inside
+  # the feature dir itself, the "feature minus renders/" before/after
+  # manifest would trivially disagree (the manifest/log files did not exist
+  # yet at the "before" snapshot) -- a false positive that would make this
+  # very check untrustworthy.
+  sc001_scratch="$SC001/$sc001_profile"
+  sc001_dir="$sc001_scratch/feature"
+  mkdir -p "$sc001_dir/council/defense-deck"
+  cp "$FIXTURES/deck/technical.md" "$sc001_dir/council/defense-deck/technical.md"
+  cp "$FIXTURES/deck/overview.md" "$sc001_dir/council/defense-deck/overview.md"
+  cp "$FIXTURES/profiles/$sc001_profile.yaml" "$sc001_dir/profile.yaml"
+
+  sc001_council_before="$sc001_scratch/council-before.manifest"
+  sc001_council_after="$sc001_scratch/council-after.manifest"
+  sc001_feature_before="$sc001_scratch/feature-before.manifest"
+  sc001_feature_after="$sc001_scratch/feature-after.manifest"
+  "$PY" "$SC001_MANIFEST_PY" "$sc001_dir/council" > "$sc001_council_before"
+  "$PY" "$SC001_MANIFEST_PY" "$sc001_dir" renders > "$sc001_feature_before"
+
+  sc001_log="$sc001_scratch/render.log"
+  sc001_rc=0
+  "$PY" "$RENDER_PY" --feature "$sc001_dir" >"$sc001_log" 2>&1 || sc001_rc=$?
+
+  "$PY" "$SC001_MANIFEST_PY" "$sc001_dir/council" > "$sc001_council_after"
+  "$PY" "$SC001_MANIFEST_PY" "$sc001_dir" renders > "$sc001_feature_after"
+
+  if [ "$sc001_rc" -eq 0 ]; then
+    pass "SC-001 $sc001_profile -- render.py --feature <fixture dir>, NO explicit deck arg (selection from profile alone), exited 0 (see $sc001_log)"
+  else
+    fail "SC-001 $sc001_profile -- render.py exited $sc001_rc, expected 0 for the default nothing-selected path (see $sc001_log)"
+  fi
+
+  if [ -d "$sc001_dir/renders" ]; then
+    sc001_render_count=$(find "$sc001_dir/renders" -type f | wc -l | tr -d ' ')
+  else
+    sc001_render_count=0
+  fi
+  if [ "$sc001_render_count" -eq 0 ]; then
+    pass "SC-001 $sc001_profile -- zero files under renders/ (dir is absent or empty; FR-007/FR-016)"
+  else
+    fail "SC-001 $sc001_profile -- renders/ contains $sc001_render_count file(s), expected 0 -- deck_render: none (or the absent key) must render nothing"
+  fi
+
+  if grep -q "nothing selected" "$sc001_log"; then
+    pass "SC-001 $sc001_profile -- run discloses the nothing-selected outcome (commands.md Sec 2 step 3): $(cat "$sc001_log")"
+  else
+    fail "SC-001 $sc001_profile -- expected disclosure did not mention 'nothing selected' -- got: $(cat "$sc001_log")"
+  fi
+
+  if cmp -s "$sc001_council_before" "$sc001_council_after"; then
+    pass "SC-001 $sc001_profile -- council/ subtree byte-identical (sha256 manifest) before and after the run -- the renderer never writes under council/ (FR-007/FR-013)"
+  else
+    fail "SC-001 $sc001_profile -- council/ subtree changed by the run -- the renderer must NEVER write under council/ (manifest diff: $(diff "$sc001_council_before" "$sc001_council_after" | head -10))"
+  fi
+
+  if cmp -s "$sc001_feature_before" "$sc001_feature_after"; then
+    pass "SC-001 $sc001_profile -- feature directory minus renders/ is byte-identical before and after the run -- no stray output written anywhere outside renders/"
+  else
+    fail "SC-001 $sc001_profile -- feature directory (minus renders/) changed by the run -- something was written outside renders/ (manifest diff: $(diff "$sc001_feature_before" "$sc001_feature_after" | head -10))"
+  fi
+done
+
+# ---------------------------------------------------------------------------
+section "8. SC-008 invalid/unreadable deck_render profile fails loud, nothing written (I-B1, data-model.md Sec 1 V2/V3/V5)"
+# The guarantee under test: a typo'd/invalid `deck_render` must fail LOUDLY,
+# never silently. Two DISTINCT branches, both hard failures (exit 3), and
+# BOTH kept apart from each other and from SC-001's quiet "nothing selected
+# (deck_render: none)" outcome above -- folding either one into that quieter
+# signal is exactly what SC-008 forbids:
+#   - invalid.yaml   -- OUT-OF-ENUM (data-model.md V2/V3): the YAML itself
+#     parses cleanly; `deck_render: sparkle` is simply not one of
+#     {none,technical,overview,both}. profile_key.py's branch 2.
+#   - unreadable.yaml -- UNREADABLE/UNPARSEABLE (V5): a merge-conflict
+#     marker corrupts the YAML document before any deck_render value could
+#     even be inspected. profile_key.py's branch 3.
+# Both are exercised two ways -- a bare `render.py --feature <dir>` (no
+# explicit deck arg, so selection comes from the broken profile alone) and
+# `render.py --validate-profile --feature <dir>` -- and both must exit 3 and
+# write NOTHING (renders/ absent or empty, council/ byte-identical, same
+# sha256-manifest technique SC-001 above already established). A closing
+# sanity arm re-runs `--validate-profile` against overview.yaml (a genuinely
+# valid selection) and asserts exit 0, proving the exit-3 assertions above
+# are actually discriminating rather than a blanket nonzero from a harness
+# bug. Library-independent: profile_key.py's resolver raises before
+# render.py's lazy `import pptx` site is ever reached, so this section runs
+# (and must PASS) with no require_pptx guard, even on this pptx-absent host.
+SC008="$TMP/sc008"
+mkdir -p "$SC008"
+
+SC008_MANIFEST_PY="$SC008/manifest.py"
+cat > "$SC008_MANIFEST_PY" <<'PYEOF'
+#!/usr/bin/env python3
+"""SC-008 sha256 manifest (T024 inline helper) -- mirrors SC-001's own
+manifest_council.py idiom above, kept section-local (never imported across
+sections) per the harness's per-section "$TMP/<name>" isolation convention.
+Prints one "<sha256>  <relpath>" line per regular file under ROOT_DIR,
+sorted by relpath, to stdout -- an independently-computed byte-identity
+fingerprint, never a mtime or file-count proxy.
+
+Usage: manifest.py ROOT_DIR [EXCLUDE_TOPLEVEL_NAME ...]
+"""
+import hashlib
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+excluded = set(sys.argv[2:])
+
+lines = []
+if root.is_dir():
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(root)
+        if rel.parts and rel.parts[0] in excluded:
+            continue
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        lines.append("%s  %s" % (digest, rel.as_posix()))
+
+for line in lines:
+    print(line)
+PYEOF
+
+for sc008_profile in invalid unreadable; do
+  case "$sc008_profile" in
+    invalid) sc008_kind="out-of-enum (parseable YAML, deck_render value not in the enum)" ;;
+    unreadable) sc008_kind="unreadable/unparseable (broken YAML)" ;;
+  esac
+
+  # A SIBLING scratch dir holds this loop's own manifest/log files, never
+  # inside the feature dir itself -- mirrors SC-001's own rationale above
+  # (otherwise the "feature minus renders/" before/after manifest would
+  # trivially disagree on the scratch files' own late arrival).
+  sc008_scratch="$SC008/$sc008_profile"
+  sc008_dir="$sc008_scratch/feature"
+  mkdir -p "$sc008_dir/council/defense-deck"
+  cp "$FIXTURES/deck/technical.md" "$sc008_dir/council/defense-deck/technical.md"
+  cp "$FIXTURES/deck/overview.md" "$sc008_dir/council/defense-deck/overview.md"
+  cp "$FIXTURES/profiles/$sc008_profile.yaml" "$sc008_dir/profile.yaml"
+
+  sc008_council_before="$sc008_scratch/council-before.manifest"
+  sc008_council_after="$sc008_scratch/council-after.manifest"
+  sc008_feature_before="$sc008_scratch/feature-before.manifest"
+  sc008_feature_after="$sc008_scratch/feature-after.manifest"
+  "$PY" "$SC008_MANIFEST_PY" "$sc008_dir/council" > "$sc008_council_before"
+  "$PY" "$SC008_MANIFEST_PY" "$sc008_dir" renders > "$sc008_feature_before"
+
+  sc008_log="$sc008_scratch/render.log"
+  sc008_rc=0
+  "$PY" "$RENDER_PY" --feature "$sc008_dir" >"$sc008_log" 2>&1 || sc008_rc=$?
+
+  "$PY" "$SC008_MANIFEST_PY" "$sc008_dir/council" > "$sc008_council_after"
+  "$PY" "$SC008_MANIFEST_PY" "$sc008_dir" renders > "$sc008_feature_after"
+
+  if [ "$sc008_rc" -eq 3 ]; then
+    pass "SC-008 $sc008_profile -- render.py --feature <fixture dir>, NO explicit deck arg ($sc008_kind), exited 3 (see $sc008_log)"
+  else
+    fail "SC-008 $sc008_profile -- render.py exited $sc008_rc, expected 3 for a $sc008_kind deck_render profile (see $sc008_log)"
+  fi
+
+  if [ -d "$sc008_dir/renders" ]; then
+    sc008_render_count=$(find "$sc008_dir/renders" -type f | wc -l | tr -d ' ')
+  else
+    sc008_render_count=0
+  fi
+  if [ "$sc008_render_count" -eq 0 ]; then
+    pass "SC-008 $sc008_profile -- zero files under renders/ (dir is absent or empty) -- a $sc008_kind profile must write NOTHING"
+  else
+    fail "SC-008 $sc008_profile -- renders/ contains $sc008_render_count file(s), expected 0 -- a $sc008_kind deck_render profile must render nothing"
+  fi
+
+  if cmp -s "$sc008_council_before" "$sc008_council_after"; then
+    pass "SC-008 $sc008_profile -- council/ subtree byte-identical (sha256 manifest) before and after the run"
+  else
+    fail "SC-008 $sc008_profile -- council/ subtree changed by the run (manifest diff: $(diff "$sc008_council_before" "$sc008_council_after" | head -10))"
+  fi
+
+  if cmp -s "$sc008_feature_before" "$sc008_feature_after"; then
+    pass "SC-008 $sc008_profile -- feature directory minus renders/ is byte-identical before and after the run -- no stray output written anywhere"
+  else
+    fail "SC-008 $sc008_profile -- feature directory (minus renders/) changed by the run (manifest diff: $(diff "$sc008_feature_before" "$sc008_feature_after" | head -10))"
+  fi
+
+  # The failure must be LOUD/disclosed, not routed to the quieter 'none'
+  # branch (SC-008's own point): assert the disclosure names the failure as
+  # INVALID, and separately assert it does NOT print SC-001's silent
+  # "nothing selected (deck_render: none)" sentence -- the worse signal
+  # (a corrupt/typo'd profile) must never resolve to the quieter outcome.
+  if grep -q "INVALID" "$sc008_log"; then
+    pass "SC-008 $sc008_profile -- disclosure names the failure as INVALID (loud, non-'none'): $(cat "$sc008_log")"
+  else
+    fail "SC-008 $sc008_profile -- expected disclosure to mention INVALID -- got: $(cat "$sc008_log")"
+  fi
+
+  if grep -q "nothing selected" "$sc008_log"; then
+    fail "SC-008 $sc008_profile -- disclosure wrongly resolved to SC-001's silent 'nothing selected (deck_render: none)' outcome -- a $sc008_kind profile must fail loud, never fold into the quiet none branch (SC-008)"
+  else
+    pass "SC-008 $sc008_profile -- disclosure does NOT fall back to the silent 'nothing selected (deck_render: none)' sentence"
+  fi
+
+  # `--validate-profile` surfaces the SAME exit code on the SAME broken
+  # profile. It renders nothing by construction (render.py's
+  # --validate-profile branch returns before ever calling
+  # _expand_selection()/_render_deck()), so no further manifest check is
+  # needed here -- only the exit code.
+  sc008_validate_log="$sc008_scratch/validate.log"
+  sc008_validate_rc=0
+  "$PY" "$RENDER_PY" --validate-profile --feature "$sc008_dir" >"$sc008_validate_log" 2>&1 || sc008_validate_rc=$?
+  if [ "$sc008_validate_rc" -eq 3 ]; then
+    pass "SC-008 $sc008_profile -- render.py --validate-profile --feature <fixture dir> exited 3 (see $sc008_validate_log)"
+  else
+    fail "SC-008 $sc008_profile -- render.py --validate-profile exited $sc008_validate_rc, expected 3 for a $sc008_kind deck_render profile (see $sc008_validate_log)"
+  fi
+done
+
+# ---- sanity: a genuinely valid profile still resolves cleanly ------------
+# The discriminating counterpart to the two exit-3 arms above: without this,
+# a harness bug that made --validate-profile exit 3 unconditionally would
+# pass every assertion above undetected. overview.yaml is a real, in-enum
+# selection (profile_key.py's "parsed" + present + in-enum branch) -- no
+# council/defense-deck fixture is needed, since --validate-profile never
+# reads past profile.yaml itself.
+SC008_VALID="$SC008/valid"
+mkdir -p "$SC008_VALID"
+cp "$FIXTURES/profiles/overview.yaml" "$SC008_VALID/profile.yaml"
+
+sc008_valid_log="$SC008_VALID/validate.log"
+sc008_valid_rc=0
+"$PY" "$RENDER_PY" --validate-profile --feature "$SC008_VALID" >"$sc008_valid_log" 2>&1 || sc008_valid_rc=$?
+if [ "$sc008_valid_rc" -eq 0 ]; then
+  pass "SC-008 sanity -- render.py --validate-profile --feature <fixture dir with overview.yaml> exited 0 (see $sc008_valid_log) -- confirms the exit-3 assertions above are discriminating, not a blanket failure"
+else
+  fail "SC-008 sanity -- render.py --validate-profile exited $sc008_valid_rc, expected 0 for a valid deck_render=overview profile (see $sc008_valid_log)"
+fi
+
+# ---------------------------------------------------------------------------
+section "16. FR-016 explicit override beats profile: none (V4, boundary unchanged)"
+# The guarantee under test (data-model.md Sec 1 V4, FR-016): `deck_render` is
+# a DEFAULT SELECTION, not a hard gate. An invocation that explicitly names a
+# deck renders that deck regardless of the profile's value -- including when
+# the profile says `none`. Contrast with SC-001 above (T023): a NO-ARG
+# invocation against this exact SAME `none.yaml` profile renders nothing at
+# all ("nothing selected (deck_render: none). No file written."); this
+# section proves that giving `overview` as an explicit argument against the
+# identical profile takes a completely different path.
+#
+# Two properties, kept deliberately apart:
+#   (selection, unguarded -- runs on ANY host, pptx present or not) the
+#   overview deck is ATTEMPTED: its disclosure line reads `rendered` (pptx
+#   present) or `FAILED ... toolchain absent` (pptx absent) -- never
+#   `skipped`, and the run never falls back to SC-001's silent
+#   "nothing selected" sentence. Being attempted at all -- reaching
+#   `_render_deck()`'s per-deck body instead of stopping at commands.md Sec 2
+#   step 3's earlier "nothing selected" exit -- is what proves the explicit
+#   arg was SELECTED OVER the profile's `none`; whether that attempt then
+#   succeeds or fails on toolchain grounds is a separate, orthogonal fact
+#   (SC-003/T7 above already cover the real-render case; SC-008 above
+#   already covers profile-driven failure).
+#   (file produced, require_pptx-guarded) with the toolchain present, the
+#   SAME invocation actually writes `renders/overview.pptx` and exits 0 --
+#   this is the only part of this section that needs a real render.
+#
+# The boundary is unchanged either way (FR-016's own closing sentence,
+# spec.md): an explicitly-rendered deck is still derived, still un-bound
+# (never in gates.yml), still un-traced (no traces.jsonl record), and the
+# markdown under council/ remains the untouched artifact of record. These
+# boundary assertions are unguarded -- library-independent, like SC-001's --
+# and must PASS on this pptx-absent host exactly as they must on a host with
+# the toolchain installed.
+FR016="$TMP/fr016"
+FR016_DIR="$FR016/feature"
+mkdir -p "$FR016_DIR/council/defense-deck"
+cp "$FIXTURES/deck/technical.md" "$FR016_DIR/council/defense-deck/technical.md"
+cp "$FIXTURES/deck/overview.md" "$FR016_DIR/council/defense-deck/overview.md"
+cp "$FIXTURES/profiles/none.yaml" "$FR016_DIR/profile.yaml"
+
+# The byte-identity manifest: an independently-computed sha256 fingerprint
+# (relpath -> hashlib.sha256 of the file's bytes, sorted), never a mtime or
+# file-count proxy -- mirrors SC-001's own manifest_council.py idiom above,
+# kept section-local per the harness's per-section "$TMP/<name>" isolation
+# convention rather than shared across sections.
+FR016_MANIFEST_PY="$FR016/manifest.py"
+cat > "$FR016_MANIFEST_PY" <<'PYEOF'
+#!/usr/bin/env python3
+"""FR-016 sha256 manifest (T025 inline helper) -- mirrors SC-001's own
+manifest_council.py idiom above. Prints one "<sha256>  <relpath>" line per
+regular file under ROOT_DIR, sorted by relpath, to stdout. Invoked twice
+(before/after the explicit-arg render) by run.sh's FR-016 section, so the
+two manifests can be `cmp -s`'d.
+
+Usage: manifest.py ROOT_DIR [EXCLUDE_TOPLEVEL_NAME ...]
+"""
+import hashlib
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+excluded = set(sys.argv[2:])
+
+lines = []
+if root.is_dir():
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(root)
+        if rel.parts and rel.parts[0] in excluded:
+            continue
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        lines.append("%s  %s" % (digest, rel.as_posix()))
+
+for line in lines:
+    print(line)
+PYEOF
+
+fr016_council_before="$FR016/council-before.manifest"
+fr016_council_after="$FR016/council-after.manifest"
+fr016_feature_before="$FR016/feature-before.manifest"
+fr016_feature_after="$FR016/feature-after.manifest"
+"$PY" "$FR016_MANIFEST_PY" "$FR016_DIR/council" > "$fr016_council_before"
+"$PY" "$FR016_MANIFEST_PY" "$FR016_DIR" renders > "$fr016_feature_before"
+
+fr016_log="$FR016/render.log"
+fr016_rc=0
+"$PY" "$RENDER_PY" overview --feature "$FR016_DIR" >"$fr016_log" 2>&1 || fr016_rc=$?
+
+"$PY" "$FR016_MANIFEST_PY" "$FR016_DIR/council" > "$fr016_council_after"
+"$PY" "$FR016_MANIFEST_PY" "$FR016_DIR" renders > "$fr016_feature_after"
+
+# ---- selection: the explicit arg beat the profile's none (unguarded) ------
+if grep -qE '^  overview   rendered   ' "$fr016_log"; then
+  fr016_overview_status="rendered"
+elif grep -qE '^  overview   FAILED     ' "$fr016_log"; then
+  fr016_overview_status="FAILED (attempted, toolchain or other render failure -- see SC-003/T7 above for the real-render case)"
+else
+  fr016_overview_status=""
+fi
+if [ -n "$fr016_overview_status" ]; then
+  pass "FR-016 override selected -- render.py overview --feature <dir> (profile: none) ATTEMPTED the overview deck ($fr016_overview_status, never skipped) -- the explicit arg was selected over the profile's none (see $fr016_log)"
+else
+  fail "FR-016 override selected -- expected the overview deck's disclosure line to show rendered or FAILED (i.e. attempted), got: $(cat "$fr016_log")"
+fi
+
+if grep -q '^  overview   skipped' "$fr016_log"; then
+  fail "FR-016 override selected -- overview line shows skipped -- the explicit arg did NOT beat the profile's none (see $fr016_log)"
+else
+  pass "FR-016 override selected -- overview line is never skipped"
+fi
+
+if grep -q "nothing selected" "$fr016_log"; then
+  fail "FR-016 override selected -- disclosure fell back to SC-001/T023's silent 'nothing selected (deck_render: none)' sentence -- an explicit overview argument must beat profile: none, not resolve to the no-arg outcome (see $fr016_log)"
+else
+  pass "FR-016 override selected -- disclosure does NOT fall back to the silent 'nothing selected (deck_render: none)' sentence that the SAME none.yaml profile produces on a no-arg run (SC-001/T023) -- proves the explicit arg overrode the profile"
+fi
+
+# ---- boundary unchanged: derived / un-bound / un-traced (unguarded) -------
+fr016_traces_count=$(find "$FR016_DIR" -name 'traces.jsonl' 2>/dev/null | wc -l | tr -d ' ')
+if [ "$fr016_traces_count" -eq 0 ]; then
+  pass "FR-016 boundary -- zero traces.jsonl anywhere under the feature dir -- the explicit-arg render writes no trace record (un-traced)"
+else
+  fail "FR-016 boundary -- found $fr016_traces_count traces.jsonl file(s) under the feature dir, expected 0 -- an explicit-arg render must remain un-traced"
+fi
+
+if [ -f "$FR016_DIR/gates.yml" ]; then
+  fail "FR-016 boundary -- gates.yml exists under the feature dir after an explicit-arg render -- the render must remain un-bound, never entering gates.yml"
+else
+  pass "FR-016 boundary -- no gates.yml created under the feature dir -- the render remains un-bound"
+fi
+
+if cmp -s "$fr016_council_before" "$fr016_council_after"; then
+  pass "FR-016 boundary -- council/ subtree byte-identical (sha256 manifest) before and after the explicit-arg render -- the markdown remains the untouched artifact of record"
+else
+  fail "FR-016 boundary -- council/ subtree changed by the explicit-arg render (manifest diff: $(diff "$fr016_council_before" "$fr016_council_after" | head -10))"
+fi
+
+if cmp -s "$fr016_feature_before" "$fr016_feature_after"; then
+  pass "FR-016 boundary -- feature directory minus renders/ is byte-identical before and after the run -- the explicit-arg render writes ONLY under renders/ (no traces.jsonl, no gates.yml, nothing else)"
+else
+  fail "FR-016 boundary -- feature directory (minus renders/) changed by the explicit-arg render -- something was written outside renders/ (manifest diff: $(diff "$fr016_feature_before" "$fr016_feature_after" | head -10))"
+fi
+
+# ---- file actually produced (require_pptx-guarded) -------------------------
+if require_pptx "FR-016 override renders a file"; then
+  if [ "$fr016_rc" -eq 0 ] && [ -f "$FR016_DIR/renders/overview.pptx" ]; then
+    pass "FR-016 override renders a file -- render.py overview --feature <dir> (profile: none) exited 0 and wrote renders/overview.pptx (see $fr016_log)"
+  else
+    fail "FR-016 override renders a file -- render.py overview exited $fr016_rc or renders/overview.pptx is missing -- expected the explicit arg to actually produce the file once python-pptx is present (see $fr016_log)"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+section "12. S12 deck_render enum SSOT drift -- profile_key.py vs. the contract docs, both directions (T026)"
+# The guarantee under test (plan.md S12): the closed enum {none, technical,
+# overview, both} is defined EXACTLY ONCE, in profile_key.py, exported as
+# DECK_RENDER_ENUM -- every contract doc that names this enum is asserted
+# AGAINST that export, never re-typed as an independent copy. plan.md cites
+# a live cautionary precedent for what happens when this discipline is
+# skipped: `council_tier: standrad` (sic) degrades silently today precisely
+# because ITS enum lives in two unlinked places with nothing checking them
+# against each other. This section is the fixture Phase C promises to close
+# that exact drift shape for deck_render specifically.
+#
+# Two docs, each checked at the SPECIFIC anchor(s) where they name the
+# enum -- never a whole-file substring scan, which a stray, unrelated
+# occurrence of the word "both" or "none" elsewhere in the prose could
+# satisfy vacuously:
+#   - docs/contracts/profile-schema.md Sec 1 (the ```yaml schema block's
+#     `deck_render:` comment, e.g. "none | technical | overview | both.")
+#     and Sec 3 (the field table's `deck_render` row, "One of `none` |
+#     `technical` | `overview` | `both`").
+#   - specs/006-deck-render/contracts/commands.md Sec 1 (the command
+#     signature's `[technical|overview|both]` bracket group and the
+#     Arguments table's matching backtick-quoted row) and Sec 4 (the `both`
+#     outcome matrix's own per-deck naming sentence, "`technical` and
+#     `overview` are interchangeable in this table", combined with its
+#     "Under `deck_render: both`" lead-in) -- deliberately NOT a blind scan
+#     of that table's cells, which are full of unrelated backtick-quoted
+#     OUTCOME values (`rendered`, `failed`, `skipped`) that are not
+#     deck-selector values at all.
+# Every comparison is a SET, both directions: a doc value the code doesn't
+# export (extra) is a FAIL exactly like a code value the doc omits
+# (missing) -- neither direction is favored, per S12's own wording ("fails
+# if the contract doc's list diverges from it").
+# commands.md's three anchors are compared against the SSOT MINUS `none`
+# (the three CLI-selectable decks -- `none` is expressed by omitting the
+# argument entirely, never a literal selector token, per commands.md Sec 1's
+# own Arguments table: "(none) | Render exactly what the feature's
+# profile.yaml selects").
+# Pure text/code inspection -- profile_key.py has no pptx dependency and
+# neither contract doc does either -- so this runs (and must PASS) on any
+# host, no require_pptx guard.
+S12="$TMP/s12"
+mkdir -p "$S12"
+S12_PROFILE_SCHEMA_MD="$REPO/docs/contracts/profile-schema.md"
+S12_COMMANDS_MD="$REPO/specs/006-deck-render/contracts/commands.md"
+
+S12_CHECK_PY="$S12/check_enum_drift.py"
+cat > "$S12_CHECK_PY" <<'PYEOF'
+#!/usr/bin/env python3
+"""S12 deck_render enum SSOT-drift checker (T026 inline helper).
+
+Invoked once by run.sh's S12 section. Imports profile_key.py DIRECTLY (the
+module under test IS the SSOT -- DECK_RENDER_ENUM -- so this checker never
+re-types a second copy of the four literals) and compares it, as a SET in
+BOTH directions, against the exact anchors where docs/contracts/
+profile-schema.md and specs/006-deck-render/contracts/commands.md name the
+enum. A doc value the code does not export (extra) and a code value the
+doc omits (missing) are both a FAIL -- this is the drift shape plan.md's
+S12 paragraph cites `council_tier: standrad` as the cautionary precedent
+for.
+
+Prints one result per line to stdout, "RESULT <PASS|FAIL> <label>". run.sh
+reads this back from a temp FILE (never a pipe, so its PASS/FAIL counters
+are not evaluated inside a subshell) and calls its own pass()/fail().
+"""
+import re
+import sys
+from pathlib import Path
+
+SCRIPTS_DIR, PROFILE_SCHEMA_MD, COMMANDS_MD = sys.argv[1:4]
+
+sys.path.insert(0, SCRIPTS_DIR)
+
+import profile_key  # noqa: E402 -- the SSOT itself; never re-typed here
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
+SSOT = set(profile_key.DECK_RENDER_ENUM)
+# The three CLI-selectable decks: SSOT minus 'none' -- 'none' is expressed
+# by omitting the argument, never a literal selector token (commands.md
+# Sec 1's own Arguments table, the "(none)" row).
+SSOT_SELECTABLE = SSOT - {profile_key.DECK_RENDER_DEFAULT}
+
+
+def emit(verdict, label):
+    label = " ".join(label.split())
+    if len(label) > 240:
+        label = label[:240] + " ...(truncated)"
+    print("RESULT %s %s" % (verdict, label))
+
+
+def compare(anchor_label, found, expected):
+    """Both-direction SET comparison -- never a loose substring check a
+    stray occurrence could satisfy. A value found in the doc that the SSOT
+    does not export (extra), OR an SSOT value the doc omits (missing), is a
+    FAIL either way.
+    """
+    extra = found - expected
+    missing = expected - found
+    if not extra and not missing:
+        emit("PASS", "%s -- %s matches profile_key.DECK_RENDER_ENUM exactly" % (anchor_label, sorted(found)))
+        return
+    detail = []
+    if extra:
+        detail.append("doc lists %s which profile_key.py does NOT export" % sorted(extra))
+    if missing:
+        detail.append("profile_key.py exports %s which the doc omits" % sorted(missing))
+    emit("FAIL", "%s -- diverges from the SSOT (expected %s): %s" % (anchor_label, sorted(expected), "; ".join(detail)))
+
+
+def check_profile_schema(path):
+    text = Path(path).read_bytes().decode("utf-8")
+
+    # Sec 1: the FIRST fenced ```yaml schema block's `deck_render:` comment
+    # line, e.g. "deck_render: none  # optional, default none (D73(3)).
+    # none | technical | overview | both." -- the trailing period-terminated
+    # "a | b | c | d" segment is the doc's own enumeration, independent of
+    # the Sec 3 table below.
+    block_match = re.search(r"```yaml\n(.*?)```", text, re.DOTALL)
+    if block_match is None:
+        emit("FAIL", "profile-schema.md Sec1 -- no ```yaml fenced schema block found at all; cannot locate the deck_render line")
+    else:
+        line_match = re.search(r"^deck_render:.*$", block_match.group(1), re.MULTILINE)
+        if line_match is None:
+            emit("FAIL", "profile-schema.md Sec1 -- the ```yaml schema block has no `deck_render:` line at all")
+        else:
+            list_match = re.search(r"\.\s*([a-z]+(?:\s*\|\s*[a-z]+)+)\.\s*$", line_match.group(0))
+            if list_match is None:
+                emit("FAIL", "profile-schema.md Sec1 -- deck_render line has no trailing 'a | b | c' enum list: %r" % line_match.group(0))
+            else:
+                found = {tok.strip() for tok in list_match.group(1).split("|")}
+                compare("profile-schema.md Sec1 (schema block deck_render comment)", found, SSOT)
+
+    # Sec 3: the field table's `deck_render` row, e.g. "| `deck_render` |
+    # enum scalar | `none` | One of `none` \\| `technical` \\| `overview` \\|
+    # `both` (D73(3)); ..." -- only the "One of ..." list segment is
+    # captured, never the whole row (which also re-mentions `none` twice
+    # elsewhere in its own prose).
+    row_match = re.search(r"^\|\s*`deck_render`\s*\|.*$", text, re.MULTILINE)
+    if row_match is None:
+        emit("FAIL", "profile-schema.md Sec3 -- no field-table row starting with `deck_render` found at all")
+    else:
+        list_match = re.search(r"One of\s+((?:`[a-zA-Z_]+`\s*\\?\|\s*)+`[a-zA-Z_]+`)", row_match.group(0))
+        if list_match is None:
+            emit("FAIL", "profile-schema.md Sec3 -- deck_render row has no 'One of `a` | `b` ...' enum list: %r" % row_match.group(0))
+        else:
+            found = set(re.findall(r"`([a-zA-Z_]+)`", list_match.group(1)))
+            compare("profile-schema.md Sec3 (field-table deck_render row 'One of' list)", found, SSOT)
+
+
+def check_commands(path):
+    text = Path(path).read_bytes().decode("utf-8")
+
+    # Sec 1: the command signature's bracketed deck-selector group --
+    # "/speckit-deck-render [technical|overview|both] [--feature <dir>]
+    # [--validate-profile]" -- only the FIRST bracket group is a
+    # pipe-delimited alpha list; the other two never match this pattern.
+    sig_match = re.search(r"/speckit-deck-render\s+\[([a-z]+(?:\|[a-z]+)+)\]", text)
+    if sig_match is None:
+        emit("FAIL", "commands.md Sec1 -- no '/speckit-deck-render [a|b|c]' signature line found at all")
+    else:
+        found = set(sig_match.group(1).split("|"))
+        compare("commands.md Sec1 (command signature [technical|overview|both])", found, SSOT_SELECTABLE)
+
+    # Sec 1: the Arguments table's enum row, e.g. "| `technical` \\|
+    # `overview` \\| `both` | **Explicit selection ...` |" -- anchored on
+    # the unique "**Explicit selection" text that follows it on the SAME
+    # line, so this can never accidentally latch onto an unrelated
+    # backtick-pipe-backtick row elsewhere in the doc (e.g. the Sec 4
+    # outcome-matrix's own `rendered`/`rendered` rows).
+    arg_row_match = re.search(
+        r"^\|\s*((?:`[a-zA-Z]+`\s*\\?\|\s*)+`[a-zA-Z]+`)\s*\|\s*\*\*Explicit selection",
+        text, re.MULTILINE,
+    )
+    if arg_row_match is None:
+        emit("FAIL", "commands.md Sec1 -- no Arguments-table 'Explicit selection' row enumerating backtick-quoted deck values found at all")
+    else:
+        found = set(re.findall(r"`([a-zA-Z]+)`", arg_row_match.group(1)))
+        compare("commands.md Sec1 (Arguments table deck-selector row)", found, SSOT_SELECTABLE)
+
+    # Sec 4: the `both` outcome matrix's own per-deck naming -- "`technical`
+    # and `overview` are interchangeable in this table" plus its "Under
+    # `deck_render: both`" lead-in -- deliberately NOT a blind scan of the
+    # whole outcome-matrix table, whose cells are full of unrelated
+    # backtick-quoted OUTCOME values (`rendered`, `failed`, `skipped`) that
+    # are not deck-selector values at all.
+    pair_match = re.search(r"`([a-zA-Z]+)`\s+and\s+`([a-zA-Z]+)`\s+are interchangeable in this table", text)
+    under_match = re.search(r"Under\s+`deck_render:\s*([a-zA-Z]+)`", text)
+    if pair_match is None or under_match is None:
+        emit("FAIL", "commands.md Sec4 -- could not locate the both-outcome-matrix's per-deck naming sentence ('`X` and `Y` are interchangeable in this table') and/or its 'Under `deck_render: Z`' lead-in")
+    else:
+        found = {pair_match.group(1), pair_match.group(2), under_match.group(1)}
+        compare("commands.md Sec4 (both-outcome-matrix per-deck naming)", found, SSOT_SELECTABLE)
+
+
+emit("PASS", "S12 SSOT read -- profile_key.DECK_RENDER_ENUM = %s (from %s)" % (profile_key.DECK_RENDER_ENUM, profile_key.__file__))
+
+for doc_label, checker, doc_path in (
+    ("profile-schema.md", check_profile_schema, PROFILE_SCHEMA_MD),
+    ("commands.md", check_commands, COMMANDS_MD),
+):
+    try:
+        checker(doc_path)
+    except Exception as exc:  # noqa: BLE001 -- isolate one doc's crash from the other (I-B2 idiom)
+        emit("FAIL", "%s -- checker crashed: %r" % (doc_label, exc))
+PYEOF
+
+S12_RESULTS="$S12/results.txt"
+s12_check_rc=0
+"$PY" "$S12_CHECK_PY" "$SCRIPTS" "$S12_PROFILE_SCHEMA_MD" "$S12_COMMANDS_MD" > "$S12_RESULTS" 2>"$S12/check_enum_drift.err" || s12_check_rc=$?
+
+if [ "$s12_check_rc" -ne 0 ]; then
+  fail "S12 enum SSOT-drift checker exited $s12_check_rc (a bug in the checker itself, not necessarily a real doc divergence) -- see $S12/check_enum_drift.err"
+fi
+
+s12_result_count=0
+# Read from a FILE, never a pipe: piping into `while read` would run the
+# loop body in a subshell, and pass()/fail() updating PASS/FAIL there would
+# be lost the moment the pipeline exits (mirrors every prior section above).
+while read -r s12_tag s12_verdict s12_label; do
+  [ "$s12_tag" = "RESULT" ] || continue
+  s12_result_count=$((s12_result_count + 1))
+  case "$s12_verdict" in
+    PASS) pass "$s12_label" ;;
+    FAIL) fail "$s12_label" ;;
+    *) fail "S12 checker produced an unparseable result line: $s12_tag $s12_verdict $s12_label" ;;
+  esac
+done < "$S12_RESULTS"
+
+if [ "$s12_result_count" -eq 0 ] && [ "$s12_check_rc" -eq 0 ]; then
+  fail "S12 enum SSOT-drift checker produced zero result lines -- a silent 0-assertion pass, which S10's discipline forbids"
+fi
+
 report
