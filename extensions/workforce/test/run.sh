@@ -77,6 +77,7 @@ section "3. validator units (frontmatter parser + categorization + skill validat
 run_suite "test_frontmatter.py (S21 shared parser)" python3 "$here/test_frontmatter.py"
 run_suite "test_categorize.sh (SC-001/002, S22 no-write)" sh "$here/test_categorize.sh"
 run_suite "test_skill_builder.sh (FR-007/S9, SC-007/S04, grant-disjoint)" sh "$here/test_skill_builder.sh"
+run_suite "test_profile.sh (SC-008/009/010, FR-018 enum-equiv, R1-S09/S10/S18)" sh "$here/test_profile.sh"
 
 # ---------------------------------------------------------------------------
 section "4. loop-closure (SC-008 — traces carry only approved assemblies)"
