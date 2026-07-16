@@ -15,6 +15,8 @@
 #                                <gate>` still succeed for council AND workforce (R1-S04/S07/S17)?
 #   5. before_specify drift lint (R1-S29/D50) — grep guard against the rejected before_specify
 #                                branch-creation design
+#   (§8 branch.sh/commit.sh worktree regression I-28; §9/§10 cleanup.sh integrate+tag+delete,
+#    single-worktree happy path AND the I-30/D81 base-branch-in-a-sibling-worktree regression.)
 #
 # Runs entirely in throwaway dirs under a temp root; never touches this repo.
 # Usage:  sh extensions/git/test/run.sh
@@ -606,6 +608,87 @@ else
 fi
 
 ( cd "$R8" && git worktree remove --force "$WT" >/dev/null 2>&1 ) || true
+
+# ---------------------------------------------------------------------------
+bold "9. cleanup.sh happy path (single worktree): integrate + tag + delete"
+# cleanup.sh had ZERO coverage until now — which is exactly why the worktree
+# checkout bug (section 10) reached 006 unnoticed. This section pins the plain
+# single-clone contract: ff-integrate the feature branch into base_branch, set
+# the mandatory complete/<spec-id> tag, delete the branch, and no-op on re-run.
+CLEANUP_SH="$GIT_EXT/extension/scripts/cleanup.sh"
+R9="$TMP/cleanup-solo"; mk_repo "$R9" "070-cleanup-solo"
+( cd "$R9" && git branch -M main )                     # base_branch resolves to main (git-config.yml)
+( cd "$R9" && git checkout -q -b 070-cleanup-solo \
+    && : > feat && git add -A && git commit -qm "feature work" )
+
+if ( cd "$R9" && sh "$CLEANUP_SH" 070-cleanup-solo >/dev/null 2>&1 ); then
+  ok "cleanup.sh exits 0 integrating a feature branch (single worktree)"
+else
+  bad "cleanup.sh FAILED on the plain single-worktree happy path"
+fi
+if git -C "$R9" rev-parse --verify --quiet refs/tags/complete/070-cleanup-solo >/dev/null; then
+  ok "cleanup.sh created the mandatory complete/<spec-id> tag"
+else
+  bad "cleanup.sh did not create the complete/<spec-id> tag"
+fi
+if git -C "$R9" rev-parse --verify --quiet refs/heads/070-cleanup-solo >/dev/null 2>&1; then
+  bad "cleanup.sh left the feature branch undeleted"
+else
+  ok "cleanup.sh deleted the feature branch (git branch -d)"
+fi
+if ( cd "$R9" && git log main --format=%s | grep -q "feature work" ); then
+  ok "base_branch received the feature branch's commits"
+else
+  bad "base_branch is missing the feature branch's commits after integration"
+fi
+# idempotency: a second run is a clean no-op (branch gone, tag present)
+if ( cd "$R9" && sh "$CLEANUP_SH" 070-cleanup-solo 2>&1 | grep -q "already clean" ); then
+  ok "cleanup.sh re-run is an idempotent no-op (branch gone, tag present)"
+else
+  bad "cleanup.sh re-run did not report the idempotent no-op"
+fi
+
+# ---------------------------------------------------------------------------
+bold "10. cleanup.sh worktree regression (I-30): base_branch in a sibling worktree"
+# THE bug this whole fix exists for. In the per-feature-worktree layout this
+# repo actually uses, base_branch (main) is checked out in the PRIMARY worktree
+# while the feature branch lives in its own linked worktree. cleanup.sh's old
+# unconditional `git checkout <base>` then dies with "fatal: 'main' is already
+# used by worktree ..." — blocking integration on every feature. The fix
+# integrates in whichever worktree owns base_branch and detaches the feature
+# worktree's HEAD so the branch can be retired.
+R10="$TMP/cleanup-wt"; mk_repo "$R10" "071-cleanup-wt"
+( cd "$R10" && git branch -M main )
+WT10="$TMP/cleanup-wt-feat"
+( cd "$R10" && git worktree add -q -b 071-cleanup-wt "$WT10" >/dev/null 2>&1 )
+( cd "$WT10" && : > feat && git add -A && git commit -qm "worktree feature work" )
+
+[ -f "$WT10/.git" ] \
+  && ok "fixture: base_branch in primary worktree, feature branch in a linked worktree (I-30 precondition)" \
+  || bad "fixture: linked worktree not set up — this section is NOT exercising I-30"
+
+# THE regression: run cleanup FROM the feature worktree, base checked out elsewhere.
+if ( cd "$WT10" && sh "$CLEANUP_SH" >/dev/null 2>&1 ); then
+  ok "cleanup.sh integrates from a feature worktree with base_branch in another (I-30)"
+else
+  bad "cleanup.sh FAILED from a feature worktree — the 'already used by worktree' checkout bug is back (I-30)"
+fi
+if git -C "$R10" rev-parse --verify --quiet refs/tags/complete/071-cleanup-wt >/dev/null; then
+  ok "cleanup.sh created the completion tag from a worktree integration"
+else
+  bad "cleanup.sh did not create the completion tag from a worktree"
+fi
+if git -C "$R10" rev-parse --verify --quiet refs/heads/071-cleanup-wt >/dev/null 2>&1; then
+  bad "cleanup.sh left the feature branch undeleted after a worktree integration"
+else
+  ok "cleanup.sh deleted the feature branch (detached the worktree HEAD first)"
+fi
+if ( cd "$R10" && git log main --format=%s | grep -q "worktree feature work" ); then
+  ok "base_branch (in its own worktree) fast-forwarded to include the feature commits"
+else
+  bad "base_branch did not receive the feature worktree's commits"
+fi
+( cd "$R10" && git worktree remove --force "$WT10" >/dev/null 2>&1 ) || true
 
 # ---------------------------------------------------------------------------
 bold "Result: $PASS passed, $FAIL failed"

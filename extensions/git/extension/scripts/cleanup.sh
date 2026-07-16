@@ -78,6 +78,18 @@ tag_exists() {
     git show-ref --verify --quiet "refs/tags/$1"
 }
 
+# worktree_of_branch <branch> — path of the worktree that currently has
+# <branch> checked out, or empty if none. In a linked-worktree layout the
+# base_branch and the feature branch live in *different* worktrees, and git
+# forbids checking a branch out in two places at once — so cleanup must ask
+# where each branch lives rather than assume it can `git checkout` in place.
+worktree_of_branch() {
+    git worktree list --porcelain 2>/dev/null | awk -v want="refs/heads/$1" '
+        /^worktree / { path = substr($0, 10) }
+        /^branch /   { if (substr($0, 8) == want) { print path; exit } }
+    '
+}
+
 # ---------------------------------------------------------------------------
 # Args
 # ---------------------------------------------------------------------------
@@ -173,45 +185,93 @@ fi
 branch_exists "$base_branch" || die "base_branch '$base_branch' does not exist locally"
 
 # ---------------------------------------------------------------------------
+# Locate base_branch. In a linked-worktree layout it is typically checked out
+# in a *different* worktree (e.g. the primary clone), where git forbids us from
+# checking it out here — a `git checkout <base>` would fail with "already used
+# by worktree ...", blocking every cleanup run invoked from a feature worktree
+# (I-30/D81). Integrate in whichever worktree owns base_branch rather than
+# assuming this one can hold it.
+# ---------------------------------------------------------------------------
+
+base_wt=$(worktree_of_branch "$base_branch")
+
+if [ -n "$base_wt" ] && [ "$base_wt" != "$repo_root" ]; then
+    # base_branch lives elsewhere — operate there, and require it clean so a
+    # fast-forward can't be blocked by, or leave behind, unrelated local state.
+    [ -z "$(git -C "$base_wt" status --porcelain)" ] \
+        || die "base_branch '$base_branch' is checked out in worktree '$base_wt' with a dirty working tree; commit or stash there before cleanup"
+    integrate_here=false
+else
+    # base_branch is here (or checked out nowhere) — check it out in place, the
+    # original single-worktree behavior.
+    git checkout --quiet "$base_branch" || die "could not check out base_branch '$base_branch'"
+    integrate_here=true
+fi
+
+# bgit — run git in base_branch's worktree (here, or the one that owns it).
+bgit() {
+    if [ "$integrate_here" = true ]; then
+        git "$@"
+    else
+        git -C "$base_wt" "$@"
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # Integrate: ff when possible, --no-ff only when base_branch has diverged
 # from the feature branch tip (D52). Never squash, never rebase-collapse.
 # ---------------------------------------------------------------------------
-
-git checkout --quiet "$base_branch" || die "could not check out base_branch '$base_branch'"
 
 ff_possible=false
 git merge-base --is-ancestor "$base_branch" "$feature_branch" && ff_possible=true
 
 merge_failed=false
 if [ "$ff_possible" = true ]; then
-    git merge --ff-only "$feature_branch" || merge_failed=true
+    bgit merge --ff-only "$feature_branch" || merge_failed=true
 else
-    git merge --no-ff -m "complete(${spec_id}): integrate ${feature_branch} into ${base_branch}" "$feature_branch" || merge_failed=true
+    bgit merge --no-ff -m "complete(${spec_id}): integrate ${feature_branch} into ${base_branch}" "$feature_branch" || merge_failed=true
 fi
 
 if [ "$merge_failed" = true ]; then
-    git merge --abort >/dev/null 2>&1 || true
+    bgit merge --abort >/dev/null 2>&1 || true
     die "integration of '$feature_branch' into '$base_branch' failed (likely a merge conflict) — merge aborted, no changes made, '$feature_branch' left intact; resolve manually and re-run cleanup.sh"
 fi
 
+integration_commit=$(git rev-parse "$base_branch")
+
 # ---------------------------------------------------------------------------
 # Mandatory completion anchor: annotated tag at the integration commit,
-# unconditionally, regardless of merge topology (D52). Skip only if a
-# prior, interrupted run already created it.
+# unconditionally, regardless of merge topology (D52). Tags are global — this
+# works the same whichever worktree performed the merge. Skip only if a prior,
+# interrupted run already created it.
 # ---------------------------------------------------------------------------
 
 if [ "$tag_is_present" = true ]; then
     printf 'cleanup.sh: tag "%s" already present; skipping tag creation.\n' "$tag_name"
 else
-    git tag -a "$tag_name" HEAD -m "Completion anchor for ${spec_id} (integrated into ${base_branch})"
+    git tag -a "$tag_name" "$integration_commit" -m "Completion anchor for ${spec_id} (integrated into ${base_branch})"
 fi
 
 # ---------------------------------------------------------------------------
-# Retire the feature branch. `-d` (never `-D`): git itself refuses if any
-# commit would become unreachable, so this is the no-silent-loss guard.
+# Retire the feature branch. `git branch -d` refuses to delete a branch that is
+# checked out in ANY worktree — so if the feature branch is still checked out
+# (typically the very worktree cleanup was invoked from), detach that HEAD
+# first. After a fast-forward the detached commit is the one already in the
+# working tree, so no files change; the worktree DIRECTORY is left in place for
+# the human to remove when they choose (never `git worktree remove` — it can be
+# the caller's own current directory). `-d` (never `-D`): git refuses if any
+# commit would become unreachable — the no-silent-loss guard.
 # ---------------------------------------------------------------------------
+
+feature_wt=$(worktree_of_branch "$feature_branch")
+detached_note=""
+if [ -n "$feature_wt" ]; then
+    git -C "$feature_wt" checkout --quiet --detach \
+        || die "feature branch '$feature_branch' is checked out in worktree '$feature_wt' and its HEAD could not be detached to retire the branch"
+    detached_note=" (worktree '$feature_wt' left on a detached HEAD)"
+fi
 
 git branch -d "$feature_branch" || die "'$feature_branch' still has commits not reachable from '$base_branch'; refusing to force-delete — resolve manually"
 
-printf 'cleanup.sh: integrated "%s" into "%s"; tag "%s" set; branch deleted.\n' \
-    "$feature_branch" "$base_branch" "$tag_name"
+printf 'cleanup.sh: integrated "%s" into "%s"; tag "%s" set; branch deleted.%s\n' \
+    "$feature_branch" "$base_branch" "$tag_name" "$detached_note"
