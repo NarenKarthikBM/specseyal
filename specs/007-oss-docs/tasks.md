@@ -123,7 +123,7 @@ Monorepo pipeline-extension + docs feature (plan §Project Type) — **not** a `
 ## Phase 6: Polish & Cross-Cutting Concerns
 
 - [X] T017 [US3] Run the full `quickstart.md` validation as the on-branch integration gate — Arm B `V1–V7` (SC-007/008/009/010 + FR-018 subsumption + regression V6) and Arm A `D1–D5` (SC-001..006, SC-011) — binding **every** SC to an executed check per the quickstart SC→check map. Depends on T008, T011, T015.
-- [ ] T016 [P] **Post-merge** graphify graph refresh (R1-S13) — after the feature branch integrates to `base_branch`, regenerate `graphify-out/graph.json` (via `/speckit-graphify-context` / graphify) so FR-018's new cross-extension coupling (`validate-profile.py` → `profile_key.py`) is **graph-checkable**, not resting on the stale graph + the equivalence test alone. Housekeeping — runs after `git-cleanup`, outside the implement waves.
+- [X] T016 [P] **Post-merge** graphify graph refresh (R1-S13) — after the feature branch integrates to `base_branch`, regenerate `graphify-out/graph.json` (via `/speckit-graphify-context` / graphify) so FR-018's new cross-extension coupling (`validate-profile.py` → `profile_key.py`) is **graph-checkable**, not resting on the stale graph + the equivalence test alone. Housekeeping — runs after `git-cleanup`, outside the implement waves.
 
 ---
 
