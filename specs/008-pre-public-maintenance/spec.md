@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: User description: "008" — the pre-public maintenance + adopter-experience feature the decision log frames as the "Actionable-now cluster" (docs/90, grouped 2026-07-17). All six ripe, unblocked items are in scope per the owner's `/speckit-specify` scope decision (2026-07-17): **I-32** (clone-free one-command install), **I-11** (contract conformance checker), **I-23** (git-ext manual-fallback block fix), **I-26** (augment inline-comment strip), **I-29** (council-round apparatus provenance), **I-31** (implement-parallel trace guard).
+**Input**: User description: "008" — the pre-public maintenance + adopter-experience feature the decision log frames as the "Actionable-now cluster" (docs/90, grouped 2026-07-17). All six ripe, unblocked items are in scope per the owner's `/speckit-specify` scope decision (2026-07-17, **D84**): **I-32** (clone-free one-command install), **I-11** (contract conformance checker), **I-23** (git-ext manual-fallback block fix), **I-26** (augment inline-comment strip), **I-29** (council-round apparatus provenance), **I-31** (implement-parallel trace guard).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -131,7 +131,7 @@ Four latent defects — each unhit or silently non-blocking today — would misl
 
 ## Assumptions
 
-- **This is the pre-public maintenance feature** the `docs/90` Actionable-now cluster (2026-07-17) frames as the natural `008`; **all six items are in scope** per the owner's `/speckit-specify` scope decision (2026-07-17). (docs/90 Actionable-now cluster; owner ruling 2026-07-17)
+- **This is the pre-public maintenance feature** the `docs/90` Actionable-now cluster (2026-07-17) frames as the natural `008`; **all six items are in scope** per the owner's `/speckit-specify` scope decision (2026-07-17). (docs/90 Actionable-now cluster; D84)
 - **The visibility commit is out of scope**: flipping the repo public and archiving `speckit-graphifyy` with a pointer remains a single manual step *after* `008` (D73, amending D29/D26); this feature only removes remaining rough edges and blockers before it. (D73/D29/D26)
 - **The four excluded items stay excluded**: I-24/I-25 (new graphify edge kinds) are booked-not-build until the recurring-evidence bar is met (D76/D66); I-21 (D47 token-attribution helper) is observability-track, better with M5 context; I-16 is obsolete and I-17 was fixed at M4. (docs/90 cluster exclusions; D66/D76/D47)
 - **The profile half of the contract-conformance pile already shipped in `007`** (the I-27 profile validator); I-11 covers the *remaining* contracts and defers profile validation to the existing `007` validator rather than reimplementing it. (007/I-27; docs/90 cluster)
