@@ -109,19 +109,25 @@ def to_registry_row(hook_name, decl):
         row["gate"] = decl["gate"]
     return row
 
-for hook_name, decl in manifest_hooks.items():
+for hook_name, decl_or_list in manifest_hooks.items():
+    # A hook key may declare a SINGLE hook (a mapping) or MULTIPLE hooks (a list of
+    # mappings) — the latter lets git register two commands on one boundary, e.g.
+    # before_tasks/before_implement carrying BOTH verify-gate and validate-profile
+    # (007 T015). Normalize to a list; the single-mapping form stays byte-identical.
+    decls = decl_or_list if isinstance(decl_or_list, list) else [decl_or_list]
     entries = hooks.get(hook_name) or []
     if not isinstance(entries, list):
         entries = []
-    row = to_registry_row(hook_name, decl)
-    already = any(
-        isinstance(e, dict)
-        and e.get("extension") == ext_id
-        and e.get("command") == row["command"]
-        for e in entries
-    )
-    if not already:
-        entries.append(row)                       # append-only: graphify's rows untouched
+    for decl in decls:
+        row = to_registry_row(hook_name, decl)
+        already = any(
+            isinstance(e, dict)
+            and e.get("extension") == ext_id
+            and e.get("command") == row["command"]
+            for e in entries
+        )
+        if not already:
+            entries.append(row)                   # append-only: graphify's rows untouched
     # sort by priority ascending so verify-gate(1) precedes graphify(5) — R1-S07, stable
     entries.sort(key=lambda e: e.get("priority", 5) if isinstance(e, dict) else 5)
     hooks[hook_name] = entries
@@ -156,7 +162,8 @@ print_manual_block() {
   Could not find a Python with PyYAML (and no `uv` to borrow one).
   Merge git's hooks into .specify/extensions.yml by hand — add `git` to `installed:`, and
   under `hooks:` add each entry below. On before_tasks / before_implement, git's verify-gate
-  row must come BEFORE graphify's context row (priority 1 < 5):
+  row must come BEFORE graphify's context row (priority 1 < 5); validate-profile (also
+  priority 1) also precedes graphify's row (007 T015 — fail-closed profile validation):
 
     installed:
       - git
@@ -169,10 +176,14 @@ print_manual_block() {
       after_implement: [ {extension: git, command: speckit.git.commit,      optional: false, phase: impl,    priority: 5} ]
       after_council_approve: [ {extension: git, command: speckit.git.record-gate, optional: false, gate: council, priority: 5} ]
       after_workforce_approve: [ {extension: git, command: speckit.git.record-gate, optional: false, gate: workforce, priority: 5} ]
-      before_tasks:     # verify-gate FIRST (priority 1), then graphify's existing row (priority 5)
-        - {extension: git, command: speckit.git.verify-gate, optional: false, gate: council,   priority: 1}
+      before_plan:      # 007 T015 — fail-closed profile validation at the plan boundary
+        - {extension: git, command: speckit.git.validate-profile, optional: false, priority: 1}
+      before_tasks:     # verify-gate FIRST (priority 1), then validate-profile (priority 1), then graphify's row (priority 5)
+        - {extension: git, command: speckit.git.verify-gate,      optional: false, gate: council,   priority: 1}
+        - {extension: git, command: speckit.git.validate-profile, optional: false, priority: 1}
       before_implement:
-        - {extension: git, command: speckit.git.verify-gate, optional: false, gate: workforce, priority: 1}
+        - {extension: git, command: speckit.git.verify-gate,      optional: false, gate: workforce, priority: 1}
+        - {extension: git, command: speckit.git.validate-profile, optional: false, priority: 1}
 MANUAL
 }
 

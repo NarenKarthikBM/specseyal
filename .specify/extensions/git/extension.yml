@@ -25,6 +25,9 @@ provides:
     - name: speckit.git.cleanup
       file: commands/speckit.git.cleanup.md
       description: "Integrate into base (ff-permitted, D52) + mandatory annotated tag complete/<spec-id> + delete branch; conflict aborts and is surfaced (FR-011)"
+    - name: speckit.git.validate-profile
+      file: commands/speckit.git.validate-profile.md
+      description: "Validate the active feature's profile.yaml against docs/contracts/profile-schema.md by shelling out to the workforce validator; non-zero ⇒ hard-block (FR-019). Fail-closed at the profile-consumption boundaries."
 
 # ── Hooks ────────────────────────────────────────────────────────────────────
 # Every hook is registered optional:false (R1-S01). optional:false is what marks a
@@ -90,16 +93,26 @@ hooks:
     gate: workforce
     optional: false
     description: "Write tasks.md @ <sha> + assignment.md @ <sha> into git-ext-owned gates.yml; ## Workforce Gate carries a one-line reference (FR-008). Signer-agnostic (FR-010/W4): must also fire on an auto-written gate."
-  before_tasks:                       # verify-gate inserted AHEAD of graphify by the installer (R1-S07)
-    command: speckit.git.verify-gate
-    gate: council
+  before_plan:                        # 007 T015 — fail-closed profile validation at the plan boundary (R1-S03/S21)
+    command: speckit.git.validate-profile
     optional: false
-    description: "Verify the council binding (plan.md) is fresh — non-zero ⇒ hard-block the tasks phase (FR-009)"
-  before_implement:                   # verify-gate ahead of graphify (R1-S07); re-run each wave (R1-S23, by implement-parallel)
-    command: speckit.git.verify-gate
-    gate: workforce
-    optional: false
-    description: "Verify the workforce binding (tasks.md + assignment.md) is fresh — non-zero ⇒ hard-block the implement phase (FR-009)"
+    description: "Validate profile.yaml before planning — non-zero ⇒ hard-block (FR-019, D-f). No fail-open by design (R1-S08)."
+  before_tasks:                       # verify-gate AHEAD of graphify (R1-S07) + fail-closed profile validation (R1-S03/S21)
+    - command: speckit.git.verify-gate
+      gate: council
+      optional: false
+      description: "Verify the council binding (plan.md) is fresh — non-zero ⇒ hard-block the tasks phase (FR-009)"
+    - command: speckit.git.validate-profile
+      optional: false
+      description: "Validate profile.yaml before tasks — non-zero ⇒ hard-block (FR-019, D-f). No fail-open by design (R1-S08)."
+  before_implement:                   # verify-gate ahead of graphify (R1-S07); re-run each wave (R1-S23); + fail-closed profile validation
+    - command: speckit.git.verify-gate
+      gate: workforce
+      optional: false
+      description: "Verify the workforce binding (tasks.md + assignment.md) is fresh — non-zero ⇒ hard-block the implement phase (FR-009)"
+    - command: speckit.git.validate-profile
+      optional: false
+      description: "Validate profile.yaml before implement — non-zero ⇒ hard-block (FR-019, D-f). No fail-open by design (R1-S08)."
 
 tags:
   - "git"

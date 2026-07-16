@@ -7,6 +7,15 @@ settings:
   auto_execute_hooks: true
 hooks:
   before_plan:
+  - extension: git
+    command: speckit.git.validate-profile
+    enabled: true
+    optional: false
+    priority: 1
+    prompt: null
+    description: "Validate profile.yaml before planning \u2014 non-zero \u21D2 hard-block\
+      \ (FR-019, D-f). No fail-open by design (R1-S08)."
+    condition: null
   - extension: graphify
     command: speckit.graphify.context
     enabled: true
@@ -26,6 +35,15 @@ hooks:
       \ hard-block the tasks phase (FR-009)"
     condition: null
     gate: council
+  - extension: git
+    command: speckit.git.validate-profile
+    enabled: true
+    optional: false
+    priority: 1
+    prompt: null
+    description: "Validate profile.yaml before tasks \u2014 non-zero \u21D2 hard-block\
+      \ (FR-019, D-f). No fail-open by design (R1-S08)."
+    condition: null
   - extension: graphify
     command: speckit.graphify.context
     enabled: true
@@ -45,6 +63,15 @@ hooks:
       \ \u2014 non-zero \u21D2 hard-block the implement phase (FR-009)"
     condition: null
     gate: workforce
+  - extension: git
+    command: speckit.git.validate-profile
+    enabled: true
+    optional: false
+    priority: 1
+    prompt: null
+    description: "Validate profile.yaml before implement \u2014 non-zero \u21D2 hard-block\
+      \ (FR-019, D-f). No fail-open by design (R1-S08)."
+    condition: null
   - extension: graphify
     command: speckit.graphify.context
     enabled: true
