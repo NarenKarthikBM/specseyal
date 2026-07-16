@@ -23,13 +23,13 @@
 > human signature regardless of profile — FR-020/W4; the pending state shown here is the `human`-mode
 > default).
 
-## Workforce Gate — [PENDING — timestamp, set by `/speckit-workforce-approve`]
+## Workforce Gate — 2026-07-16T17:02:35Z
 
 | Field | Value |
 |---|---|
-| reviewer | [PENDING — set by `/speckit-workforce-approve`] |
-| decision | [PENDING — one of `approved` \| `approved-with-notes` \| `rejected`] |
-| reviewed | [PENDING — set by `/speckit-workforce-approve`] |
+| reviewer | Naren Karthik B M |
+| decision | `approved` |
+| reviewed | `tasks.md`, `assignment.md` (roster) |
 
 ### Roster approved
 
@@ -72,6 +72,6 @@
 
 **Grant tripwire (D67):** clear — no elevated grants in this roster. `gates.workforce.mode: auto` may auto-approve (profile-schema.md P4).
 
-**Notes:** [PENDING — the reviewer's notes, or `none.` if there are none]
+**Notes:** Roster gap-free (SC-005) — 12 rows over all 17 tasks (T001–T017), zero `built` skills, assembled against `tasks.md @ ef8325d` / library snapshot `053f8e33…`. Grant tripwire clear — every row `none`. One dropped skill (T009, cap=3: `skl_quickstart_integration_gate@1.0.0`) and three empty-lane fallbacks (FR-016) surfaced at the gate; see Overrides.
 
-**Overrides:** [PENDING — any roster value the reviewer overrode at the gate, naming the D-row if one was opened, or `none.` if there are none]
+**Overrides:** Approved despite three empty-lane fallbacks (FR-016): T003 (`docs × general`), T004 (`docs × security`), T015 (`scaffold × security`) — each matched no `(type, specialization)` base lane and assembled onto `agt_generic`; accepted as-is, no new base lane opened (no D-row).
