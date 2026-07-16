@@ -1,0 +1,27 @@
+# Autonomy profile — 007-oss-docs
+# Both gates human: the default posture (D9/D33). The docs arm is model-authored
+# content; the validator arm is mechanical/stdlib — but US3 touches the full_auto
+# handshake (the council gate's correctness guard, D79(2)), so the council gate
+# stays human and defends the FR-019 enforcement point + the schema reconciliation.
+#
+# council_tier: standard — the measured default since D61; 007 is S/M and not
+# architecture-changing (D73(2)), so the cost-controlled ceremony applies.
+#
+# deck_render: DELIBERATELY ABSENT, which is exactly `none` (R1). 007 requests no
+# derived pptx render; the markdown decks remain the artifacts of record (D15/D73).
+#
+# This profile is 007's own first conformant subject for the validator it builds
+# (dogfooding) and must pass validate-profile.py. See docs/contracts/profile-schema.md.
+schema_version: "1.0"
+feature: "007-oss-docs"
+
+full_auto: false
+council_tier: standard
+
+gates:
+  council:
+    mode: human
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: human
