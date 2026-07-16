@@ -43,11 +43,21 @@ per feature as `human` or `auto` via a `profile.yaml`.
 **Install**
 
 ```bash
-# 1. Initialize GitHub Spec Kit in your repo — installs .specify/ and the
-#    stock /speckit-* commands as .claude/skills/.
+# 1. Get the SpecSeyal source onto disk. The installers are a local file copy
+#    (no network fetch), so the extensions/ tree must be present. Any of:
+git clone https://github.com/<owner>/specseyal.git         # full history, or
+git clone --depth 1 https://github.com/<owner>/specseyal.git   # shallow, or
+#    no git at all — download and extract the tree:
+#    curl -L https://github.com/<owner>/specseyal/archive/refs/heads/main.tar.gz | tar xz
+cd specseyal        # (or specseyal-main from the tarball)
+
+# 2. Initialize GitHub Spec Kit in the repo you want the pipeline in — installs
+#    .specify/ and the stock /speckit-* commands as .claude/skills/.
 specify init --here --integration claude
 
-# 2. Layer each SpecSeyal extension on top, one install.sh per extension:
+# 3. Layer each SpecSeyal extension on top, one install.sh per extension. Each
+#    installer's last argument is the TARGET repo (the one initialized in step 2):
+#    "." installs into the current directory; pass a path to install elsewhere.
 bash extensions/graphify/install.sh .
 bash extensions/council/install.sh .
 bash extensions/git/install.sh .
@@ -55,6 +65,9 @@ bash extensions/workforce/install.sh .
 bash extensions/testing/install.sh .
 bash extensions/deck-render/install.sh .
 ```
+
+To layer SpecSeyal onto a *different* repo, point the target argument at it —
+e.g. `bash /path/to/specseyal/extensions/graphify/install.sh /path/to/your-repo`.
 
 Every installer is idempotent — re-running it updates the extension in place
 rather than duplicating it — and every extension ships an `uninstall.sh`
