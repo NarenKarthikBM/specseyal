@@ -1,0 +1,16 @@
+# FAIL — unknown-key.yaml: top-level key "extra_field" is not part of the schema (unknown key at any level is a validation error).
+schema_version: "1.0"
+feature: "profile"
+
+full_auto: false
+council_tier: full
+deck_render: none
+extra_field: nope
+
+gates:
+  council:
+    mode: human
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: human

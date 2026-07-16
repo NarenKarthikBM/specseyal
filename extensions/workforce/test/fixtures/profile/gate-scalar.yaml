@@ -1,0 +1,12 @@
+# FAIL — gate-scalar.yaml: gates.council is the scalar "human" instead of a mapping (mapping required).
+schema_version: "1.0"
+feature: "profile"
+
+full_auto: false
+council_tier: full
+deck_render: none
+
+gates:
+  council: human
+  workforce:
+    mode: human

@@ -1,0 +1,15 @@
+# FAIL — full-auto-unsatisfied.yaml: full_auto true but gates.workforce.mode is human, not both auto (P3 violation).
+schema_version: "1.0"
+feature: "profile"
+
+full_auto: true
+council_tier: full
+deck_render: none
+
+gates:
+  council:
+    mode: auto
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: human

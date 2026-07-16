@@ -1,0 +1,15 @@
+# FAIL — council-auto-no-fullauto.yaml: gates.council.mode auto but full_auto is false (P2 violation).
+schema_version: "1.0"
+feature: "profile"
+
+full_auto: false
+council_tier: full
+deck_render: none
+
+gates:
+  council:
+    mode: auto
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: human

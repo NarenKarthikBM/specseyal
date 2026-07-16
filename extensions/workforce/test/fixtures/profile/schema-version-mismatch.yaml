@@ -1,0 +1,15 @@
+# FAIL — schema-version-mismatch.yaml: schema_version "2.0" is not the current "1.0" (value-check; a valid string, wrong value).
+schema_version: "2.0"
+feature: "profile"
+
+full_auto: false
+council_tier: full
+deck_render: none
+
+gates:
+  council:
+    mode: human
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: human

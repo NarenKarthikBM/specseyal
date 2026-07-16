@@ -1,0 +1,15 @@
+# PASS — full-auto-satisfied.yaml: full_auto true with both gates.council.mode and gates.workforce.mode auto (P2+P3 satisfied).
+schema_version: "1.0"
+feature: "profile"
+
+full_auto: true
+council_tier: full
+deck_render: none
+
+gates:
+  council:
+    mode: auto
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: auto

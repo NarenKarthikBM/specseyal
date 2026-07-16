@@ -1,0 +1,16 @@
+# FAIL — unknown-key-nested.yaml: gates.council carries an unknown nested key "priority" (R1-S19).
+schema_version: "1.0"
+feature: "profile"
+
+full_auto: false
+council_tier: full
+deck_render: none
+
+gates:
+  council:
+    mode: human
+    max_rounds: 1
+    reopen_tier: auto
+    priority: high
+  workforce:
+    mode: human

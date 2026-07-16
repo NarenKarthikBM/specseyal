@@ -1,0 +1,15 @@
+# PASS — workforce-auto-alone.yaml: gates.workforce.mode auto alone with full_auto false (P4 — must not be rejected).
+schema_version: "1.0"
+feature: "profile"
+
+full_auto: false
+council_tier: full
+deck_render: none
+
+gates:
+  council:
+    mode: human
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: auto

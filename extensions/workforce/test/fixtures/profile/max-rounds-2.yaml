@@ -1,0 +1,15 @@
+# FAIL — max-rounds-2.yaml: gates.council.max_rounds is 2; v1 rejects anything but 1 (D13).
+schema_version: "1.0"
+feature: "profile"
+
+full_auto: false
+council_tier: full
+deck_render: none
+
+gates:
+  council:
+    mode: human
+    max_rounds: 2
+    reopen_tier: auto
+  workforce:
+    mode: human

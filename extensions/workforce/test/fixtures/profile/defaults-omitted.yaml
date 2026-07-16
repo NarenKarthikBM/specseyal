@@ -1,0 +1,12 @@
+# PASS — defaults-omitted.yaml: council_tier, gates.council.max_rounds, gates.council.reopen_tier all absent (default to full/1/auto).
+schema_version: "1.0"
+feature: "profile"
+
+full_auto: false
+deck_render: none
+
+gates:
+  council:
+    mode: human
+  workforce:
+    mode: human

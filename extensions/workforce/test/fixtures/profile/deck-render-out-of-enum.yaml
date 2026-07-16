@@ -1,0 +1,15 @@
+# FAIL — deck-render-out-of-enum.yaml: deck_render "sparkle" is outside {none,technical,overview,both} (FR-018).
+schema_version: "1.0"
+feature: "profile"
+
+full_auto: false
+council_tier: full
+deck_render: sparkle
+
+gates:
+  council:
+    mode: human
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: human

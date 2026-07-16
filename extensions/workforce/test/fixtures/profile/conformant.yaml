@@ -1,0 +1,15 @@
+# PASS — conformant.yaml: fully valid profile, every field explicit, isolates no failure class (baseline).
+schema_version: "1.0"
+feature: "profile"
+
+full_auto: false
+council_tier: full
+deck_render: none
+
+gates:
+  council:
+    mode: human
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: human

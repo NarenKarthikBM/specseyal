@@ -1,0 +1,8 @@
+# FAIL — bad-yaml.yaml: malformed YAML (stray merge-conflict marker) must fail loudly at parse time, never fold into "absent".
+schema_version: "1.0"
+feature: "profile"
+<<<<<<< HEAD
+full_auto: false
+=======
+full_auto: true
+>>>>>>> branch
