@@ -46,3 +46,10 @@
 ## Chairman's note
 
 A strong, well-defended round with no reduced-grounding gaps: the plan's design is sound, but the council converged on three corrections it should not proceed to implementation without — the strict `full_auto` pass-branch fixture must be named in plan.md before tasks generation or SC-007's coverage claim silently overstates itself (all five members, R1-S01); the Summary's "live `council_tier: standrad`" defect is disproven by the repo's own git history and must be reframed as illustrative/fixture-only (R1-S02, peer-reproduced); and the `before_plan`-only hook's central safety claim collapses once a mutable, un-SHA-pinned profile is edited after the check, so the enforcement point should weigh the repo's existing priority-1 `verify-gate` re-validation pattern (R1-S03, peer-verified). The one genuine split is the FR-018 subsumption mechanism — pinned-constant-plus-equivalence-test vs. runtime import (R1-S07) — which triage must resolve to a single choice rather than carry both recommendations forward.
+
+### Chairman delta check — 2026-07-16T12:40:26Z
+- R1-S01 — RESOLVED — plan.md's Project Structure fixture list now names `full-auto-satisfied.yaml` as the `full_auto: true` + both-gates-`auto` ⇒ VALID pass-branch fixture, so `/speckit-tasks` will mint the strict-pass task and SC-007's both-branch coverage claim is backed.
+- R1-S02 — RESOLVED — the Summary now casts `council_tier: standrad` as the I-27/D79(2) illustrative example reproduced as the SC-009 out-of-enum fixture, explicitly not a present-tense live defect and noting the repo's committed history carries no `standrad` profile value.
+- R1-S03 — RESOLVED — the enforcement point is moved off `before_plan`-only to re-validation at the actual consumption points (`before_plan`, `before_tasks`, and `before_implement`) at priority 1, mirroring the existing `verify-gate` pattern, so a post-check profile edit can no longer reach a gate unvalidated.
+
+**Delta verdict:** all clear, ready for the gate.
