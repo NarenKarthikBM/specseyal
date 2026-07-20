@@ -35,15 +35,14 @@
 # nothing and bakes in no token of any kind — it only ever fetches source
 # files from a public ref).
 #
-# --- STATUS OF THIS FILE (T003 vs T004) --------------------------------------
-# T003 (this change) implements ONLY the argument surface and the safety
-# layer below: enum/ref/target validation, argument-injection rejection, and
-# the trap-based temp-dir cleanup. The actual fetch (sparse git clone +
-# codeload tarball fallback) and the delegation call into the fetched
-# extension's install.sh are T004's job, landing entirely inside the
-# fetch_and_delegate() stub marked below — search for "SEAM FOR T004".
-# Running this script today validates its arguments correctly and then fails
-# loudly at that stub, by design.
+# --- STATUS OF THIS FILE ------------------------------------------------------
+# Complete. Built across three tasks, all landed:
+#   T003 — argument surface + safety layer: enum/ref/target validation,
+#          argument-injection rejection, trap-based temp-dir cleanup.
+#   T004 — fetch_and_delegate(): shallow blobless sparse `git clone` primary
+#          path, codeload-tarball fallback, delegation to the fetched
+#          extension's own install.sh with its exit status propagated verbatim.
+#   T005 — `--self-test`, driving BOTH fetch branches (R1-S08).
 #
 set -eu
 
@@ -102,6 +101,12 @@ Options:
                        (NOTE: that default only resolves once feature 008 is
                        tagged at its own cleanup; until then pass --ref
                        explicitly — see the DEFAULT_REF comment in this file.)
+  --self-test          Exercise both fetch branches (sparse-partial-clone and
+                       codeload-tarball fallback) and exit. Installs nothing
+                       into a real target; every fixture lives under this
+                       run's own temp workspace and is cleaned up. A branch
+                       that cannot run in this environment is reported as a
+                       named SKIP, never a silent pass.
   -h, --help           Show this help and exit 0.
 
 Examples:
@@ -172,6 +177,13 @@ REF="${DEFAULT_REF}"
 EXT_NAME=""
 TARGET_DIR=""
 POSITIONAL_COUNT=0
+# SELF_TEST (T005, R1-S08): 0 by default (normal install run). Set to 1 by
+# the --self-test flag below. Read AFTER argument parsing to short-circuit
+# the <extension-name>/<target-repo-dir> validation (self-test needs
+# neither) and again at the very end of this file to dispatch to
+# self_test() instead of the real fetch_and_delegate() — see both sites'
+# own comments for why neither one touches this flag's surrounding logic.
+SELF_TEST=0
 
 set_positional() {  # $1 = value; fills EXT_NAME then TARGET_DIR, in order
   POSITIONAL_COUNT=$((POSITIONAL_COUNT + 1))
@@ -197,6 +209,16 @@ while [ "$#" -gt 0 ]; do
       REF="${1#--ref=}"
       shift
       ;;
+    --self-test)
+      # T005, R1-S08: run the embedded self-test (both fetch branches) and
+      # exit — see self_test()'s own header comment, defined near the end
+      # of this file, for the full contract. Deliberately just a flag
+      # capture here, exactly like every other flag in this loop; it does
+      # not itself validate or dispatch anything (that happens once, right
+      # after this loop ends, and again at this file's last line).
+      SELF_TEST=1
+      shift
+      ;;
     --)
       shift
       while [ "$#" -gt 0 ]; do
@@ -215,8 +237,21 @@ while [ "$#" -gt 0 ]; do
 done
 
 # ---- validate: <extension-name> ---------------------------------------------
-[ -n "${EXT_NAME}" ] || die_usage "missing required argument: <extension-name>"
-is_valid_extension "${EXT_NAME}" || die_usage "unknown extension '${EXT_NAME}' — must be one of: ${VALID_EXTENSIONS}"
+# T005: --self-test installs nothing into a real target, so it needs neither
+# <extension-name> nor <target-repo-dir> — this is the ONLY place that
+# distinction is made; the two validation lines themselves are UNCHANGED
+# from T003 and still run, verbatim, for every normal (non-self-test)
+# invocation. A stray positional argument alongside --self-test is still
+# rejected (die_usage, same idiom as everywhere else in this file) rather
+# than silently ignored — accepting-but-ignoring 'bootstrap.sh --self-test
+# git ./repo' would look like it did something with 'git'/'./repo' when it
+# does not.
+if [ "${SELF_TEST}" = "1" ]; then
+  [ "${POSITIONAL_COUNT}" -eq 0 ] || die_usage "--self-test takes no <extension-name>/<target-repo-dir> arguments (got: '${EXT_NAME}')"
+else
+  [ -n "${EXT_NAME}" ] || die_usage "missing required argument: <extension-name>"
+  is_valid_extension "${EXT_NAME}" || die_usage "unknown extension '${EXT_NAME}' — must be one of: ${VALID_EXTENSIONS}"
+fi
 
 # ---- validate: --ref ----------------------------------------------------------
 [ -n "${REF}" ] || die_usage "--ref value cannot be empty"
@@ -240,7 +275,17 @@ reject_leading_dash "${TARGET_DIR}" "<target-repo-dir>"
 TARGET_DIR_INPUT="${TARGET_DIR}"
 TARGET_DIR="$(cd "${TARGET_DIR}" 2>/dev/null && pwd)" || die "target-repo-dir not found or not a directory: '${TARGET_DIR_INPUT}'"
 
-bold "${SCRIPT_NAME} → installing '${EXT_NAME}' @ '${REF}' into ${TARGET_DIR}"
+# T005: the normal install banner names <extension-name>/<target-repo-dir>,
+# both meaningless in --self-test mode (EXT_NAME is deliberately empty
+# there — see the validate block above) — printing it unchanged would read
+# as "installing '' into <cwd>", which looks broken rather than
+# intentional. The normal-path line itself is UNCHANGED, still the exact
+# T003 text, still reached on every normal invocation.
+if [ "${SELF_TEST}" = "1" ]; then
+  bold "${SCRIPT_NAME} --self-test — installs nothing into a real target (see below)"
+else
+  bold "${SCRIPT_NAME} → installing '${EXT_NAME}' @ '${REF}' into ${TARGET_DIR}"
+fi
 
 # ---- safety layer: temp workspace + cleanup trap -----------------------------
 # One scratch dir for whatever T004's fetch step stages, one EXIT trap that
@@ -283,29 +328,27 @@ trap 'exit 130' INT   # 128 + SIGINT(2)
 trap 'exit 143' TERM  # 128 + SIGTERM(15)
 
 # ==============================================================================
-# SEAM FOR T004 — fetch_and_delegate() is a stub. Nothing else in this file
-# should need to change to land T004: this function's signature and its sole
-# call site (the last line of this file) are the whole seam.
-#
-# T004 replaces the BODY of this function with, per Contract B6/B7 and
-# plan.md's R1-S08 test note:
-#   1. a shallow, blobless, sparse `git clone` of extensions/"$ext_name"/ at
-#      "$ref" into "$tmp_dir" — using the already-validated/escaped "$ref"
+# fetch_and_delegate() — IMPLEMENTED (T004). This block was the T003→T004 seam
+# and is retained as the function's specification: it states what the body
+# below is required to do, and every point still holds. Per Contract B6/B7 and
+# plan.md's R1-S08 test note, the body:
+#   1. does a shallow, blobless, sparse `git clone` of extensions/"$ext_name"/
+#      at "$ref" into "$tmp_dir" — using the already-validated/escaped "$ref"
 #      and "$tmp_dir" from this function's arguments, never re-deriving or
 #      re-parsing either;
-#   2. a `codeload` tarball fallback (curl + tar only — Contract B7, no
+#   2. falls back to a `codeload` tarball (curl + tar only — Contract B7, no
 #      other third-party dependency) if the sparse clone is unavailable or
 #      fails;
-#   3. delegating to the fetched extensions/"$ext_name"/install.sh
+#   3. delegates to the fetched extensions/"$ext_name"/install.sh
 #      "$target_dir" (Contract B2 — never re-implementing that extension's
-#      own install logic), and returning ITS exit status verbatim.
+#      own install logic), returning ITS exit status verbatim.
 # A fetch failure (bad ref / network) or a failed delegated install.sh must
 # both surface as THIS script's own non-zero exit, with a message naming the
 # cause (Contract §Exit codes). cleanup() above already guarantees TMP_DIR is
 # removed on every one of these paths and that the real exit status survives
-# — T004's body only needs to `return`/`exit` with the right code; it must
-# NOT install its own EXIT/INT/TERM trap (that would replace this one — see
-# the "no handler stacking" note above cleanup()).
+# — the body only needs to `return`/`exit` with the right code, and must NOT
+# install its own EXIT/INT/TERM trap (that would replace this one — see the
+# "no handler stacking" note above cleanup()).
 # ==============================================================================
 # ---- fetch constants (T004) --------------------------------------------------
 # The origin repo this whole file fetches FROM — public source only, no
@@ -454,5 +497,364 @@ fetch_and_delegate() {  # $1=ext_name $2=ref $3=target_dir $4=tmp_dir
   # own.
   "${installer}" "${target_dir}"
 }
+
+# ==============================================================================
+# --self-test (T005, R1-S08) --------------------------------------------------
+#
+# Council decision R1-S08 (specs/008-pre-public-maintenance/council/
+# decision-record.md): "the largest branch-count increase [in this file]
+# sits in the least-tested item... a minimal automated smoke test now
+# exercises both the sparse-partial-clone and codeload-tarball fallback
+# branches." This section is that smoke test. Folded into bootstrap.sh
+# itself, not a new file, mirroring extensions/workforce/extension/scripts/
+# validate-profile.py's embedded `_self_test()` / `_write_fixture()`
+# precedent (a new top-level test harness file would fall outside this
+# feature's own scope allowlist).
+#
+# WHAT "BOTH BRANCHES" MEANS HERE, and why each gets TWO checks, not one:
+#   - sparse_clone_fetch() — checked against (1) a fully hermetic, always-
+#     available LOCAL git repo standing in for github.com, so this branch
+#     has at least one deterministic PASS on every host with `git`
+#     installed, network or none; and (2), best-effort, the REAL
+#     github.com remote at ref `main` (never this file's own DEFAULT_REF —
+#     see the note before SELF_TEST_REAL_REF below).
+#   - tarball_fetch() — checked against (1) a local loopback HTTP server
+#     standing in for codeload.github.com, with the sparse-clone primary
+#     path DELIBERATELY forced to fail first via a bogus local REPO_URL —
+#     not a flaky network condition — so this drives the REAL
+#     fetch_and_delegate() decision logic into its fallback branch, proving
+#     the fallback is genuinely reached, not merely defined in isolation
+#     (the exact gap this task exists to close — see this task's own
+#     prompt); and (2), best-effort, the REAL codeload.github.com endpoint.
+#
+# HONESTY CONTRACT (required behaviour #5): every result printed below is
+# tagged with exactly which of these two kinds of infrastructure it ran
+# against — "stand-in" or "real" — never left ambiguous. A stand-in never
+# exercises codeload's real HTTP redirects, its exact top-level-directory
+# naming convention, or its content-encoding behaviour; only a genuinely
+# reachable real-infra run does. Real-infra branches that cannot be
+# exercised in a given environment (no network, this repo still private
+# per D73, an unauthenticated `curl` 404ing exactly as this file's own
+# CODELOAD_URL_BASE comment already predicts) are reported as a named SKIP,
+# never folded into a silent PASS or an alarming FAIL — see this task's own
+# required-behaviour #4.
+#
+# HERMETIC / NO SECOND TRAP (required behaviour #4 and #6): every git repo,
+# tarball, and HTTP server this section creates lives ONLY under
+# "${TMP_DIR}/self-test" — a subdirectory of the SAME TMP_DIR the safety
+# layer above already created and already owns via the EXIT/INT/TERM traps
+# already installed above (search this file for "trap cleanup EXIT"). This
+# section installs no trap of its own: `rm -rf "${TMP_DIR}"` in that
+# existing cleanup() already removes everything self-test builds, exactly
+# once, on every exit path — normal completion, a FAIL, or an interrupt.
+# The one thing that existing trap cannot reach is the background HTTP
+# stand-in server's OS process (a trap removes files, not processes); this
+# section stops that server itself, explicitly, right after each use — see
+# self_test_http_server_stop() — rather than leaving it for a trap that
+# does not know about it. A ^C during the few-hundred-millisecond window
+# that server is briefly running is the one known, accepted gap this
+# leaves (documented here rather than solved by adding a second trap, which
+# required behaviour #6 forbids outright).
+#
+# fetch_and_delegate() ITSELF IS CALLED FOR REAL, UNMODIFIED, inside a
+# SUBSHELL "( ... )" below — never edited, never re-implemented (Contract
+# B2). The subshell serves two purposes at once: (a) any REPO_URL /
+# CODELOAD_URL_BASE override needed to steer a call at a stand-in
+# automatically reverts the instant that subshell exits, no manual
+# save/restore needed; and (b) fetch_and_delegate()'s own die() calls
+# `exit 1` on a total failure — inside a subshell that only ends the
+# subshell, not this whole script, so one forced-failure branch can never
+# take down the rest of this self-test's reporting.
+
+# SELF_TEST_REAL_REF: --self-test's own real-infra probes intentionally use
+# `main`, NOT this file's own ${REF} (which defaults to DEFAULT_REF —
+# `complete/008-pre-public-maintenance` — a tag that, per that constant's
+# own header comment, does not exist until this feature's own release; a
+# self-test that defaulted to it would report a guaranteed, permanent SKIP
+# today). `main` is the same ref T004 already validated the sparse-clone
+# primary path against end-to-end. --self-test does not read the user's
+# own --ref (if one was passed) — self-test is a fixed smoke test of the
+# MECHANISM, not a check of any one particular ref.
+SELF_TEST_REAL_REF="main"
+SELF_TEST_EXT="git"
+
+self_test_record() {  # $1=label $2=PASS|FAIL|SKIP $3=infra-tag $4=detail
+  st_r_label="$1"
+  st_r_status="$2"
+  st_r_infra="$3"
+  st_r_detail="$4"
+  case "${st_r_status}" in
+    PASS)
+      SELF_TEST_PASS=$((SELF_TEST_PASS + 1))
+      ok "[${st_r_infra}] ${st_r_label}: PASS — ${st_r_detail}"
+      ;;
+    FAIL)
+      SELF_TEST_FAIL=$((SELF_TEST_FAIL + 1))
+      printf '  \033[31m\xe2\x9c\x97\033[0m [%s] %s: FAIL — %s\n' "${st_r_infra}" "${st_r_label}" "${st_r_detail}"
+      ;;
+    SKIP)
+      SELF_TEST_SKIP=$((SELF_TEST_SKIP + 1))
+      warn "[${st_r_infra}] ${st_r_label}: SKIP — ${st_r_detail}"
+      ;;
+    *)
+      die "self_test_record: internal error — unknown status '${st_r_status}'"
+      ;;
+  esac
+}
+
+# self_test_write_stub_install(): a fixture extensions/<name>/install.sh —
+# NOT a real extension installer. It only proves fetch_and_delegate()'s
+# delegate step actually ran, by printing a fixed marker and exiting 0.
+# Always exit 0: fetch_and_delegate()'s own delegate call is deliberately
+# unguarded (see its own comment above) so this self-test can call the real
+# function inside a subshell without risking an unrelated nonzero exit
+# there masking a DIFFERENT branch's own result.
+self_test_write_stub_install() {  # $1=root_dir $2=ext_name
+  st_w_root="$1"
+  st_w_ext="$2"
+  mkdir -p "${st_w_root}/extensions/${st_w_ext}" || return 1
+  cat > "${st_w_root}/extensions/${st_w_ext}/install.sh" <<'STUBEOF'
+#!/bin/sh
+# bootstrap.sh --self-test fixture — not a real extension installer.
+set -eu
+printf 'self-test-stub-install-ok target=%s\n' "${1:-<missing>}"
+exit 0
+STUBEOF
+  chmod +x "${st_w_root}/extensions/${st_w_ext}/install.sh" || return 1
+  return 0
+}
+
+# self_test_local_git_origin(): a hermetic local git repo standing in for
+# github.com — real `git`, real `git clone --sparse`, zero network. Also
+# seeds a SECOND, noise, extension dir so a passing check below can prove
+# sparse-checkout genuinely narrowed the working tree, not just that
+# *something* landed.
+self_test_local_git_origin() {  # $1=origin_dir $2=ext_name
+  st_o_dir="$1"
+  st_o_ext="$2"
+  self_test_write_stub_install "${st_o_dir}" "${st_o_ext}" || return 1
+  mkdir -p "${st_o_dir}/extensions/_selftest_noise" || return 1
+  printf 'noise — must NOT appear in a sparse-checked-out working tree\n' \
+    > "${st_o_dir}/extensions/_selftest_noise/file.txt" || return 1
+  git init --quiet "${st_o_dir}" >/dev/null 2>&1 || return 1
+  git -C "${st_o_dir}" symbolic-ref HEAD refs/heads/main >/dev/null 2>&1 || return 1
+  git -C "${st_o_dir}" add -A >/dev/null 2>&1 || return 1
+  git -c user.email=selftest@bootstrap.sh -c user.name="bootstrap.sh self-test" \
+    -C "${st_o_dir}" commit --quiet -m "self-test fixture commit" >/dev/null 2>&1 || return 1
+  return 0
+}
+
+# self_test_build_codeload_tarball(): a *.tar.gz whose single top-level
+# entry wraps extensions/<name>/install.sh — the same shape tarball_fetch()
+# expects (its own comment: "codeload wraps the whole repo in one
+# top-level ... directory"). This proves the extract → find-top-dir →
+# keep-only-the-subtree logic; it does NOT prove codeload's own exact
+# naming convention (see the honesty-contract note above).
+self_test_build_codeload_tarball() {  # $1=serve_dir $2=archive_name $3=ext_name
+  st_t_serve="$1"
+  st_t_archive="$2"
+  st_t_ext="$3"
+  st_t_build="${st_t_serve}.build"
+  st_t_top="${st_t_build}/specseyal-main"
+  self_test_write_stub_install "${st_t_top}" "${st_t_ext}" || return 1
+  mkdir -p "${st_t_serve}" || return 1
+  ( cd "${st_t_build}" && tar -czf "${st_t_serve}/${st_t_archive}" "specseyal-main" ) || return 1
+  rm -rf "${st_t_build}"
+  return 0
+}
+
+# self_test_http_server_start()/_stop(): a stdlib-only (python3's
+# `http.server`) loopback HTTP server standing in for codeload.github.com —
+# a real HTTP round trip over a real socket, unlike a `file://` shortcut,
+# at the cost of requiring python3 on PATH (this file's own zero-third-
+# party-dependency rule is about bootstrap.sh's NORMAL fetch path, which
+# never runs this code — self-test's own scaffolding is exempt the same way
+# validate-profile.py's `_self_test()` is exempt from the constraints it
+# validates). Absence of python3 is a named SKIP, never a FAIL — required
+# behaviour #4.
+SELF_TEST_HTTP_PID=""
+SELF_TEST_HTTP_PORT=""
+
+self_test_http_server_start() {  # $1=serve_dir $2=port_file $3=log_file
+  st_h_serve="$1"
+  st_h_portfile="$2"
+  st_h_logfile="$3"
+  command -v python3 >/dev/null 2>&1 || return 1
+  python3 -c '
+import http.server, socketserver, sys, os
+os.chdir(sys.argv[1])
+class Handler(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+with socketserver.TCPServer(("127.0.0.1", 0), Handler) as httpd:
+    print(httpd.server_address[1], flush=True)
+    httpd.serve_forever()
+' "${st_h_serve}" >"${st_h_portfile}" 2>"${st_h_logfile}" &
+  SELF_TEST_HTTP_PID="$!"
+  st_h_wait=0
+  while [ ! -s "${st_h_portfile}" ] && [ "${st_h_wait}" -lt 5 ]; do
+    kill -0 "${SELF_TEST_HTTP_PID}" 2>/dev/null || break
+    sleep 1 || true
+    st_h_wait=$((st_h_wait + 1))
+  done
+  if [ ! -s "${st_h_portfile}" ]; then
+    self_test_http_server_stop
+    return 1
+  fi
+  SELF_TEST_HTTP_PORT="$(cat "${st_h_portfile}")"
+  [ -n "${SELF_TEST_HTTP_PORT}" ] || { self_test_http_server_stop; return 1; }
+  return 0
+}
+
+self_test_http_server_stop() {
+  if [ -n "${SELF_TEST_HTTP_PID}" ]; then
+    kill "${SELF_TEST_HTTP_PID}" >/dev/null 2>&1 || true
+    wait "${SELF_TEST_HTTP_PID}" >/dev/null 2>&1 || true
+    SELF_TEST_HTTP_PID=""
+  fi
+}
+
+self_test() {
+  SELF_TEST_PASS=0
+  SELF_TEST_FAIL=0
+  SELF_TEST_SKIP=0
+  SELF_TEST_HTTP_PID=""
+  SELF_TEST_HTTP_PORT=""
+
+  bold "${SCRIPT_NAME} --self-test — exercising both bootstrap.sh fetch branches (R1-S08)"
+  cat <<EOF
+
+Installs nothing into a real target. Every fixture below lives under this
+run's own temp workspace (the one this script already owns — see the
+existing EXIT/INT/TERM traps above) and is removed when this script exits,
+exactly like a normal run.
+
+EOF
+
+  st_root="${TMP_DIR}/self-test"
+  mkdir -p "${st_root}" || die "self-test: could not create scratch dir '${st_root}'"
+
+  # ---- branch 1/4: sparse clone — stand-in (local filesystem git repo) -----
+  bold "-- 1/4  sparse-partial-clone  ·  stand-in (local git repo, not github.com) --"
+  st_origin1="${st_root}/origin-standin"
+  st_dest1="${st_root}/dest-standin"
+  if ! command -v git >/dev/null 2>&1; then
+    self_test_record "sparse-clone (stand-in)" SKIP "n/a" "git not found on PATH"
+  elif ! self_test_local_git_origin "${st_origin1}" "${SELF_TEST_EXT}"; then
+    self_test_record "sparse-clone (stand-in)" FAIL "stand-in" "could not build the local git-repo fixture at '${st_origin1}'"
+  else
+    st_rc=0
+    ( REPO_URL="${st_origin1}"; sparse_clone_fetch "main" "${SELF_TEST_EXT}" "${st_dest1}" ) \
+      >"${st_root}/branch1.out" 2>&1 || st_rc=$?
+    if [ "${st_rc}" -eq 0 ] && [ -f "${st_dest1}/extensions/${SELF_TEST_EXT}/install.sh" ] \
+       && [ ! -e "${st_dest1}/extensions/_selftest_noise" ]; then
+      self_test_record "sparse-clone (stand-in)" PASS "stand-in (local git repo)" "cloned + sparse-checked-out extensions/${SELF_TEST_EXT}/ only (noise extension correctly absent)"
+    else
+      self_test_record "sparse-clone (stand-in)" FAIL "stand-in" "sparse_clone_fetch exit=${st_rc}; see ${st_root}/branch1.out"
+    fi
+  fi
+
+  # ---- branch 2/4: sparse clone — real infra (github.com), best-effort -----
+  bold "-- 2/4  sparse-partial-clone  ·  real infrastructure (github.com, ref=${SELF_TEST_REAL_REF}) --"
+  st_dest2="${st_root}/dest-real"
+  if ! command -v git >/dev/null 2>&1; then
+    self_test_record "sparse-clone (real)" SKIP "n/a" "git not found on PATH"
+  else
+    st_rc=0
+    ( sparse_clone_fetch "${SELF_TEST_REAL_REF}" "${SELF_TEST_EXT}" "${st_dest2}" ) \
+      >"${st_root}/branch2.out" 2>&1 || st_rc=$?
+    if [ "${st_rc}" -eq 0 ] && [ -f "${st_dest2}/extensions/${SELF_TEST_EXT}/install.sh" ]; then
+      self_test_record "sparse-clone (real)" PASS "real (github.com)" "cloned extensions/${SELF_TEST_EXT}/ from ${REPO_URL} @ ${SELF_TEST_REAL_REF}"
+    else
+      self_test_record "sparse-clone (real)" SKIP "real (github.com)" "did not succeed in this environment (private repo / unreachable / no git credential) — expected until the D73 visibility flip, not a bootstrap.sh defect; see ${st_root}/branch2.out"
+    fi
+  fi
+
+  # ---- branch 3/4: codeload tarball fallback, FORCED — stand-in ------------
+  bold "-- 3/4  codeload-tarball fallback (forced)  ·  stand-in (local loopback HTTP server) --"
+  st_serve="${st_root}/serve"
+  st_target3="${st_root}/target-standin"
+  st_tmp3="${st_root}/tmp3"
+  mkdir -p "${st_target3}" "${st_tmp3}" || die "self-test: could not create scratch dirs for branch 3"
+  if ! command -v python3 >/dev/null 2>&1; then
+    self_test_record "tarball fallback (forced, stand-in)" SKIP "n/a" "python3 not found on PATH — cannot start a local loopback HTTP server to stand in for codeload.github.com"
+  elif ! self_test_build_codeload_tarball "${st_serve}" "repo.tar.gz" "${SELF_TEST_EXT}"; then
+    self_test_record "tarball fallback (forced, stand-in)" FAIL "stand-in" "could not build the local stand-in tarball fixture"
+  elif ! self_test_http_server_start "${st_serve}" "${st_root}/http-port.txt" "${st_root}/http.log"; then
+    self_test_record "tarball fallback (forced, stand-in)" SKIP "n/a" "could not start the local loopback HTTP stand-in server — see ${st_root}/http.log"
+  else
+    # Force the PRIMARY path to fail deterministically — a nonexistent
+    # local path, never a flaky network condition — so the fallback below
+    # is genuinely reached via fetch_and_delegate()'s own decision logic,
+    # not merely exercised standalone.
+    st_rc=0
+    ( REPO_URL="${st_root}/does-not-exist-on-purpose.git"
+      CODELOAD_URL_BASE="http://127.0.0.1:${SELF_TEST_HTTP_PORT}"
+      fetch_and_delegate "${SELF_TEST_EXT}" "repo.tar.gz" "${st_target3}" "${st_tmp3}"
+    ) >"${st_root}/branch3.out" 2>&1 || st_rc=$?
+    self_test_http_server_stop
+    if [ "${st_rc}" -eq 0 ] \
+       && grep -q "falling back to the codeload tarball" "${st_root}/branch3.out" \
+       && grep -q "self-test-stub-install-ok" "${st_root}/branch3.out"; then
+      self_test_record "tarball fallback (forced, stand-in)" PASS "stand-in (local loopback HTTP server)" "primary forced to fail (bogus local REPO_URL) → fell back → fetched over real HTTP → delegated install.sh ran (exit 0)"
+    else
+      self_test_record "tarball fallback (forced, stand-in)" FAIL "stand-in" "fetch_and_delegate exit=${st_rc}; see ${st_root}/branch3.out"
+    fi
+  fi
+
+  # ---- branch 4/4: codeload tarball — real infra, best-effort --------------
+  bold "-- 4/4  codeload-tarball fallback  ·  real infrastructure (codeload.github.com, ref=${SELF_TEST_REAL_REF}) --"
+  st_dest4="${st_root}/dest-real-tarball"
+  if ! command -v curl >/dev/null 2>&1; then
+    self_test_record "tarball (real)" SKIP "n/a" "curl not found on PATH"
+  elif ! command -v tar >/dev/null 2>&1; then
+    self_test_record "tarball (real)" SKIP "n/a" "tar not found on PATH"
+  else
+    st_rc=0
+    ( tarball_fetch "${SELF_TEST_REAL_REF}" "${SELF_TEST_EXT}" "${st_dest4}" ) \
+      >"${st_root}/branch4.out" 2>&1 || st_rc=$?
+    if [ "${st_rc}" -eq 0 ] && [ -f "${st_dest4}/extensions/${SELF_TEST_EXT}/install.sh" ]; then
+      self_test_record "tarball (real)" PASS "real (codeload.github.com)" "downloaded + extracted extensions/${SELF_TEST_EXT}/ from ${CODELOAD_URL_BASE} @ ${SELF_TEST_REAL_REF}"
+    else
+      self_test_record "tarball (real)" SKIP "real (codeload.github.com)" "did not succeed in this environment — expected while this repo is still private (D73): codeload 404s an unauthenticated request, and this script deliberately adds no credential of any kind; see ${st_root}/branch4.out"
+    fi
+  fi
+
+  echo
+  bold "self-test summary: ${SELF_TEST_PASS} pass / ${SELF_TEST_FAIL} fail / ${SELF_TEST_SKIP} skip"
+  cat <<EOF
+
+Coverage notes:
+  - Branches 1 and 3 are hermetic stand-ins and always run (given git /
+    python3 on PATH): a local filesystem git repo standing in for
+    github.com, and a local loopback HTTP server standing in for
+    codeload.github.com. Branch 3 additionally forces the sparse-clone
+    primary path to fail deterministically, so it exercises
+    fetch_and_delegate()'s real fallback decision, not tarball_fetch() in
+    isolation.
+  - Branches 2 and 4 are best-effort against the real ${REPO_URL} and
+    codeload.github.com. Until the D73 visibility flip, branch 4 is
+    EXPECTED to SKIP (codeload 404s an unauthenticated request to a
+    private repo; this script adds no credential by design). Branch 2 can
+    PASS wherever the caller's own git is already authenticated for this
+    repo, and SKIP otherwise — either outcome is normal, not a defect.
+  - A stand-in is not a perfect substitute for real infrastructure: it
+    does not exercise HTTP redirects, codeload's exact top-level-directory
+    naming convention, or content-encoding behaviour. Only a branch that
+    actually ran against real infra (tagged "real" above) exercises those.
+EOF
+
+  if [ "${SELF_TEST_FAIL}" -gt 0 ]; then
+    die "self-test: ${SELF_TEST_FAIL} branch(es) FAILED — see the per-branch output above"
+  fi
+  ok "self-test: no branch FAILED (${SELF_TEST_SKIP} skipped, each with a named reason above)"
+}
+
+# ==============================================================================
+
+if [ "${SELF_TEST}" = "1" ]; then
+  self_test
+  exit 0
+fi
 
 fetch_and_delegate "${EXT_NAME}" "${REF}" "${TARGET_DIR}" "${TMP_DIR}"

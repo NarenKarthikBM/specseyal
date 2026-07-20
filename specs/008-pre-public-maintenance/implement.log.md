@@ -159,3 +159,7 @@ adopted:
    `specs/000-sample` explicitly, so it is a recorded spec deviation.
 3. **Disclose as a known gap** — T011 pins it as expected-FAIL with an I-row; the feature ships
    with SC-004 partially unmet.
+
+---
+
+2026-07-20T09:58:40Z | wave 5 | tasks: T005, T009 | agents: 2 | outcome: success

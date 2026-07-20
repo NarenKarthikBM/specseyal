@@ -107,10 +107,12 @@ this file as committed by T008.
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 __all__ = [
@@ -456,6 +458,378 @@ def _delegate_validate_skill(feature_dir: Path) -> list[Finding]:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Shared parsing/formatting helpers for the six T009 direct checks below.
+# Every one of these is a line/regex-based reader over already-committed
+# markdown/YAML/JSONL text -- Python 3 stdlib only, no PyYAML, mirroring the
+# "line-based parsing for YAML-ish content" discipline this repo's other
+# validators already follow. None of these ever raises on malformed input: a
+# parse that can't find what it's looking for returns None/[] and the caller
+# turns that into a Finding, never a traceback.
+# ---------------------------------------------------------------------------
+
+#: A level-1 or level-2 markdown heading line (`# ` or `## `, never `### `+
+#: -- the leading-hash run is capped at exactly 1 or 2 by requiring
+#: whitespace immediately after the captured hashes).
+_HEADING12_RE = re.compile(r"(?m)^(#{1,2})\s+(.*)$")
+
+#: A level-2 or level-3 heading (`## ` / `### `) -- completion-report.md and
+#: testing-doc.md's own section grammar (core sections are `##`/`###`;
+#: neither contract's core ever nests a `#### `).
+_HEADING23_RE = re.compile(r"(?m)^(#{2,3})\s+(.*)$")
+
+
+def _HEADING23_pairs(text: str) -> list[tuple[str, str]]:
+    return [(m.group(1), m.group(2).strip()) for m in _HEADING23_RE.finditer(text)]
+
+
+def _parse_frontmatter(text: str) -> dict[str, str] | None:
+    """Best-effort line-based read of a `---`-delimited frontmatter block's
+    top-level scalar keys (this repo's frontmatter blocks -- completion-
+    report.md, testing.md -- are always flat `key: value`, never nested, so
+    a full YAML parser is not needed here; PyYAML stays reserved for
+    profile.yaml's own richer shape, delegated to validate-profile.py).
+    Returns `None` when the text does not open with a `---` line or the
+    closing `---` is never found -- the caller reports that as its own
+    finding rather than this function raising."""
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None
+    end = None
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            end = i
+            break
+    if end is None:
+        return None
+    mapping: dict[str, str] = {}
+    for line in lines[1:end]:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or ":" not in stripped:
+            continue
+        key, _, value = stripped.partition(":")
+        value = value.split(" #", 1)[0].strip()
+        mapping[key.strip()] = value.strip("'\"")
+    return mapping
+
+
+def _section_body_h2(text: str, heading_title: str) -> str | None:
+    """Body of the `## <heading_title>` section (exact match) up to the next
+    `## ` heading or EOF. `None` when no such heading exists at all."""
+    m = re.search(rf"(?m)^##\s+{re.escape(heading_title)}\s*$", text)
+    if not m:
+        return None
+    rest = text[m.end():]
+    nxt = re.search(r"(?m)^##\s+", rest)
+    return rest[: nxt.start()] if nxt else rest
+
+
+def _last_top_heading_body(text: str, heading_prefix: str) -> str | None:
+    """Body of the LAST `## <heading_prefix>...` section (a *prefix* match,
+    since gate headings carry a trailing timestamp, e.g. `## Human Gate --
+    2026-07-08T15:40:02Z`) -- the R6/W3 "last one is authoritative" rule --
+    up to the next `## ` heading or EOF. `None` when no such section exists
+    at all."""
+    matches = list(re.finditer(rf"(?m)^##\s+{re.escape(heading_prefix)}.*$", text))
+    if not matches:
+        return None
+    rest = text[matches[-1].end():]
+    nxt = re.search(r"(?m)^##\s+", rest)
+    return rest[: nxt.start()] if nxt else rest
+
+
+#: A gate section's `| decision | \`approved\` |` row (decision-record.md
+#: §2, artifact-layout.md §8) -- shared by the council-gate and
+#: workforce-gate readers below.
+_GATE_DECISION_RE = re.compile(r"\|\s*decision\s*\|\s*`?([A-Za-z][A-Za-z-]*)`?\s*\|", re.IGNORECASE)
+
+
+def _gate_decision(section_body: str) -> str | None:
+    m = _GATE_DECISION_RE.search(section_body)
+    return m.group(1) if m else None
+
+
+def _gate_is_approved(feature_dir: Path, rel_path: str, heading_prefix: str) -> bool:
+    """Whether `<feature_dir>/<rel_path>`'s LAST `## <heading_prefix>...`
+    section records `decision: approved` or `approved-with-notes`. `False`
+    whenever the file, the section, or a recognizable decision value is
+    absent -- callers only reach this once they already know a downstream
+    artifact exists and are asking whether the upstream gate cleared it."""
+    path = feature_dir / rel_path
+    if not path.is_file():
+        return False
+    body = _last_top_heading_body(path.read_text(encoding="utf-8", errors="replace"), heading_prefix)
+    if body is None:
+        return False
+    return _gate_decision(body) in ("approved", "approved-with-notes")
+
+
+def _read_gate_mode(profile_text: str, gate_name: str) -> str | None:
+    """Best-effort, indentation-based read of `gates.<gate_name>.mode` out of
+    a profile.yaml's raw text (`gate_name` is `"council"` or `"workforce"`).
+    Deliberately NOT a YAML parse -- profile.yaml's *content* is
+    validate-profile.py's business (C2); this reads exactly the one scalar
+    artifact-layout.md §7 rule 3 needs to know, mirroring how
+    `_delegate_validate_profile` never re-judges profile.yaml's own
+    correctness. Returns `None` on any missing/malformed shape -- callers
+    treat that as "not provably auto", the conservative branch (a profile
+    this reader can't follow does not get to silently waive the gate)."""
+    gates_indent: int | None = None
+    target_indent: int | None = None
+    in_target = False
+    for raw_line in profile_text.splitlines():
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(raw_line) - len(raw_line.lstrip(" "))
+        if gates_indent is None:
+            if stripped == "gates:":
+                gates_indent = indent
+            continue
+        if indent <= gates_indent:
+            break  # left the gates: block without ever entering the target
+        if not in_target:
+            if stripped == f"{gate_name}:":
+                in_target = True
+                target_indent = indent
+            continue
+        if indent <= (target_indent or 0):
+            break  # left the gates.<gate_name>: block without finding mode
+        m = re.match(r"^mode:\s*(\S+)\s*$", stripped)
+        if m:
+            return m.group(1).strip("'\"")
+    return None
+
+
+#: The D50 meta-feature carve-out marker (artifact-layout.md §7 rule 5) --
+#: a checker greps for exactly this line-start in the feature's own
+#: `spec.md` and, if present, skips rule 5 for that feature alone.
+_RULE5_EXEMPT_RE = re.compile(r"(?m)^>\s*\*\*Rule-5 exempt \(meta-feature\):")
+
+#: Every `SC-###` / `FR-###` id token (testing-doc.md §3/§6 rule 3).
+_ID_RE = re.compile(r"\b(?:FR|SC)-\d+\b")
+
+
+def _pipe_table_rows(body: str, min_cells: int) -> list[list[str]]:
+    """Every data row of the FIRST markdown pipe table in `body` (header row
+    and the `|---|...|` separator row both skipped), each a list of
+    stripped cell strings. Rows with fewer than `min_cells` cells are
+    dropped rather than raising -- a malformed row is a validation finding
+    for the caller to raise explicitly, not a crash here."""
+    rows: list[list[str]] = []
+    header_seen = False
+    for line in body.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            continue
+        cells = [c.strip() for c in stripped.strip("|").split("|")]
+        if not header_seen:
+            header_seen = True
+            continue
+        if cells and set(cells[0]) <= {"-"}:
+            continue  # the `|---|---|...` separator row
+        if len(cells) < min_cells:
+            continue
+        rows.append(cells)
+    return rows
+
+
+#: The various "nothing here" spellings this repo's fixtures use in a table
+#: cell -- treated as zero/absent, never as one entry.
+_EMPTY_CELL = {"", "-", "—", "*(none)*", "(none)", "none"}
+
+
+def _count_csv_cell(cell: str) -> int:
+    """Count comma-separated entries in a table cell, treating `_EMPTY_CELL`
+    spellings as zero."""
+    stripped = cell.strip()
+    if stripped in _EMPTY_CELL:
+        return 0
+    return len([p for p in stripped.split(",") if p.strip()])
+
+
+#: `(type, specialization)` lane cell, e.g. `` `(scaffold, devtools-cli)` ``
+#: (agent-library-schema.md §1.1 taxonomy block, rendered in
+#: agents/assignment.md's own Roster table).
+_LANE_RE = re.compile(r"\(\s*([a-z][a-z-]*)\s*,\s*([a-z][a-z-]*)\s*\)")
+
+
+def _lane_type(cell: str) -> str | None:
+    m = _LANE_RE.search(cell)
+    return m.group(1) if m else None
+
+
+#: taxonomy.md §3 -- the 7 implementation types (everything but `docs`) that
+#: agent-library-schema.md §4 pins to `model: sonnet`.
+_IMPLEMENTATION_TYPES = frozenset(
+    {"scaffold", "data-model", "service", "endpoint", "ui", "test", "infra"}
+)
+
+#: agent-library-schema.md §3 D40 Guardrails -- "Assembly cap: base + 3
+#: injected skills, maximum."
+_ASSEMBLY_CAP = 3
+
+
+def _git_repo_root(start: Path) -> Path | None:
+    """`git -C <start> rev-parse --show-toplevel`, or `None` on any failure
+    (no git binary, `start` outside a work tree, ...) -- never raises. Used
+    only by the trace-schema check's I-31/H4.1 gitignored-artifact pinning
+    (hardening-invariants.md H4.2: "tracked-state probed via git"); a
+    missing git binary degrades that one sub-check to a silent skip rather
+    than failing the whole run."""
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(start), "rev-parse", "--show-toplevel"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    out = proc.stdout.strip()
+    return Path(out) if out else None
+
+
+def _git_check_ignore(repo_root: Path, repo_relative_path: str) -> bool | None:
+    """Whether `repo_relative_path` (as recorded verbatim in a trace
+    record's own `artifact` field) is git-ignored, per `git check-ignore`
+    (hardening-invariants.md H4.2). `True`/`False` on a clean answer, `None`
+    on any inability to ask (no git binary, not a work tree, ...) -- the
+    caller treats `None` as "cannot determine", not as "not ignored"."""
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(repo_root), "check-ignore", "-q", repo_relative_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode == 0:
+        return True
+    if proc.returncode == 1:
+        return False
+    return None  # returncode >= 2 -- a real git error, not a yes/no answer
+
+
+def _parse_iso8601_ms(value: object) -> datetime | None:
+    """Parse a trace-schema.md §1 `started_at`/`ended_at` timestamp
+    (ISO-8601 UTC, ms precision, e.g. `2026-07-08T14:00:03.120Z`). `None` on
+    anything that isn't a parseable string -- the caller skips the
+    duration_ms cross-check rather than raising on a malformed timestamp
+    that some other rule already reports."""
+    if not isinstance(value, str):
+        return None
+    v = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        return datetime.fromisoformat(v)
+    except ValueError:
+        return None
+
+
+# ---------------------------------------------------------------------------
+# check_artifact_layout -- artifact-layout.md
+# ---------------------------------------------------------------------------
+
+#: The two council/defense-deck/ files -- the one nested layout path in §1
+#: whose content carries no OWN docs/contracts/*.md schema (unlike
+#: decision-record.md/completion-report.md/testing.md/traces.jsonl, each
+#: validated by one of this file's other five direct checks), so a
+#: misplaced copy can only ever be an artifact-layout finding, never
+#: mistaken for a second contract's (violation-wrong-path/'s own reasoning).
+_DEFENSE_DECK_FILES = ("technical.md", "overview.md")
+
+
+def _check_defense_deck_paths(feature_dir: Path) -> list[Finding]:
+    findings: list[Finding] = []
+    council_dir = feature_dir / "council"
+    if not council_dir.is_dir():
+        return findings  # council phase not reached yet -- not a violation
+    for name in _DEFENSE_DECK_FILES:
+        canonical_rel = f"council/defense-deck/{name}"
+        if (feature_dir / canonical_rel).is_file():
+            continue
+        matches = sorted(p for p in council_dir.rglob(name) if p.is_file())
+        if not matches:
+            continue  # legitimately absent (resumability -- pending phase)
+        found_rel = matches[0].relative_to(feature_dir).as_posix()
+        findings.append(
+            emit_finding(
+                canonical_rel,
+                "artifact-layout.md §1: required artifact not found at its layout path "
+                f"(found instead at {found_rel}, missing the defense-deck/ subdirectory)",
+            )
+        )
+    return findings
+
+
+def _check_upstream_gates(feature_dir: Path) -> list[Finding]:
+    """§7 rule 3 -- no artifact exists whose upstream phase is incomplete."""
+    findings: list[Finding] = []
+    profile_path = feature_dir / "profile.yaml"
+    profile_text = (
+        profile_path.read_text(encoding="utf-8", errors="replace") if profile_path.is_file() else ""
+    )
+    council_mode = _read_gate_mode(profile_text, "council")
+    workforce_mode = _read_gate_mode(profile_text, "workforce")
+
+    if (feature_dir / "tasks.md").is_file() and council_mode != "auto":
+        if not _gate_is_approved(feature_dir, "council/decision-record.md", "Human Gate"):
+            findings.append(
+                emit_finding(
+                    "tasks.md",
+                    "artifact-layout.md §7 rule 3: tasks.md exists without an approved "
+                    "council/decision-record.md '## Human Gate' section (required unless "
+                    "profile.yaml sets gates.council.mode: auto)",
+                )
+            )
+
+    if (feature_dir / "implement.log.md").is_file() and workforce_mode != "auto":
+        if not _gate_is_approved(feature_dir, "agents/assignment.md", "Workforce Gate"):
+            findings.append(
+                emit_finding(
+                    "implement.log.md",
+                    "artifact-layout.md §7 rule 3: implement.log.md exists without an approved "
+                    "agents/assignment.md '## Workforce Gate' section (required unless "
+                    "profile.yaml sets gates.workforce.mode: auto)",
+                )
+            )
+    return findings
+
+
+def _check_opinions_leak(feature_dir: Path) -> list[Finding]:
+    """§7 rule 5, with the D50 meta-feature carve-out (C8/FR-006)."""
+    spec_path = feature_dir / "spec.md"
+    if spec_path.is_file():
+        if _RULE5_EXEMPT_RE.search(spec_path.read_text(encoding="utf-8", errors="replace")):
+            return []  # declared meta-feature -- exempt, never reported as drift
+
+    findings: list[Finding] = []
+    for path in sorted(feature_dir.rglob("*")):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(feature_dir)
+        if rel.parts and rel.parts[0] == "council":
+            continue  # rule 5 only governs files OUTSIDE council/
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if "opinions/" in text:
+            findings.append(
+                emit_finding(
+                    rel.as_posix(),
+                    "artifact-layout.md §7 rule 5: mentions the 'opinions/' path outside "
+                    "council/ (context-hygiene leak -- a deliberately blunt grep, not a "
+                    "judgment about whether the reference is a real read)",
+                )
+            )
+    return findings
+
+
 # T009: docs/contracts/artifact-layout.md
 def check_artifact_layout(feature_dir: Path) -> list[Finding]:
     """Required-artifact presence + layout paths (artifact-layout.md §1,
@@ -464,8 +838,28 @@ def check_artifact_layout(feature_dir: Path) -> list[Finding]:
     (violation-wrong-path/ fixture). MUST honor the D50 meta-feature rule-5
     carve-out (`^>\\s*\\*\\*Rule-5 exempt \\(meta-feature\\):` in the
     feature's own `spec.md`) as conformant, never as drift (C8/FR-006).
-    Not yet implemented -- returns `[]`."""
-    return []
+
+    §7 rule 1 (the `^[0-9]{3}-[a-z0-9]+...$` directory-name regex) is
+    deliberately NOT enforced here: this checker's own committed fixtures
+    (`specs/008-pre-public-maintenance/fixtures/{conformant,violation-*}/`)
+    are named for what they test, not `NNN-slug`, exactly as
+    `fixtures/README.md`'s own design notes flag and recommend (option b --
+    "simply not enforce rule 1 at all in the direct artifact-layout check,
+    treating it as informational"). Enforcing it here would fail every
+    fixture in this checker's own both-branch suite for an incidental
+    directory-name mismatch, swallowing the real signal each fixture exists
+    to carry.
+    """
+    findings: list[Finding] = []
+    findings += _check_defense_deck_paths(feature_dir)
+    findings += _check_upstream_gates(feature_dir)
+    findings += _check_opinions_leak(feature_dir)
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# check_decision_record -- decision-record.md
+# ---------------------------------------------------------------------------
 
 
 # T009: docs/contracts/decision-record.md
@@ -473,26 +867,537 @@ def check_decision_record(feature_dir: Path) -> list[Finding]:
     """Required sections, in order, per decision-record.md §5's Sections
     table (`## Metadata`, `## Round N`, `## Human Gate`, `## Carried
     Constraints` -- the last always present, even if empty;
-    violation-missing-section/ fixture). Not yet implemented -- returns
-    `[]`."""
-    return []
+    violation-missing-section/ fixture). Presence-conditional on
+    `council/decision-record.md` itself existing (R7: the file exists as
+    soon as round 1 is triaged -- absence is a pending phase, not this
+    check's business; artifact-layout.md §7 rule 3 owns "exists too early
+    relative to its upstream")."""
+    path = feature_dir / "council" / "decision-record.md"
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8", errors="replace")
+    artifact = "council/decision-record.md"
+    findings: list[Finding] = []
+
+    def _rule(msg: str) -> Finding:
+        return emit_finding(artifact, f"decision-record.md §5: {msg}")
+
+    headings = [(m.group(1), m.group(2).strip()) for m in _HEADING12_RE.finditer(text)]
+
+    if not any(level == "#" and title.startswith("Decision Record") for level, title in headings):
+        findings.append(_rule("required title heading '# Decision Record — <spec-id>' is missing"))
+
+    if not any(level == "##" and title == "Metadata" for level, title in headings):
+        findings.append(_rule("required section '## Metadata' is missing (cardinality 1, required)"))
+
+    round_nums: list[int] = []
+    for level, title in headings:
+        if level == "##":
+            m = re.match(r"^Round\s+(\d+)\b", title)
+            if m:
+                round_nums.append(int(m.group(1)))
+    if not round_nums:
+        findings.append(_rule("required section '## Round N' is missing (cardinality ≥1, required)"))
+    elif round_nums != list(range(1, len(round_nums) + 1)):
+        findings.append(
+            _rule(
+                "'## Round N' sections are not ascending/contiguous starting at 1 "
+                f"(found order: {round_nums})"
+            )
+        )
+
+    profile_path = feature_dir / "profile.yaml"
+    profile_text = (
+        profile_path.read_text(encoding="utf-8", errors="replace") if profile_path.is_file() else ""
+    )
+    council_mode = _read_gate_mode(profile_text, "council")
+
+    has_human_gate = any(level == "##" and title.startswith("Human Gate") for level, title in headings)
+    if not has_human_gate and council_mode != "auto":
+        findings.append(
+            _rule(
+                "required section '## Human Gate' is missing (cardinality ≥1, required "
+                "unless gates.council.mode: auto)"
+            )
+        )
+
+    carried_positions = [
+        i for i, (level, title) in enumerate(headings) if level == "##" and title == "Carried Constraints"
+    ]
+    if not carried_positions:
+        findings.append(
+            _rule(
+                "required section '## Carried Constraints' is missing (cardinality 1, last, "
+                "required — may be empty but never absent)"
+            )
+        )
+    elif len(carried_positions) > 1 or carried_positions[-1] != len(headings) - 1:
+        findings.append(
+            _rule("'## Carried Constraints' is not the last top-level section (cardinality 1, last, required)")
+        )
+
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# check_completion_report -- completion-report.md
+# ---------------------------------------------------------------------------
+
+_COMPLETION_STATUS_ENUM = ("success", "partial", "failed")
+
+#: completion-report.md §2 -- the exact, ordered, greppable core heading
+#: list; `<name>`/`(N/N)` are placeholders, matched by pattern rather than
+#: literal text.
+_COMPLETION_CORE_SECTIONS: list[tuple[str, "re.Pattern[str]", str]] = [
+    ("##", re.compile(r"^Implementation Complete — .+$"), "## Implementation Complete — <name>"),
+    ("###", re.compile(r"^Completed \(\d+/\d+\)$"), "### Completed (N/N)"),
+    ("###", re.compile(r"^Partial/Degraded$"), "### Partial/Degraded"),
+    ("###", re.compile(r"^Failed$"), "### Failed"),
+    ("###", re.compile(r"^Integration status$"), "### Integration status"),
+    ("###", re.compile(r"^Key results$"), "### Key results"),
+]
+
+#: §3 -- the ONLY additional top-level headings a completion report may
+#: carry (unvalidated appendix; §6 rule 5 forbids any OTHER `##` heading).
+_COMPLETION_APPENDIX_H2 = {"Milestone-close context", "Decisions & log"}
 
 
 # T009: docs/contracts/completion-report.md
 def check_completion_report(feature_dir: Path) -> list[Finding]:
     """Frontmatter `status` closed enum `{success, partial, failed}`
     (completion-report.md §6 rule 1; violation-bad-frontmatter/ fixture) +
-    the six ordered core sections. Not yet implemented -- returns `[]`."""
-    return []
+    the six ordered core sections. Presence-conditional on
+    `completion-report.md` itself existing."""
+    path = feature_dir / "completion-report.md"
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8", errors="replace")
+    artifact = "completion-report.md"
+    findings: list[Finding] = []
+
+    def _rule(n: int, msg: str) -> Finding:
+        return emit_finding(artifact, f"completion-report.md §6 rule {n}: {msg}")
+
+    frontmatter = _parse_frontmatter(text)
+    status: str | None = None
+    if frontmatter is None:
+        findings.append(_rule(1, "frontmatter is missing or malformed (expected a '---'-delimited block)"))
+    else:
+        for key in ("feature", "phase", "status"):
+            if key not in frontmatter:
+                findings.append(_rule(1, f"frontmatter is missing required key '{key}'"))
+        phase = frontmatter.get("phase")
+        if phase is not None and phase != "complete":
+            findings.append(_rule(1, f"frontmatter 'phase' = '{phase}' must be 'complete'"))
+        status = frontmatter.get("status")
+        if status is not None and status not in _COMPLETION_STATUS_ENUM:
+            findings.append(_rule(1, f"frontmatter 'status' = '{status}' is not one of {{success, partial, failed}}"))
+
+    headings = [(m.group(1), m.group(2).strip()) for m in _HEADING23_RE.finditer(text)]
+
+    matched_labels: list[str] = []
+    for level, pattern, label in _COMPLETION_CORE_SECTIONS:
+        hits = [title for hlevel, title in headings if hlevel == level and pattern.match(title)]
+        if not hits:
+            findings.append(_rule(2, f"required core section '{label}' is missing"))
+        else:
+            matched_labels.append(label)
+
+    if len(matched_labels) == len(_COMPLETION_CORE_SECTIONS):
+        expected_order = [label for _, _, label in _COMPLETION_CORE_SECTIONS]
+        seen_order = [
+            label
+            for level, title in headings
+            for lvl2, pattern, label in _COMPLETION_CORE_SECTIONS
+            if level == lvl2 and pattern.match(title)
+        ]
+        if seen_order != expected_order:
+            findings.append(_rule(2, f"core sections are not in the required order (expected: {expected_order})"))
+
+    for level, title in headings:
+        if level != "##":
+            continue
+        if title.startswith("Implementation Complete — "):
+            continue
+        if title in _COMPLETION_APPENDIX_H2:
+            continue
+        findings.append(
+            _rule(
+                5,
+                f"unexpected top-level '## {title}' heading (only the core heading plus the "
+                "optional §3 appendix headings are permitted)",
+            )
+        )
+
+    def _body_of(name_pattern: "re.Pattern[str]") -> str | None:
+        for m in _HEADING23_RE.finditer(text):
+            if m.group(1) == "###" and name_pattern.match(m.group(2).strip()):
+                rest = text[m.end():]
+                nxt = _HEADING23_RE.search(rest)
+                return (rest[: nxt.start()] if nxt else rest).strip()
+        return None
+
+    if status == "partial":
+        if not _body_of(re.compile(r"^Partial/Degraded$")):
+            findings.append(_rule(6, "status: partial requires '### Partial/Degraded' to be non-empty"))
+    if status == "failed":
+        if not _body_of(re.compile(r"^Failed$")):
+            findings.append(_rule(6, "status: failed requires '### Failed' to be non-empty"))
+
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# check_testing_doc -- testing-doc.md
+# ---------------------------------------------------------------------------
+
+_TESTING_EVIDENCE_ENUM = ("report-claimed", "log-verified")
+_TESTING_ROW_STATUS_ENUM = ("covered", "GAP")
+_TESTING_REQUIRED_H2 = ["Coverage map", "Verified by reading vs. would-execute in v2"]
+
+
+def _parse_coverage_rows(text: str) -> list[dict[str, str]]:
+    body = _section_body_h2(text, "Coverage map")
+    if body is None:
+        return []
+    rows = _pipe_table_rows(body, min_cells=5)
+    return [
+        {
+            "id": cells[0],
+            "approach": cells[1],
+            "grounding": cells[2],
+            "evidence-source": cells[3].strip("*"),
+            "status": cells[4].strip("*"),
+        }
+        for cells in rows
+    ]
 
 
 # T009: docs/contracts/testing-doc.md
 def check_testing_doc(feature_dir: Path) -> list[Finding]:
     """Frontmatter `executed` + the full `spec.md` SC/FR id <-> `##
     Coverage map` row bijection (testing-doc.md §6 rule 3;
-    violation-coverage-gap/ fixture). Not yet implemented -- returns
-    `[]`."""
-    return []
+    violation-coverage-gap/ fixture). Presence-conditional on `testing.md`
+    itself existing."""
+    path = feature_dir / "testing.md"
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8", errors="replace")
+    artifact = "testing.md"
+    findings: list[Finding] = []
+
+    def _rule(n: int, msg: str) -> Finding:
+        return emit_finding(artifact, f"testing-doc.md §6 rule {n}: {msg}")
+
+    frontmatter = _parse_frontmatter(text)
+    if frontmatter is None:
+        findings.append(_rule(1, "frontmatter is missing or malformed (expected a '---'-delimited block)"))
+    else:
+        for key in ("feature", "phase", "executed"):
+            if key not in frontmatter:
+                findings.append(_rule(1, f"frontmatter is missing required key '{key}'"))
+        phase = frontmatter.get("phase")
+        if phase is not None and phase != "testing":
+            findings.append(_rule(1, f"frontmatter 'phase' = '{phase}' must be 'testing'"))
+        executed = frontmatter.get("executed")
+        if executed is not None and executed != "none":
+            findings.append(
+                _rule(1, f"frontmatter 'executed' = '{executed}' must be 'none' (the only conforming value)")
+            )
+
+    headings = [title for level, title in _HEADING23_pairs(text) if level == "##"]
+    for label in _TESTING_REQUIRED_H2:
+        if label not in headings:
+            findings.append(_rule(2, f"required section '## {label}' is missing"))
+    present_required = [h for h in headings if h in _TESTING_REQUIRED_H2]
+    if all(label in headings for label in _TESTING_REQUIRED_H2) and present_required != _TESTING_REQUIRED_H2:
+        findings.append(_rule(2, "required sections are not in the required order"))
+    extra = sorted({h for h in headings if h not in _TESTING_REQUIRED_H2})
+    if extra:
+        findings.append(
+            _rule(2, f"unexpected top-level heading(s) {extra} (this contract defines no optional appendix)")
+        )
+
+    rows = _parse_coverage_rows(text)
+    row_ids = [r["id"] for r in rows]
+    for dup in sorted({i for i in row_ids if row_ids.count(i) > 1}):
+        findings.append(_rule(3, f"'{dup}' appears more than once in '## Coverage map' (no id repeated)"))
+
+    spec_path = feature_dir / "spec.md"
+    spec_ids: set[str] = set()
+    if spec_path.is_file():
+        spec_ids = set(_ID_RE.findall(spec_path.read_text(encoding="utf-8", errors="replace")))
+    row_id_set = set(row_ids)
+
+    for missing_id in sorted(spec_ids - row_id_set):
+        findings.append(
+            _rule(3, f"'{missing_id}' appears in spec.md but has no '## Coverage map' row (bijection broken)")
+        )
+    for extra_id in sorted(row_id_set - spec_ids):
+        findings.append(
+            _rule(3, f"'{extra_id}' has a '## Coverage map' row but does not appear in spec.md (bijection broken)")
+        )
+
+    for row in rows:
+        es = row.get("evidence-source", "")
+        if es not in _TESTING_EVIDENCE_ENUM:
+            findings.append(
+                _rule(
+                    4,
+                    f"'{row['id']}' row 'evidence-source' = '{es}' is not one of "
+                    "{report-claimed, log-verified}",
+                )
+            )
+        status = row.get("status", "")
+        if status not in _TESTING_ROW_STATUS_ENUM:
+            findings.append(_rule(4, f"'{row['id']}' row 'status' = '{status}' is not one of {{covered, GAP}}"))
+        elif status == "covered" and (
+            row.get("approach", "").strip() in _EMPTY_CELL or row.get("grounding", "").strip() in _EMPTY_CELL
+        ):
+            findings.append(
+                _rule(
+                    5,
+                    f"'{row['id']}' row is 'covered' without a genuine approach/grounding "
+                    "(must be 'GAP' instead)",
+                )
+            )
+
+    verified_body = _section_body_h2(text, "Verified by reading vs. would-execute in v2")
+    if verified_body is not None and not verified_body.strip():
+        findings.append(
+            _rule(6, "'## Verified by reading vs. would-execute in v2' is empty (must carry non-empty prose)")
+        )
+
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# check_trace_schema -- trace-schema.md (+ hardening-invariants.md H4 / I-31)
+# ---------------------------------------------------------------------------
+
+#: trace-schema.md §1 -- every field a record must carry, MINUS the three
+#: role-scoped fields (`context_in`, `graph_queries`, `ceiling_hit`), which
+#: are validated by their own §7 rule 11/12 presence-iff-role checks below
+#: rather than this flat presence list.
+_TRACE_REQUIRED_FIELDS = (
+    "schema_version", "trace_id", "parent_trace_id", "feature", "phase", "role",
+    "agent_id", "skills", "elevated_grants", "model", "effort", "started_at",
+    "ended_at", "duration_ms", "tokens", "capture_method", "outcome", "artifact",
+    "cost_usd",
+)
+
+#: trace-schema.md §2 -- the closed `role` enum.
+_TRACE_ROLE_ENUM = frozenset(
+    {
+        "orchestrator", "deck-prep", "council-member", "chairman", "triage",
+        "categorizer", "agent-creator", "analyzer", "implementer",
+        "wave-reviewer", "tester",
+    }
+)
+_TRACE_OUTCOME_ENUM = frozenset({"success", "partial", "failed", "aborted"})
+_TRACE_CAPTURE_METHOD_ENUM = frozenset({"sdk", "transcript", "unavailable"})
+_TRACE_CORE_TOOLSET = frozenset({"Read", "Write", "Edit", "Bash", "Glob", "Grep"})
+_TRACE_SKILL_ID_RE = re.compile(r"^skl_[a-z0-9]+(_[a-z0-9]+)*$")
+_TRACE_SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+")
+
+
+def _trace_contains_newline(value: object) -> bool:
+    if isinstance(value, str):
+        return "\n" in value
+    if isinstance(value, dict):
+        return any(_trace_contains_newline(v) for v in value.values())
+    if isinstance(value, list):
+        return any(_trace_contains_newline(v) for v in value)
+    return False
+
+
+def _check_trace_record(loc: str, record: dict) -> list[Finding]:
+    findings: list[Finding] = []
+    role = record.get("role")
+
+    missing = [f for f in _TRACE_REQUIRED_FIELDS if f not in record]
+    if missing:
+        findings.append(
+            emit_finding(loc, f"trace-schema.md §7 rule 2: missing required field(s): {', '.join(missing)}")
+        )
+
+    has_context_in = "context_in" in record
+    if role == "tester" and not has_context_in:
+        findings.append(
+            emit_finding(
+                loc, "trace-schema.md §7 rule 11: role 'tester' record is missing the required 'context_in' field"
+            )
+        )
+    elif has_context_in and role != "tester":
+        findings.append(
+            emit_finding(loc, f"trace-schema.md §7 rule 11: 'context_in' present on a non-tester record (role {role!r})")
+        )
+
+    has_gq = "graph_queries" in record
+    has_ch = "ceiling_hit" in record
+    if role == "council-member" and not (has_gq and has_ch):
+        findings.append(
+            emit_finding(
+                loc,
+                "trace-schema.md §7 rule 12: role 'council-member' record is missing the required "
+                "'graph_queries'/'ceiling_hit' field(s)",
+            )
+        )
+    elif (has_gq or has_ch) and role != "council-member":
+        findings.append(
+            emit_finding(
+                loc,
+                f"trace-schema.md §7 rule 12: 'graph_queries'/'ceiling_hit' present on a "
+                f"non-council-member record (role {role!r})",
+            )
+        )
+
+    if "role" in record and role not in _TRACE_ROLE_ENUM:
+        findings.append(emit_finding(loc, f"trace-schema.md §2: role {role!r} is not one of the documented roles"))
+
+    if "agent_id" in record:
+        agent_id = record.get("agent_id")
+        if agent_id is not None and role != "implementer":
+            findings.append(
+                emit_finding(
+                    loc,
+                    f"trace-schema.md §7 rule 4: role '{role}' record carries non-null agent_id "
+                    "(agent_id != null must imply role == \"implementer\")",
+                )
+            )
+        elif agent_id is None and role == "implementer":
+            findings.append(
+                emit_finding(
+                    loc,
+                    "trace-schema.md §7 rule 4: role 'implementer' record carries a null agent_id "
+                    "(agent_id != null must imply role == \"implementer\")",
+                )
+            )
+
+    if "skills" in record:
+        skills = record["skills"]
+        if not isinstance(skills, list):
+            findings.append(emit_finding(loc, "trace-schema.md §7 rule 5: 'skills' must be an array"))
+        else:
+            if len(skills) > _ASSEMBLY_CAP:
+                findings.append(
+                    emit_finding(
+                        loc,
+                        f"trace-schema.md §7 rule 5: 'skills' carries {len(skills)} entries, exceeding "
+                        f"the assembly cap of {_ASSEMBLY_CAP}",
+                    )
+                )
+            if skills and role != "implementer":
+                findings.append(
+                    emit_finding(
+                        loc,
+                        f"trace-schema.md §7 rule 5: role '{role}' record carries a non-empty 'skills' "
+                        "array (skills != [] must imply role == \"implementer\")",
+                    )
+                )
+            for entry in skills:
+                if not isinstance(entry, dict) or "id" not in entry or "version" not in entry:
+                    findings.append(
+                        emit_finding(loc, "trace-schema.md §7 rule 5: a 'skills' entry is missing 'id'/'version'")
+                    )
+                    continue
+                sid, sver = entry.get("id"), entry.get("version")
+                if not isinstance(sid, str) or not _TRACE_SKILL_ID_RE.match(sid):
+                    findings.append(
+                        emit_finding(loc, f"trace-schema.md §7 rule 5: skill id {sid!r} does not match ^skl_[a-z0-9_]+$")
+                    )
+                if not isinstance(sver, str) or not _TRACE_SEMVER_RE.match(sver):
+                    findings.append(
+                        emit_finding(loc, f"trace-schema.md §7 rule 5: skill version {sver!r} is not valid semver")
+                    )
+
+    if "elevated_grants" in record:
+        grants = record["elevated_grants"]
+        if not isinstance(grants, list):
+            findings.append(emit_finding(loc, "trace-schema.md §7 rule 6: 'elevated_grants' must be an array"))
+        else:
+            for g in grants:
+                if g in _TRACE_CORE_TOOLSET:
+                    findings.append(
+                        emit_finding(
+                            loc,
+                            f"trace-schema.md §7 rule 6: 'elevated_grants' lists core tool {g!r} (only "
+                            "elevation beyond the core toolset is recorded)",
+                        )
+                    )
+            if grants and role != "implementer":
+                findings.append(
+                    emit_finding(
+                        loc,
+                        f"trace-schema.md §7 rule 6: role '{role}' record carries a non-empty "
+                        "'elevated_grants' array",
+                    )
+                )
+
+    capture_method = record.get("capture_method")
+    if "capture_method" in record and capture_method not in _TRACE_CAPTURE_METHOD_ENUM:
+        findings.append(
+            emit_finding(
+                loc,
+                f"trace-schema.md §7 rule 10: capture_method {capture_method!r} is not one of "
+                "{sdk, transcript, unavailable}",
+            )
+        )
+    if "tokens" in record and "capture_method" in record:
+        tokens = record["tokens"]
+        if capture_method == "unavailable":
+            if tokens is not None:
+                findings.append(
+                    emit_finding(loc, "trace-schema.md §7 rule 10: capture_method 'unavailable' requires tokens: null")
+                )
+        else:
+            if tokens is None:
+                findings.append(
+                    emit_finding(loc, "trace-schema.md §7 rule 10: 'tokens' is null but capture_method != 'unavailable'")
+                )
+            elif isinstance(tokens, dict):
+                for key in ("input", "output", "cache_read", "cache_creation"):
+                    v = tokens.get(key)
+                    if not isinstance(v, int) or isinstance(v, bool) or v < 0:
+                        findings.append(
+                            emit_finding(
+                                loc, f"trace-schema.md §7 rule 10: tokens.{key} must be a non-negative int, got {v!r}"
+                            )
+                        )
+            else:
+                findings.append(
+                    emit_finding(
+                        loc, "trace-schema.md §7 rule 10: 'tokens' must be an object when capture_method != 'unavailable'"
+                    )
+                )
+
+    if "outcome" in record and record.get("outcome") not in _TRACE_OUTCOME_ENUM:
+        findings.append(
+            emit_finding(
+                loc,
+                f"trace-schema.md §1: 'outcome' {record.get('outcome')!r} is not one of "
+                "{success, partial, failed, aborted}",
+            )
+        )
+
+    started = _parse_iso8601_ms(record.get("started_at"))
+    ended = _parse_iso8601_ms(record.get("ended_at"))
+    duration_ms = record.get("duration_ms")
+    if started is not None and ended is not None and isinstance(duration_ms, int) and not isinstance(duration_ms, bool):
+        expected_ms = round((ended - started).total_seconds() * 1000)
+        if abs(expected_ms - duration_ms) > 1:
+            findings.append(
+                emit_finding(
+                    loc,
+                    f"trace-schema.md §7 rule 3: duration_ms ({duration_ms}) != ended_at - started_at "
+                    f"({expected_ms}ms)",
+                )
+            )
+
+    if _trace_contains_newline(record):
+        findings.append(emit_finding(loc, "trace-schema.md §7 rule 8: a field value contains a literal newline"))
+
+    return findings
 
 
 # T009: docs/contracts/trace-schema.md
@@ -503,9 +1408,65 @@ def check_trace_schema(feature_dir: Path) -> list[Finding]:
     committed pinning mechanism for the I-31 hardening
     (`hardening-invariants.md` H4.1 -- a gitignored/untracked sole output
     must record `artifact: null`, never the ignored path;
-    violation-bad-trace-line/ fixture, case 2, R1-S03). Not yet implemented
-    -- returns `[]`."""
-    return []
+    violation-bad-trace-line/ fixture, case 2, R1-S03). Presence-conditional
+    on `traces.jsonl` itself existing."""
+    path = feature_dir / "traces.jsonl"
+    if not path.is_file():
+        return []
+    findings: list[Finding] = []
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+
+    repo_root = _git_repo_root(feature_dir)
+    trace_id_lines: dict[str, list[int]] = {}
+
+    for lineno, raw in enumerate(lines, start=1):
+        if not raw.strip():
+            continue
+        loc = f"traces.jsonl:{lineno}"
+        try:
+            record = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            findings.append(emit_finding(loc, f"trace-schema.md §7 rule 1: not a complete JSON object ({exc})"))
+            continue
+        if not isinstance(record, dict):
+            findings.append(emit_finding(loc, "trace-schema.md §7 rule 1: line does not parse to a JSON object"))
+            continue
+
+        findings += _check_trace_record(loc, record)
+
+        tid = record.get("trace_id")
+        if isinstance(tid, str):
+            trace_id_lines.setdefault(tid, []).append(lineno)
+
+        artifact_val = record.get("artifact")
+        if repo_root is not None and isinstance(artifact_val, str) and artifact_val:
+            if _git_check_ignore(repo_root, artifact_val) is True:
+                findings.append(
+                    emit_finding(
+                        f"traces.jsonl:{lineno} (I-31 pinning case)",
+                        f"hardening-invariants.md H4.1: artifact '{artifact_val}' is a gitignored path "
+                        "— a task whose sole output is gitignored/untracked must record "
+                        "artifact: null",
+                    )
+                )
+
+    for tid in sorted(trace_id_lines):
+        occurrences = trace_id_lines[tid]
+        if len(occurrences) > 1:
+            findings.append(
+                emit_finding(
+                    f"traces.jsonl:{occurrences[0]}",
+                    f"trace-schema.md §7 rule 7: trace_id '{tid}' is not unique (also on line(s) "
+                    f"{', '.join(str(n) for n in occurrences[1:])})",
+                )
+            )
+
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# check_agent_library_schema -- agent-library-schema.md
+# ---------------------------------------------------------------------------
 
 
 # T009: docs/contracts/agent-library-schema.md
@@ -515,8 +1476,41 @@ def check_agent_library_schema(feature_dir: Path) -> list[Finding]:
     formats, which stay delegate-or-untouched): the assembly cap of base +
     3 injected skills, maximum (§3 D40 Guardrails;
     violation-assembly-cap-exceeded/ fixture) and the §4 model-policy rule.
-    Not yet implemented -- returns `[]`."""
-    return []
+    Presence-conditional on `agents/assignment.md` itself existing."""
+    path = feature_dir / "agents" / "assignment.md"
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8", errors="replace")
+    artifact = "agents/assignment.md"
+    findings: list[Finding] = []
+
+    body = _section_body_h2(text, "Roster")
+    rows = _pipe_table_rows(body, min_cells=6) if body is not None else []
+
+    for cells in rows:
+        task, lane, _base, _base_id, model, skills_cell = cells[:6]
+        injected = _count_csv_cell(skills_cell)
+        if injected > _ASSEMBLY_CAP:
+            findings.append(
+                emit_finding(
+                    artifact,
+                    f"agent-library-schema.md §3 (D40 Guardrails): assembled agent for {task} carries "
+                    f"{injected} injected skills, exceeding the assembly cap of {_ASSEMBLY_CAP}",
+                )
+            )
+
+        task_type = _lane_type(lane)
+        if task_type in _IMPLEMENTATION_TYPES and model.strip().lower() != "sonnet":
+            findings.append(
+                emit_finding(
+                    artifact,
+                    f"agent-library-schema.md §4: assembled agent for {task} accepts implementation "
+                    f"type '{task_type}' but runs model '{model.strip()}' (implementation types are "
+                    "enforced to sonnet)",
+                )
+            )
+
+    return findings
 
 
 # ---------------------------------------------------------------------------
