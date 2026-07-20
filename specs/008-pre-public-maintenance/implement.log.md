@@ -48,3 +48,33 @@ not a code defect:
   for 008 (the path is outside the FR-015 allowlist, and the defect is a council/deck-render
   concern) — carried forward to T017 as a new I-row rather than fixed here. See the wave-2
   scope note below.
+
+---
+
+2026-07-20T08:56:30Z | wave 2 | tasks: T002 | agents: 1 | outcome: success
+
+## Scope note — the FR-015 allowlist carve-out (T002, wave 2)
+
+`tasks.md`'s declared allowlist enumerates 13 **implementation edit sites**. Taken literally,
+the guard it specifies was unimplementable: at wave 2 the branch diff already held **30 paths**,
+of which only `docs/90-DECISIONS-AND-IDEAS.md` was allowlisted. The other 29 — 27 SDD artifacts
+under `specs/008-pre-public-maintenance/` and 2 workforce-persisted skills under
+`.claude/skills/` — were committed by the spec/plan/council/tasks/categorize/agents phases
+**before implementation began**. A literal guard would have failed on all 29 and hard-blocked
+every remaining task on the first wave that ran it.
+
+**Resolution (human-approved, this run):** the guard's allowlist is the **union** of the 13
+declared source sites and exactly two pipeline-output prefixes —
+`specs/008-pre-public-maintenance/` and `.claude/skills/` — each enumerated and commented in
+the source as output-not-source. FR-015 asserts *source* non-interference ("no gate-schema or
+gate-semantics file changed"); the pipeline's own artifact writes are not source edits.
+
+**The teeth are retained and were witnessed.** Any path under `extensions/**`, `docs/**`, or
+the repo root outside the 13 declared sites still FAILs, and any *other* feature's `specs/`
+directory is unexempted. Verified both branches: PASS 14/14 on the clean tree; FAIL naming
+`extensions/testing/STRAY.txt` on a deliberately-introduced stray path.
+
+**Known property (not a defect):** `git diff --name-only <merge-base>..HEAD` sees committed
+history only, so an *uncommitted* working-tree stray is not caught. This matches `tasks.md`'s
+literal specification of the diff command, and is harmless under this run's discipline — every
+wave commits before its tasks are marked `[X]`, so by T018 the full branch is committed.

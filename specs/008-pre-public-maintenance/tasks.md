@@ -59,7 +59,7 @@ docs/90-DECISIONS-AND-IDEAS.md
 
 **⚠️ CRITICAL**: No story work begins until T002 is in place — it is the guard that proves the whole feature stayed gate-semantics-neutral.
 
-- [ ] T002 Add the FR-015 branch-scope allowlist guard to `extensions/workforce/test/run.sh` (R1-S01): assert `git diff --name-only $(git merge-base <base_branch> HEAD)..HEAD` yields **no path outside** the declared allowlist above; FAIL naming the stray path. Read `base_branch` from the feature's git config/`profile.yaml` resolution rather than hard-coding `main`.
+- [X] T002 Add the FR-015 branch-scope allowlist guard to `extensions/workforce/test/run.sh` (R1-S01): assert `git diff --name-only $(git merge-base <base_branch> HEAD)..HEAD` yields **no path outside** the declared allowlist above; FAIL naming the stray path. Read `base_branch` from the feature's git config/`profile.yaml` resolution rather than hard-coding `main`.
 
 **Checkpoint**: Scope guard armed — story work can begin.
 

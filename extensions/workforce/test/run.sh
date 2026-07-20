@@ -83,6 +83,80 @@ run_suite "test_profile.sh (SC-008/009/010, FR-018 enum-equiv, R1-S09/S10/S18)" 
 section "4. loop-closure (SC-008 — traces carry only approved assemblies)"
 run_suite "trace-roster-diff.sh --self-test" sh "$here/trace-roster-diff.sh" --self-test
 
+# ===========================================================================
+# 5. FR-015 branch-scope allowlist guard — begin (T002, 008-pre-public-maintenance)
+# ===========================================================================
+section "5. FR-015 branch-scope allowlist guard (no stray path outside this feature's declared allowlist)"
+# Mechanically enforces FR-015, this feature's load-bearing scope invariant:
+# no path in this branch's diff against base_branch may fall outside the
+# feature's declared allowlist. A stray edit to any gate-schema or
+# gate-semantics file must break this suite, naming the offending path.
+# Folded into THIS file rather than a new one: a new file would itself fall
+# outside the allowlist it defines and would self-fail.
+
+# fr015_path_allowed <path> — true iff <path> is inside the FR-015 allowlist.
+# The allowlist is a UNION of two categories, and the distinction matters:
+fr015_path_allowed() {
+  case "$1" in
+    # -- declared FR-015 implementation edit sites (13) --
+    bootstrap.sh) return 0 ;;
+    extensions/workforce/extension/scripts/check-conformance.py) return 0 ;;
+    specs/008-pre-public-maintenance/fixtures/*) return 0 ;;
+    extensions/git/install.sh) return 0 ;;
+    extensions/git/test/run.sh) return 0 ;;
+    extensions/graphify/extension/scripts/augment_merge.py) return 0 ;;
+    extensions/graphify/test/run.sh) return 0 ;;
+    extensions/council/skills/speckit-council/SKILL.md) return 0 ;;
+    extensions/council/skills/speckit-council-triage/SKILL.md) return 0 ;;
+    extensions/graphify/skills/speckit-implement-parallel/SKILL.md) return 0 ;;
+    extensions/workforce/test/run.sh) return 0 ;;
+    README.md) return 0 ;;
+    docs/90-DECISIONS-AND-IDEAS.md) return 0 ;;
+  esac
+  case "$1" in
+    # -- pipeline OUTPUT, not source edits (see note below) --
+    # FR-015 asserts SOURCE non-interference: that no gate-schema or
+    # gate-semantics file changed. The SDD pipeline itself writes tasks.md,
+    # traces.jsonl, implement.log.md, gates.yml, council/, and
+    # completion-report.md into the feature's own directory on every phase,
+    # and /speckit-agent-assign persists generated skills into
+    # .claude/skills/. Those are pipeline OUTPUT, not source edits, and they
+    # appear in the branch diff unavoidably. A guard that flagged them would
+    # fail on its own run and prove nothing — exempting them (and ONLY
+    # them) is what lets the guard keep its teeth everywhere FR-015
+    # actually points.
+    specs/008-pre-public-maintenance/*) return 0 ;;   # the feature's own SDD artifacts
+    .claude/skills/*) return 0 ;;                      # workforce-persisted generated skills
+  esac
+  return 1
+}
+
+gitcfg="$repo/.specify/extensions/git/git-config.yml"
+base_branch=$(awk '/^base_branch:/ { print $2; exit }' "$gitcfg" 2>/dev/null || true)
+
+if [ -z "${base_branch:-}" ]; then
+  bad "FR-015 allowlist guard: could not resolve base_branch from $gitcfg"
+elif merge_base=$(cd "$repo" && git merge-base "$base_branch" HEAD 2>/dev/null); then
+  branch_diff=$(cd "$repo" && git diff --name-only "$merge_base"..HEAD)
+  n_checked=0; stray_count=0
+  while IFS= read -r p; do
+    [ -z "$p" ] && continue
+    n_checked=$((n_checked+1))
+    if ! fr015_path_allowed "$p"; then
+      bad "stray path outside FR-015 allowlist: $p"
+      stray_count=$((stray_count+1))
+    fi
+  done <<FR015_DIFF
+$branch_diff
+FR015_DIFF
+  [ "$stray_count" -eq 0 ] && ok "FR-015 branch-scope allowlist guard ($n_checked branch-diff path(s), all inside the declared allowlist)"
+else
+  bad "FR-015 allowlist guard: could not compute merge-base($base_branch, HEAD)"
+fi
+# ===========================================================================
+# 5. FR-015 branch-scope allowlist guard — end (T011 appends AFTER this line)
+# ===========================================================================
+
 # ---------------------------------------------------------------------------
 printf '\n\033[1mworkforce test/run.sh: %d passed, %d failed\033[0m\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1
