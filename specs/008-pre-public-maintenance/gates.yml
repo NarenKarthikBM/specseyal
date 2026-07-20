@@ -6,3 +6,6 @@
 version: 1
 council:
   plan.md: dca56c43de19de3c4e8765c974b7f773eba1c313
+workforce:
+  tasks.md: b13ee4217cb3ad32830cad12e879a7c066e37e27
+  agents/assignment.md: 8d4667c2bac017c23cd7263391b5c03fc0e306d9

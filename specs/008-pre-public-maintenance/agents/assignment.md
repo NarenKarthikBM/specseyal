@@ -23,13 +23,13 @@
 > human signature regardless of profile — FR-020/W4; the pending state shown here is the `human`-mode
 > default).
 
-## Workforce Gate — [PENDING — timestamp, set by `/speckit-workforce-approve`]
+## Workforce Gate — 2026-07-20T08:43:13Z
 
 | Field | Value |
 |---|---|
-| reviewer | [PENDING — set by `/speckit-workforce-approve`] |
-| decision | [PENDING — one of `approved` \| `approved-with-notes` \| `rejected`] |
-| reviewed | [PENDING — set by `/speckit-workforce-approve`] |
+| reviewer | Naren Karthik B M |
+| decision | `approved` |
+| reviewed | `tasks.md`, `assignment.md` (roster) |
 
 ### Roster approved
 
@@ -81,6 +81,6 @@
 
 **Grant tripwire (D67):** clear — no elevated grants in this roster. `gates.workforce.mode: auto` may auto-approve (profile-schema.md P4).
 
-**Notes:** [PENDING — the reviewer's notes, or `none.` if there are none]
+**Notes:** none.
 
-**Overrides:** [PENDING — any roster value the reviewer overrode at the gate, naming the D-row if one was opened, or `none.` if there are none]
+**Overrides:** T017 empty-lane fallback (FR-016) — surfaced at the gate and approved as assembled; `docs × general` matches no base lane, so the task runs on `agt_generic`. No D-row opened.
