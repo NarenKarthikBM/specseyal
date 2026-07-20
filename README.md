@@ -90,19 +90,12 @@ curl -fsSLO https://raw.githubusercontent.com/NarenKarthikBM/specseyal/<pinned-r
 sh bootstrap.sh <extension-name> [<target-repo-dir>] [--ref <pinned-ref>]
 ```
 
-> **⚠ Not available yet — use the local route above until the next release tag lands.**
->
-> `bootstrap.sh` is introduced by the release that mints
-> `complete/008-pre-public-maintenance`, and **that tag does not exist yet**. Because
-> `bootstrap.sh` is absent from every *earlier* tag, there is currently **no `<pinned-ref>`
-> for which the `curl` above succeeds** — it will 404 for any ref you substitute. Passing
-> `--ref` does not work around this: `--ref` selects which ref the *extension subtree* is
-> fetched from (step 2), while the `curl` URL selects which ref `bootstrap.sh` *itself* is
-> fetched from (step 1). Step 1 is the one with no valid ref today.
->
-> Until that tag lands, use the local `install.sh` route documented above — it works now
-> and is unaffected. Once the tag exists, substitute it for `<pinned-ref>` and both forms
-> below work as written.
+`<pinned-ref>` is a concrete tag — the earliest one carrying `bootstrap.sh` is
+`complete/008-pre-public-maintenance`, so it is the floor for this route. Note
+that the two refs are independent: the `curl` URL selects which ref
+`bootstrap.sh` *itself* is fetched from, while `--ref` selects which ref the
+*extension subtree* is fetched from. Pin both to the same tag unless you
+deliberately want otherwise.
 
 `<extension-name>` is one of: `git | graphify | council | workforce | testing
 | deck-render`. `<target-repo-dir>` is optional and defaults to `.` (must
