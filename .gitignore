@@ -21,3 +21,11 @@ node_modules/
 # rendered defense decks are derived build products, never the artifact of
 # record (FR-014); SC-005 asserts git ls-files returns none.
 specs/*/renders/
+
+# ...and a rendered deck must never be tracked *regardless of path* (SC-005),
+# not merely when it lands under renders/. The rule above is path-scoped, so it
+# never covered a .pptx written into the council subtree by hand — which is how
+# 008's defense deck was admitted by a council human-gate commit (I-34).
+# deck-render itself never writes under council/ (FR-009), so any .pptx here is
+# by definition hand-placed and derived. Guards the commit path that admitted it.
+specs/*/council/defense-deck/*.pptx
