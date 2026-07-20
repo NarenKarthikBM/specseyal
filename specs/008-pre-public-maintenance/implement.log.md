@@ -417,3 +417,41 @@ base lane; approved as assembled at the workforce gate, FR-016).
 - **SC-010 deliberately NOT claimed** — that verification is T018's.
 
 Row numbering verified sequential and gap-free: D1–D84, I-1–I-37.
+
+---
+
+2026-07-20T11:07:00Z | wave 12 | tasks: T018 | agents: 1 | outcome: success
+
+## T018 — final verification: GREEN
+
+Read-only; `git status --porcelain` returned 0 lines before and after, orchestrator-confirmed.
+
+| verification | result |
+|---|---|
+| FR-015 allowlist guard over complete branch diff | **PASS** — 169 paths, zero strays |
+| git harness | **61/0** — matches baseline |
+| graphify harness | **40/0** — baseline 28/0, +12 from T014 |
+| workforce harness | **25/0** — baseline 13/0, +1 T002 +11 T011 |
+| testing harness | **43/0** — matches baseline |
+| deck-render harness | **92/8** — unchanged in count *and composition*; no 9th failure |
+| SC-010 six I-rows resolved | **6/6** |
+| checker `--self-test` | **exit 0**, 89/89 assertions |
+| seven fixture verdicts | **7/7 correct** (`conformant`→0, six `violation-*`→1) |
+| all 18 tasks `[X]` | yes (T018 marked by the orchestrator — a read-only task cannot self-mark) |
+
+**No regression against T001's baseline on any harness.**
+
+### Orchestrator verification note — a false alarm, recorded
+
+The orchestrator initially could not reproduce T018's quoted resolution markers and suspected
+fabricated evidence. That suspicion was **wrong**, and the error was the orchestrator's:
+
+- `grep "Built at 008"` returned 0 because the file's actual text is ``Built at `008` `` — with
+  markdown backticks that T018 had normalized away when quoting.
+- I-11's row carries **three** `→` markers (a v1-refinement note, the D50 carve-out resolution,
+  and the 008 resolution); a `head -1` extraction returned the oldest, not the 008 one.
+
+Re-checked definitively: all six rows carry a `[Bb]uilt at .008. (D84… 2026-07-20)` marker —
+**6/6 RESOLVED** — and every line number T018 cited (128, 140, 143, 146, 148, 149) is correct.
+T018's report was accurate. Recorded here because a retracted accusation should leave a trace as
+durable as the accusation would have.

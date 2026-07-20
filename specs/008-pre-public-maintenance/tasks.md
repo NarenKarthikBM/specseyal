@@ -146,7 +146,7 @@ docs/90-DECISIONS-AND-IDEAS.md
 
 - [X] T017 `docs/90-DECISIONS-AND-IDEAS.md` close-out — **the final serialized step, gated on all five owner piles completing** (R1-S20/FR-016, depends on T016): resolve and update the status of all six ripe I-rows (I-32, I-11, I-23, I-26, I-29, I-31) **in the same session** (log discipline). Add a new I-row recording that **four of the five identical `print_manual_block()` copies remain unclosed** — `deck-render`, `graphify`, `testing`, `workforce` — since I-23 closes git's copy only and does not close the pattern repo-wide (R1-S07). Add the explicit **FR-015 gate sign-off line** confirming no gate-schema or gate-semantics file changed — **distinct from** SC-010's `docs/90` I-code grep, which proves close-out bookkeeping, not non-interference (R1-S01).
 
-- [ ] T018 Final verification (depends on T017): re-run the T002 FR-015 allowlist guard over the complete branch diff and the full test suite across all five extensions; confirm a green result against T001's baseline. SC-010's `grep -nE 'I-32|I-11|I-23|I-26|I-29|I-31' docs/90-DECISIONS-AND-IDEAS.md` returns all six resolved.
+- [X] T018 Final verification (depends on T017): re-run the T002 FR-015 allowlist guard over the complete branch diff and the full test suite across all five extensions; confirm a green result against T001's baseline. SC-010's `grep -nE 'I-32|I-11|I-23|I-26|I-29|I-31' docs/90-DECISIONS-AND-IDEAS.md` returns all six resolved.
 
 ---
 
