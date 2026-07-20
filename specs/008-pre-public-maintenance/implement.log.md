@@ -294,3 +294,41 @@ omits it because the script is a dev-time tool run from source (by design) is **
 here** — T017 should decide which it is. This matches the repo's known install-mirror-drift
 pattern, so drift is the more likely reading, but the orchestrator did not verify that and does
 not assert it.
+
+---
+
+2026-07-20T10:43:00Z | wave 9 | tasks: T011 | agents: 1 | outcome: success
+
+## T011 — checker wired; golden substitution implemented as adjudicated
+
+`extensions/workforce/test/run.sh`: **25 passed, 0 failed** (14 prior + 11 new), also verified
+clean under `dash`, not just bash-as-sh. Appended as sections 6–10 strictly after T002's guard
+end-banner; T002's FR-015 section is unmodified.
+
+- **§6 both-branch fixtures (FR-009).** All seven dirs. Violations are matched against each
+  fixture's own `VIOLATION.md` "Expected checker message" — **not exit codes alone**, which would
+  pass even when the checker named the wrong rule. `violation-bad-trace-line/` asserts both of its
+  two independently-named cases.
+- **§7 static no-import guard (R1-S22).** FR-008's composition-not-duplication is now a caught
+  regression rather than an assertion.
+- **§8 double-run byte-diff (R1-S21/SC-005).** Run against `violation-assembly-cap-exceeded/`
+  because it emits real findings; `conformant/` would compare a one-liner. **SC-005 moves from
+  manual to code-verified.**
+- **§9 standing golden — substituted, disclosed.** Pinned against `fixtures/conformant/` per the
+  human adjudication, with a ~20-line in-source comment recording that `FR-006`/`C4`/`SC-004` name
+  `specs/000-sample`, that it is NONCONFORMANT on 12 counts, that this was discovered rather than
+  assumed, and — explicitly — that the harness **does not** assert `specs/000-sample` fails, since
+  that would pin its brokenness as expected behaviour. `specs/000-sample` is not read by the
+  harness at all.
+- **§10 `--self-test`** wired, exit 0 (89 assertions).
+
+**Both-branch witnesses observed and restored** (scratch in `/tmp` only, `git status` clean before
+and after): the no-import guard FAILed against a scratch copy carrying an injected
+`import validate_profile`, naming the offending line; and a violation assertion FAILed when given
+a deliberately wrong expected message, printing `expected message not found on stderr: …` —
+confirming it refuses to pass on exit code alone.
+
+**Disclosed contract deviation.** `contracts/conformance-checker-command.md` C4 (and its
+"Both-branch fixtures" section, line 40) names `specs/000-sample` as the standing CI golden. That
+literal text was **not** implemented, by human decision. Recorded here and in the harness comment
+as a deliberate, disclosed deviation — carried to T017.
