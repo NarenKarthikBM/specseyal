@@ -163,3 +163,50 @@ adopted:
 ---
 
 2026-07-20T09:58:40Z | wave 5 | tasks: T005, T009 | agents: 2 | outcome: success
+
+---
+
+2026-07-20T10:14:50Z | wave 6 | tasks: T006, T010 | agents: 2 | outcome: success
+
+## Orchestrator integration patch (wave 6) — README two-ref conflation
+
+T006's `--ref` caveat conflated two distinct refs and would have misled the first reader of a
+public README:
+
+- `<pinned-ref>` in the `curl` URL selects which ref **`bootstrap.sh` itself** is fetched from
+  (step 1).
+- `--ref` selects which ref the **extension subtree** is fetched from (step 2).
+
+The original text offered `--ref complete/007-oss-docs` as a workaround, implying the two-step
+form becomes usable. It does not: no existing tag contains `bootstrap.sh`, so step 1's `curl`
+404s for **every** substitutable ref. The clone-free path is currently unavailable in full, not
+merely default-broken.
+
+Rewritten as a leading blockquote stating the path is not yet available and directing the
+reader to the local `install.sh` route (which works today and is unaffected), with the
+step-1/step-2 ref distinction spelled out. Everything becomes correct once this feature's
+cleanup mints `complete/008-pre-public-maintenance`.
+
+## T011 decision recorded (human-approved, wave 6)
+
+The `specs/000-sample` blocker opened at wave 4 is resolved: **T011 pins the PASS assertion
+against `fixtures/conformant/`** (authored against current contracts, verified passing), and
+`specs/000-sample`'s 12 violations are recorded as a T017 I-row for a follow-up feature.
+Scope-clean; no gate re-approval needed. SC-004 is met in substance while deviating from the
+fixture `FR-006`/`C4` names — recorded as an explicit deviation, not silently.
+
+Complete `specs/000-sample` violation list (obtained by T009, hand-verified, none a parser
+artifact — it predates D72, D77, and the M4 shapes of `completion-report.md`/`testing-doc.md`):
+
+```
+categorization.md    · no '## Categorization table' heading                    (delegated)
+completion-report.md · frontmatter missing/malformed
+completion-report.md · required core section '### Completed (N/N)' missing
+completion-report.md · required core section '### Key results' missing
+testing.md           · frontmatter missing/malformed
+testing.md           · required section '## Coverage map' missing
+testing.md           · required section '## Verified by reading vs. would-execute in v2' missing
+testing.md           · 4 unexpected top-level headings (contract defines no optional appendix)
+traces.jsonl:20      · role 'tester' missing required 'context_in'             (D72)
+traces.jsonl:6,7,8   · role 'council-member' missing 'graph_queries'/'ceiling_hit' (D77)
+```

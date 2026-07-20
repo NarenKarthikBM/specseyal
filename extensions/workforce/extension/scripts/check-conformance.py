@@ -81,6 +81,17 @@ resurrect the D57 citation here.
         parsing stderr prose. Mirrors `validate-categorization.py`'s own
         1-vs-2 split exactly (content problem vs. invocation problem).
 
+    3   SELF-TEST failure (T010, `--self-test` only). One or more of the
+        six `check_*` functions' own parsing constants (a section header,
+        a field name, an enum value, ...) no longer appears in its
+        `docs/contracts/*.md` source -- a contract doc drifted out from
+        under its only enforcer. Always accompanied, on stderr, by one
+        `<contract> :: missing <item> (<why>) -- depended on by <check_fn>`
+        line per drift. Deliberately DISTINCT from exit 1: this is a
+        verdict on THIS FILE's own coupling to the contracts, never on any
+        `<feature-dir>`'s artifacts -- `--self-test` takes no `<feature-dir>`
+        argument at all. See `_self_test()`.
+
 ## Determinism (C6/FR-007, R1-S21)
 
 Same input -> byte-identical output, every run. No timestamps, no wall-clock
@@ -95,13 +106,16 @@ mechanically with a double-run byte-diff.
 
 T009 fills in the SIX `# T009:`-marked `check_*` functions below (currently
 stubs returning `[]` -- every feature dir reads as conformant for these six
-rules until T009 lands). T010 adds `_self_test()` at the `# T010:` marker
-near the bottom of this file (not yet present). Neither is implemented in
-this file as committed by T008.
+rules until T009 lands). T010 adds `_self_test()` near the bottom of this
+file, wired to `--self-test` (below) -- both now implemented.
 
 ## Usage
 
     check-conformance.py <feature-dir>
+    check-conformance.py --self-test    # T010: asserts this file's own
+                                         # check_* functions still match
+                                         # docs/contracts/*.md; no
+                                         # <feature-dir> required or read.
 """
 
 from __future__ import annotations
@@ -119,6 +133,7 @@ __all__ = [
     "EXIT_CONFORMANT",
     "EXIT_NONCONFORMANT",
     "EXIT_USAGE",
+    "EXIT_SELFTEST_FAIL",
     "Finding",
     "ConformanceResult",
     "emit_finding",
@@ -142,6 +157,14 @@ __all__ = [
 EXIT_CONFORMANT = 0
 EXIT_NONCONFORMANT = 1
 EXIT_USAGE = 2
+
+#: T010 (C9/R1-S19). Reserved distinct from `EXIT_NONCONFORMANT` on purpose:
+#: exit 1 is a verdict ON A FEATURE DIR's artifacts (module docstring, "Exit
+#: codes"); a `--self-test` failure is a verdict on THIS FILE's own
+#: check_* functions vs. docs/contracts/*.md -- not about any feature dir at
+#: all -- so it gets its own code rather than overloading 1's meaning. See
+#: `_self_test()` / `main()`'s `--self-test` branch.
+EXIT_SELFTEST_FAIL = 3
 
 # ---------------------------------------------------------------------------
 # Sibling validator locations -- resolved relative to THIS file's own
@@ -1563,13 +1586,30 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "  2  usage error -- <feature-dir> missing, nonexistent, not a\n"
             "     directory, or the invocation was otherwise malformed. NOT a\n"
             "     verdict on any feature dir's conformance.\n"
+            "  3  self-test failure (--self-test only) -- one of this file's own\n"
+            "     check_* functions no longer matches its docs/contracts/*.md\n"
+            "     source; each drift is named on stderr as '<contract> :: missing\n"
+            "     <item> (<why>) -- depended on by <check_fn>'. NOT a verdict on\n"
+            "     any feature dir; --self-test takes no <feature-dir>.\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "feature_dir",
+        nargs="?",
+        default=None,
         metavar="<feature-dir>",
-        help="Path to a specs/NNN-feature/ directory to validate.",
+        help="Path to a specs/NNN-feature/ directory to validate. Not required, "
+        "and ignored if given, with --self-test.",
+    )
+    parser.add_argument(
+        "--self-test",
+        action="store_true",
+        help="T010: run the embedded self-test -- assert every section header/"
+        "field name/enum value the six check_* functions parse still appears "
+        "in its docs/contracts/*.md source -- and exit. Requires no "
+        "<feature-dir>; reads only already-committed docs/contracts/*.md, "
+        "never any specs/ tree.",
     )
     return parser
 
@@ -1578,6 +1618,24 @@ def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     parser = _build_arg_parser()
     args = parser.parse_args(argv)  # a malformed invocation exits 2 here, on its own
+
+    if args.self_test:
+        try:
+            _self_test()
+        except _SelfTestFailure as exc:
+            print("check-conformance.py: SELF-TEST FAILED", file=sys.stderr)
+            for line in sorted(exc.messages):
+                print(f"  {line}", file=sys.stderr)
+            return EXIT_SELFTEST_FAIL
+        return EXIT_CONFORMANT
+
+    if args.feature_dir is None:
+        # Same usage-error shape a required positional produced before this
+        # flag existed (Required behaviour #3 / "every flag is a promise" --
+        # <feature-dir> stays required for every invocation that is not
+        # --self-test; nargs="?" above exists only so --self-test alone is
+        # legal, never to relax this).
+        parser.error("the following arguments are required: <feature-dir>")
 
     feature_dir = Path(args.feature_dir)
 
@@ -1611,14 +1669,245 @@ def main(argv: list[str] | None = None) -> int:
 
 
 # ---------------------------------------------------------------------------
-# T010: the embedded `_self_test()` goes here (validate-profile.py's own
-# `_self_test()`/`_write_fixture()` shape) -- asserting the contract section
-# headers and field names this file's `check_*` functions parse still exist
-# in each docs/contracts/*.md, per T010's brief (C9/R1-S19). Not present in
-# this file as committed by T008; do not add a `--self-test` CLI flag ahead
-# of it (a flag with no implemented behavior behind it is a promise this
-# file cannot yet keep).
+# T010: embedded self-test (C9/R1-S19; the shape `validate-profile.py`'s own
+# `_self_test()` set as precedent) -- but pointed the opposite direction from
+# that one's hermetic tempfile fixtures. This file is the ONLY code kept in
+# sync with the prose in docs/contracts/*.md: its six `check_*` functions
+# above hardcode section headers, field names, and enum values straight out
+# of that prose. If a future edit renames a section or a field in one of
+# those six .md files, this checker would otherwise keep validating against
+# the OLD rule forever, silently. `_self_test()` closes that gap: it asserts
+# every such header/field/enum the six `check_*` functions parse is STILL
+# present in its own docs/contracts/*.md file, so a contract-doc edit that
+# breaks that coupling fails LOUDLY, right here, instead of drifting unseen.
+#
+# Every needle below is read straight off this module's OWN parsing
+# constants already defined above -- `_DEFENSE_DECK_FILES`, `_RULE5_EXEMPT_RE`,
+# `_GATE_DECISION_RE`, `_COMPLETION_STATUS_ENUM`, `_COMPLETION_CORE_SECTIONS`,
+# `_COMPLETION_APPENDIX_H2`, `_TESTING_REQUIRED_H2`, `_TESTING_EVIDENCE_ENUM`,
+# `_TESTING_ROW_STATUS_ENUM`, `_TRACE_REQUIRED_FIELDS`, `_TRACE_ROLE_ENUM`,
+# `_TRACE_OUTCOME_ENUM`, `_TRACE_CAPTURE_METHOD_ENUM`, `_TRACE_SKILL_ID_RE`,
+# `_ASSEMBLY_CAP`, `_LANE_RE`, `_IMPLEMENTATION_TYPES` -- wherever one already
+# exists, rather than a hand-retyped second copy; a future edit to a
+# check_*'s own constant updates what this self-test checks for free. Two
+# regex constants (`_RULE5_EXEMPT_RE`, `_GATE_DECISION_RE`, `_LANE_RE`) are
+# run directly against the contract text below, rather than approximated as
+# a substring, so the self-test exercises the EXACT pattern the checker
+# runs. Only where a `check_*` function reads an inline literal with no
+# named constant (e.g. `check_completion_report`'s bare `for key in
+# ("feature", "phase", "status")`) is the needle here a literal copied
+# straight off that function's body, per the T010 brief's own instruction to
+# derive this list from what the checks actually parse.
+#
+# Deliberately NOT one of the checks `check_feature_dir()`/`main()`'s default
+# path runs (Required behaviour #3): `--self-test` is its own CLI mode,
+# reads no <feature-dir>, and is never invoked from a `before_*`/`after_*`
+# hook (R1-S14 -- this checker stays detectable-on-demand only).
 # ---------------------------------------------------------------------------
+
+
+class _SelfTestFailure(Exception):
+    """Raised by `_self_test()` carrying EVERY drift found between a
+    `check_*` function's own parsing constants and its contract doc's
+    current text -- never just the first, and never surfaced as a bare
+    `AssertionError` (Required behaviour #2: a maintainer must not have to
+    rediscover which contract, which missing item, and which function from
+    a generic message -- `main()`'s `--self-test` branch prints
+    `self.messages` verbatim, one per stderr line)."""
+
+    def __init__(self, messages: list[str]) -> None:
+        self.messages = messages
+        super().__init__("; ".join(messages))
+
+
+def _contracts_dir() -> Path | None:
+    """Resolve `docs/contracts/` via the repo root, mirroring
+    `_git_repo_root`'s own git-anchored resolution (already used above by
+    `check_trace_schema`'s I-31 pinning) for the identical reason: this
+    script's own directory varies between the source tree and an installed
+    mirror, but `docs/contracts/` only ever lives at the repo root. `None`
+    when no repo root is found, or `docs/contracts/` is missing there -- the
+    caller turns that into its own loud self-test failure rather than
+    silently skipping every assertion."""
+    repo_root = _git_repo_root(_SCRIPT_DIR)
+    if repo_root is None:
+        return None
+    d = repo_root / "docs" / "contracts"
+    return d if d.is_dir() else None
+
+
+def _needle_present(text: str, needle: "str | re.Pattern[str]") -> bool:
+    """A `needle` is either a literal substring (the common case) or an
+    already-compiled `re.Pattern` -- used for the handful of assertions that
+    ARE one of this file's own regex constants (`_RULE5_EXEMPT_RE`,
+    `_GATE_DECISION_RE`, `_LANE_RE`), so the self-test runs the exact same
+    pattern the checker runs against a target artifact, not a hand-
+    approximated substring of it."""
+    if isinstance(needle, re.Pattern):
+        return needle.search(text) is not None
+    return needle in text
+
+
+def _assert_needles(
+    contracts_dir: Path,
+    contract_name: str,
+    check_fn_name: str,
+    items: list[tuple["str | re.Pattern[str]", str]],
+    failures: list[str],
+) -> None:
+    """Assert every `(needle, description)` pair in `items` is found in
+    `docs/contracts/<contract_name>`'s current text (Required behaviour #1).
+    Every miss -- not just the first -- is appended to `failures`, already
+    formatted as `<contract> :: missing <needle> (<description>) --
+    depended on by <check_fn_name>` (Required behaviour #2: contract, missing
+    item, and dependent function, named in one line -- never a bare 'self-
+    test failed')."""
+    path = contracts_dir / contract_name
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        failures.append(f"{contract_name} :: could not read ({exc}) -- depended on by {check_fn_name}")
+        return
+    for needle, description in items:
+        if not _needle_present(text, needle):
+            shown = needle.pattern if isinstance(needle, re.Pattern) else needle
+            failures.append(
+                f"{contract_name} :: missing {shown!r} ({description}) -- depended on by {check_fn_name}"
+            )
+
+
+def _self_test() -> None:
+    """Assert every section header / field name / enum value the six
+    `check_*` functions above parse is still present in its own
+    `docs/contracts/*.md` file (C9/R1-S19). Raises `_SelfTestFailure` --
+    never a bare `AssertionError` -- carrying every drift found;
+    `main()`'s `--self-test` branch turns that into sorted stderr lines and
+    `EXIT_SELFTEST_FAIL`. Deterministic (Required behaviour #4): every
+    assertion group below is a fixed list, in fixed order, built from this
+    module's own already-loaded constants; the only external input is
+    `docs/contracts/*.md`'s own already-committed bytes, and failures are
+    sorted before being raised."""
+    contracts_dir = _contracts_dir()
+    failures: list[str] = []
+
+    if contracts_dir is None:
+        raise _SelfTestFailure(
+            [
+                "docs/contracts/ :: could not resolve (no git repo root found, or "
+                "docs/contracts/ is missing at its root) -- depended on by every "
+                "check_* function"
+            ]
+        )
+
+    total = 0
+
+    # -- artifact-layout.md : check_artifact_layout --------------------------
+    items: list[tuple["str | re.Pattern[str]", str]] = [
+        ("council/defense-deck/", "the required nested layout path _check_defense_deck_paths pins"),
+        *[
+            (name, f"the defense-deck '{name}' filename _DEFENSE_DECK_FILES pins")
+            for name in _DEFENSE_DECK_FILES
+        ],
+        ("gates.council.mode: auto", "the §7 rule 3 council-gate auto-mode escape hatch"),
+        ("## Workforce Gate", "the §7 rule 3 workforce-gate section heading it names"),
+        ("gates.workforce.mode: auto", "the §7 rule 3 workforce-gate auto-mode escape hatch"),
+        (_RULE5_EXEMPT_RE, "the D50 meta-feature carve-out marker example _RULE5_EXEMPT_RE matches"),
+        ("opinions/", "the §7 rule 5 context-hygiene path _check_opinions_leak greps for"),
+    ]
+    total += len(items)
+    _assert_needles(contracts_dir, "artifact-layout.md", "check_artifact_layout", items, failures)
+
+    # -- decision-record.md : check_decision_record ---------------------------
+    items = [
+        ("# Decision Record — <spec-id>", "the required title heading §5 lists"),
+        ("## Metadata", "the required '## Metadata' section §5 lists"),
+        ("## Round N", "the required '## Round N' section §5 lists"),
+        ("## Human Gate", "the required '## Human Gate' section §5 lists"),
+        ("## Carried Constraints", "the required, last '## Carried Constraints' section §5 lists"),
+        (_GATE_DECISION_RE, "the gate 'decision' table row _GATE_DECISION_RE parses"),
+        ("approved-with-notes", "the 'approved-with-notes' decision value _gate_is_approved also accepts"),
+    ]
+    total += len(items)
+    _assert_needles(contracts_dir, "decision-record.md", "check_decision_record", items, failures)
+
+    # -- completion-report.md : check_completion_report ------------------------
+    items = [
+        ("phase: complete", "the frontmatter 'phase' literal value §6 rule 1 requires"),
+        (" | ".join(_COMPLETION_STATUS_ENUM), "the frontmatter 'status' closed enum §6 rule 1 requires"),
+        *[(label, "a required, ordered core section §2 lists") for _, _, label in _COMPLETION_CORE_SECTIONS],
+        *[
+            (f"## {name}", "an optional §3 appendix heading")
+            for name in sorted(_COMPLETION_APPENDIX_H2)
+        ],
+    ]
+    total += len(items)
+    _assert_needles(contracts_dir, "completion-report.md", "check_completion_report", items, failures)
+
+    # -- testing-doc.md : check_testing_doc -------------------------------------
+    items = [
+        ("phase: testing", "the frontmatter 'phase' literal value §6 rule 1 requires"),
+        ("executed: none", "the frontmatter 'executed' literal value §6 rule 1 requires"),
+        *[(f"## {name}", "a required, ordered §2 section") for name in _TESTING_REQUIRED_H2],
+        *[
+            (f"`{f}`", "a required '## Coverage map' row field §3 lists")
+            for f in ("id", "approach", "grounding", "evidence-source", "status")
+        ],
+        *[(v, "an 'evidence-source' closed enum value §3 requires") for v in _TESTING_EVIDENCE_ENUM],
+        *[(v, "a row 'status' closed enum value §3 requires") for v in _TESTING_ROW_STATUS_ENUM],
+    ]
+    total += len(items)
+    _assert_needles(contracts_dir, "testing-doc.md", "check_testing_doc", items, failures)
+
+    # -- trace-schema.md : check_trace_schema / _check_trace_record ------------
+    items = [
+        *[
+            (f"`{f}`", "a required §1 record field _TRACE_REQUIRED_FIELDS pins")
+            for f in _TRACE_REQUIRED_FIELDS
+        ],
+        *[(f"`{r}`", "a §2 closed 'role' enum value") for r in sorted(_TRACE_ROLE_ENUM)],
+        *[(f"`{o}`", "a §1 closed 'outcome' enum value") for o in sorted(_TRACE_OUTCOME_ENUM)],
+        *[
+            (f"`{c}`", "a §7 rule 10 closed 'capture_method' enum value")
+            for c in sorted(_TRACE_CAPTURE_METHOD_ENUM)
+        ],
+        ("{Read, Write, Edit, Bash, Glob, Grep}", "the core toolset §7 rule 6 excludes from 'elevated_grants'"),
+        ("`context_in`", "the role-scoped 'tester' field §7 rule 11 pins"),
+        ("`graph_queries`", "the role-scoped 'council-member' field §7 rule 12 pins"),
+        ("`ceiling_hit`", "the role-scoped 'council-member' field §7 rule 12 pins"),
+        *[
+            (f"`{k}`", "a required 'tokens' sub-field §7 rule 10 pins")
+            for k in ("input", "output", "cache_read", "cache_creation")
+        ],
+        (_TRACE_SKILL_ID_RE.pattern, "the skill 'id' regex §7 rule 5 pins"),
+        (f"`|skills| ≤ {_ASSEMBLY_CAP}`", "the assembly-cap bound §7 rule 5 pins"),
+    ]
+    total += len(items)
+    _assert_needles(contracts_dir, "trace-schema.md", "check_trace_schema", items, failures)
+
+    # -- agent-library-schema.md : check_agent_library_schema -------------------
+    items = [
+        (_LANE_RE, "the '(type, specialization)' lane-cell shape _LANE_RE parses"),
+        (
+            f"Assembly cap: base + {_ASSEMBLY_CAP} injected skills, maximum.",
+            "the §3 D40 Guardrails assembly-cap sentence",
+        ),
+        (
+            f"{len(_IMPLEMENTATION_TYPES)} implementation types",
+            "the §4 implementation-type count _IMPLEMENTATION_TYPES pins",
+        ),
+        ("model ≠ sonnet", "the §4 model-policy enforcement rule"),
+    ]
+    total += len(items)
+    _assert_needles(contracts_dir, "agent-library-schema.md", "check_agent_library_schema", items, failures)
+
+    if failures:
+        raise _SelfTestFailure(sorted(failures))
+
+    print(
+        f"check-conformance.py: self-check OK ({total}/{total} contract-coupling "
+        "assertions across the six direct check_* functions still hold against "
+        "docs/contracts/*.md)"
+    )
 
 
 if __name__ == "__main__":

@@ -73,6 +73,55 @@ Every installer is idempotent — re-running it updates the extension in place
 rather than duplicating it — and every extension ships an `uninstall.sh`
 alongside its `install.sh`.
 
+**Clone-free install (single extension)**
+
+Don't want to clone the whole repo just to install one extension?
+`bootstrap.sh`, at the SpecSeyal repo root, fetches a single
+`extensions/<name>/` subtree from a pinned ref and delegates straight to that
+extension's own `install.sh` — no manual `git clone` of SpecSeyal required.
+This is additive to the route above, not a replacement: both work, and
+re-running either is idempotent.
+
+The documented default is the reviewable two-step form — fetch the script,
+then run it, so you can read it before anything executes:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/NarenKarthikBM/specseyal/<pinned-ref>/bootstrap.sh
+sh bootstrap.sh <extension-name> [<target-repo-dir>] [--ref <pinned-ref>]
+```
+
+> **⚠ Not available yet — use the local route above until the next release tag lands.**
+>
+> `bootstrap.sh` is introduced by the release that mints
+> `complete/008-pre-public-maintenance`, and **that tag does not exist yet**. Because
+> `bootstrap.sh` is absent from every *earlier* tag, there is currently **no `<pinned-ref>`
+> for which the `curl` above succeeds** — it will 404 for any ref you substitute. Passing
+> `--ref` does not work around this: `--ref` selects which ref the *extension subtree* is
+> fetched from (step 2), while the `curl` URL selects which ref `bootstrap.sh` *itself* is
+> fetched from (step 1). Step 1 is the one with no valid ref today.
+>
+> Until that tag lands, use the local `install.sh` route documented above — it works now
+> and is unaffected. Once the tag exists, substitute it for `<pinned-ref>` and both forms
+> below work as written.
+
+`<extension-name>` is one of: `git | graphify | council | workforce | testing
+| deck-render`. `<target-repo-dir>` is optional and defaults to `.` (must
+already exist). `--ref` always takes a concrete tag or commit, never a moving
+branch.
+
+A convenience one-liner exists but is intentionally secondary — it skips the
+inspection step above, so treat it as a shortcut for a ref you already
+trust, not the primary path:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/NarenKarthikBM/specseyal/<pinned-ref>/bootstrap.sh | sh -s -- <extension-name> [<target-repo-dir>] [--ref <pinned-ref>]
+```
+
+`sh bootstrap.sh --self-test` exercises both of its fetch paths (sparse clone
+and tarball fallback) against local, hermetic stand-ins and installs nothing
+— a way to sanity-check the script itself before pointing it at a real
+target.
+
 **First commands**
 
 ```

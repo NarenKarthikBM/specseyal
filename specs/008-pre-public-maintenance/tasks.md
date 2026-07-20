@@ -79,7 +79,7 @@ docs/90-DECISIONS-AND-IDEAS.md
 
 - [X] T005 [US1] Add `bootstrap.sh --self-test` exercising **both** fetch branches — sparse-partial-clone and codeload-tarball fallback (R1-S08, depends on T004). Mirrors the `validate-profile.py` embedded-`_self_test()` precedent; folded into `bootstrap.sh` rather than a new harness file because a new file would breach the T002 allowlist.
 
-- [ ] T006 [US1] Update the `README.md` quickstart to document the clone-free install path (FR-002/SC-002, depends on T003): the **reviewable two-step form** (`curl -fsSLO <raw-url>/<pinned-ref>/bootstrap.sh` then `sh bootstrap.sh <ext> <target>`) is the documented default; any `curl | sh` convenience line is secondary and **never the sole instruction** (spec Edge: security posture). No undocumented acquisition step may remain.
+- [X] T006 [US1] Update the `README.md` quickstart to document the clone-free install path (FR-002/SC-002, depends on T003): the **reviewable two-step form** (`curl -fsSLO <raw-url>/<pinned-ref>/bootstrap.sh` then `sh bootstrap.sh <ext> <target>`) is the documented default; any `curl | sh` convenience line is secondary and **never the sole instruction** (spec Edge: security posture). No undocumented acquisition step may remain.
 
 **Checkpoint**: US1 independently shippable — the highest adopter-value slice on its own.
 
@@ -103,7 +103,7 @@ docs/90-DECISIONS-AND-IDEAS.md
 
 - [X] T009 [US2] Implement the six direct contract checks in `check-conformance.py` (depends on T008): `artifact-layout` (required-file presence + layout paths), `decision-record` (required sections/frontmatter), `completion-report` (status enum + ordered core sections), `testing-doc` (SC/FR mapping shape), `trace-schema` (every field present, per `traces.jsonl` line), `agent-library-schema` (`agents/assignment.md` roster shape) — each rule read **from the contracts' own stated rules, not from the M0 fixture** (FR-005/C3). Honor documented D50 meta-feature rule-5 carve-outs as conformant, never as drift (C8/FR-006). Emit deterministic `<artifact> · <rule>` lines; exit non-zero on any nonconformance (C5/C6).
 
-- [ ] T010 [US2] Add `_self_test()` to `check-conformance.py` (depends on T009, C9/R1-S19): assert the contract **section headers and field names the checker parses still exist** in each `docs/contracts/*.md`, so a future contract-doc edit fails loudly instead of silently desyncing the only code kept in sync with that prose. Mirrors `validate-profile.py`'s embedded-self-test shape.
+- [X] T010 [US2] Add `_self_test()` to `check-conformance.py` (depends on T009, C9/R1-S19): assert the contract **section headers and field names the checker parses still exist** in each `docs/contracts/*.md`, so a future contract-doc edit fails loudly instead of silently desyncing the only code kept in sync with that prose. Mirrors `validate-profile.py`'s embedded-self-test shape.
 
 - [ ] T011 [US2] Wire the checker's assertions into `extensions/workforce/test/run.sh` (depends on T002, T007, T010 — **same file as T002, never co-scheduled**): invoke every both-branch fixture (conformant PASSES; each violation FAILS naming its cause); pin the standing `specs/000-sample` golden assertion (C4/FR-006/SC-004); add the **static no-import guard** asserting `check-conformance.py`'s source contains no source-level `import` of the three validators, only `subprocess`/shell-out (R1-S22); add the **double-run byte-diff determinism assertion** replacing the manual re-run-and-eyeball step, moving SC-005 from manual to code-verified (R1-S21).
 
