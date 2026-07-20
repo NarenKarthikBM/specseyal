@@ -49,7 +49,7 @@ docs/90-DECISIONS-AND-IDEAS.md
 
 **Purpose**: Establish the pre-change baseline every "witness FAIL → witness PASS" sub-order depends on.
 
-- [ ] T001 Record the pre-change green baseline: run `sh extensions/git/test/run.sh`, `sh extensions/graphify/test/run.sh`, `sh extensions/workforce/test/run.sh`, `sh extensions/testing/test/run.sh`, `sh extensions/deck-render/test/run.sh`; capture pass/fail counts. Required so T012's R1-S11 "witness the guard FAIL against the pre-fix manifest/block" is distinguishable from a pre-existing failure.
+- [X] T001 Record the pre-change green baseline: run `sh extensions/git/test/run.sh`, `sh extensions/graphify/test/run.sh`, `sh extensions/workforce/test/run.sh`, `sh extensions/testing/test/run.sh`, `sh extensions/deck-render/test/run.sh`; capture pass/fail counts. Required so T012's R1-S11 "witness the guard FAIL against the pre-fix manifest/block" is distinguishable from a pre-existing failure.
 
 ---
 
