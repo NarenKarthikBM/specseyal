@@ -48,3 +48,8 @@
 ## Chairman's note
 
 The council found an unusually well-grounded, deliberately boring plan — all five members independently re-ran and confirmed its graph claims — so the verdict is narrow: one blocking item, that FR-015's load-bearing "no gate-semantics change" invariant (the entire justification for bundling six items) has no verification mechanism at all, plus a strong cluster the members converged on from five angles (I-26/I-29/I-31 each fixture the primary fix but not the invariant it must preserve) and a well-scoped set of security, sequencing, and testability refinements. The round's two genuinely novel finds were the self-reference of I-29 into the very council `SKILL.md` files this round runs under, and that `check-conformance.py` (I-11) is never wired to anything that runs it. Resolve R1-S01 and the plan is ready for the gate.
+
+### Chairman delta check — 2026-07-20T07:54:35.000Z
+- R1-S01 — RESOLVED — The revised §Autonomy & Gates row gives FR-015 both mechanisms the finding asked for: a committed check that runs `git diff --name-only $(git merge-base <base_branch> HEAD)..HEAD` and fails if any changed path falls outside the enumerated six-edit-site allowlist, plus an explicit human-gate sign-off line confirming no gate-schema/semantics file changed — expressly distinct from SC-010's `docs/90` I-code grep.
+
+**Delta verdict:** all clear, ready for the gate
