@@ -385,3 +385,35 @@ and removed. Independently re-confirmed by the orchestrator.
 **SC-001/002/003 are PROVISIONAL for two independent reasons**, both requiring post-D73
 re-confirmation: the repo is private (R1-S06's original reason), **and** the pinned default ref
 does not exist until this feature's own cleanup tags it (discovered this run).
+
+---
+
+2026-07-20T11:02:10Z | wave 11 | tasks: T017 | agents: 1 | outcome: success
+
+## T017 — `docs/90` close-out complete (R1-S20/FR-016)
+
+Ran on `agt_generic` — the roster's single **empty-lane** assignment (`docs × general` matched no
+base lane; approved as assembled at the workforce gate, FR-016).
+
+- **Six ripe I-rows resolved in-session**, appended not rewritten, per the file's own
+  I-17/I-27/I-28 incremental-update precedent. **I-29 and I-31 are recorded as
+  landed-but-NOT-yet-observed-live** — no council round has run since the provenance rule, and no
+  task in 008's own waves had a sole gitignored output. Recorded as shipped, not as verified.
+- **I-33 (mandated, R1-S07)** — the four unclosed `print_manual_block()` copies
+  (`deck-render`/`graphify`/`testing`/`workforce`), naming the **manifest-derived guard pattern**
+  as the reusable deliverable rather than the two-line fix.
+- **I-34…I-37** — the four findings discovered during implementation, none in the original plan:
+  the tracked `.pptx` traced to admitting commit `0786e9f`; `hardening-invariants.md` H3's wrong
+  site description; `specs/000-sample`'s 12-count staleness plus the disclosed C4 deviation; and
+  graphify's installed-mirror drift, left as an **open, unadjudicated question** rather than
+  asserted as a bug.
+- **FR-015 gate sign-off, stated on evidence** (distinct from SC-010's grep, which proves
+  bookkeeping not non-interference): the branch's source diff is **exactly the 12 declared paths,
+  zero strays**. The `gates.yml` nuance is handled precisely rather than glossed — it appears in
+  the branch diff but last changed at `06bd974` (agents phase, before wave 1 at `93ad2a1`), and
+  `git diff 06bd974..HEAD -- gates.yml` is **empty** (orchestrator-verified: 0 lines) across all
+  ten implementation waves. It is a gate *binding record* written by the `record-gate` hooks —
+  data, not schema or semantics.
+- **SC-010 deliberately NOT claimed** — that verification is T018's.
+
+Row numbering verified sequential and gap-free: D1–D84, I-1–I-37.
