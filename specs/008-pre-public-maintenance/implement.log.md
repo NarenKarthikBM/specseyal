@@ -116,3 +116,46 @@ brand-new file is untracked, so a trace written pre-commit would null out legiti
 Patched inline (not re-dispatched) with a clause pinning the probe to **after** step 4's
 commit, matching this skill's own step 4 → step 5 ordering. Contract H4.1–H4.3 were already
 satisfied by the agent's text; this closes a misread, not a contract gap.
+
+---
+
+2026-07-20T09:36:20Z | wave 4 | tasks: T004, T008 | agents: 2 | outcome: success
+
+## ⚠ Open blocker for T011 — `specs/000-sample` does not pass the checker (wave 4)
+
+Surfaced by T008, independently confirmed by the orchestrator. **Not a defect in the checker** —
+the checker and its delegation layer work correctly; the *golden fixture is stale*.
+
+`FR-006`/`C4`/`SC-004` require `check-conformance.py` to **pass** `specs/000-sample`, and T011 is
+tasked with pinning exactly that as a standing golden assertion. Today it exits 1:
+
+```
+specs/000-sample: NONCONFORMANT
+  categorization.md · taxonomy.md (validate-categorization.py): no '## Categorization table'
+  heading found -- this file is not shaped like a categorization.md (data-model.md SS1)
+```
+
+`specs/000-sample/categorization.md` is M0-era (`taxonomy-v0.md`-authored) and carries
+`## \`general\` cap check`, `## Categorizer notes`, `## Assembly implication` — but not the
+`## Categorization table` heading the current contract requires.
+
+**The full extent is not yet visible.** Only the *delegated* categorization check fires today;
+the six *direct* contract checks are still T009 stubs returning `[]`. `fixtures/README.md`
+separately discloses that `specs/000-sample` also predates `completion-report.md`'s and
+`testing-doc.md`'s M4 shape, so T009 is expected to surface **further** violations in the same
+fixture.
+
+**Decision deliberately deferred to T011 (wave 9), not taken now.** Deciding at wave 4 would mean
+choosing a remedy against a partial failure list. T009 does not depend on `specs/000-sample`
+passing — it only implements checks — so the correct sequencing is: let T009 land, obtain the
+complete violation set, then choose with full information. The candidate remedies, none yet
+adopted:
+
+1. **Amend `specs/000-sample` to the current contracts** — follows the D49/D50 precedent of
+   updating this exact fixture when contracts evolve. Requires widening the FR-015 allowlist,
+   which is a real scope change the workforce gate did not approve.
+2. **Re-point the golden assertion at `fixtures/conformant/`** — authored by T007 against the
+   current contracts and verified passing. Scope-clean, but `FR-006`/`C4`/`SC-004` name
+   `specs/000-sample` explicitly, so it is a recorded spec deviation.
+3. **Disclose as a known gap** — T011 pins it as expected-FAIL with an I-row; the feature ships
+   with SC-004 partially unmet.

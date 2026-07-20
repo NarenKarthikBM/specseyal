@@ -307,14 +307,152 @@ trap 'exit 143' TERM  # 128 + SIGTERM(15)
 # NOT install its own EXIT/INT/TERM trap (that would replace this one — see
 # the "no handler stacking" note above cleanup()).
 # ==============================================================================
+# ---- fetch constants (T004) --------------------------------------------------
+# The origin repo this whole file fetches FROM — public source only, no
+# token/credential of any kind baked in (Constitution / D28). The repo is
+# still private as of feature 008 (D73 — a public-visibility flip is a
+# separate, later, manual step); an unauthenticated fetch against it will
+# legitimately fail until that flip happens. That is expected, not a bug
+# here — see sparse_clone_fetch()/tarball_fetch() below, both of which are
+# written correctly for the public case and add no auth of any kind.
+REPO_URL="https://github.com/NarenKarthikBM/specseyal.git"
+CODELOAD_URL_BASE="https://codeload.github.com/NarenKarthikBM/specseyal/tar.gz"
+
+# ---- fetch path 1 (primary): shallow, blobless, sparse git clone -----------
+# Contract B6. Lands ONLY extensions/"$ext_name"/ at the pinned ref into
+# dest_dir — never the whole repo; that narrowness is the point of I-32.
+#
+# Whether this git build even supports `--filter=blob:none --sparse`
+# (partial clone landed in git 2.25; the `--sparse` clone flag in 2.27)
+# varies by distro backport, so parsing `git --version` ourselves would be
+# unreliable. We instead PROBE capability by attempting the real clone and
+# treating ITS failure as the single signal to fall back to the tarball path
+# below (Contract B6: "unavailable or fails" — deliberately not
+# distinguishing an old git from a bad ref from a network error here; the
+# tarball fallback either recovers from it or reproduces the same failure
+# with its own clear message, so nothing is lost by not diagnosing further).
+#
+# `--branch "$ref"` resolves a tag or branch; it does NOT resolve an
+# arbitrary raw commit SHA on every server. A caller who passes --ref as a
+# bare commit SHA may legitimately fail HERE and fall through to the
+# tarball path below, which resolves any commit via codeload — by design,
+# not a bug (the two paths' capabilities are complementary, not identical).
+#
+# GIT_TERMINAL_PROMPT=0: never let this script block waiting on a TTY
+# credential prompt — it fetches a public ref with no credential of any
+# kind (see REPO_URL comment above); if that ever needs auth, it must fail
+# fast, not hang.
+sparse_clone_fetch() {  # $1=ref $2=ext_name $3=dest_dir → 0 fetched, 1 fall back
+  ref="$1"
+  ext_name="$2"
+  dest_dir="$3"
+
+  command -v git >/dev/null 2>&1 || return 1
+
+  GIT_TERMINAL_PROMPT=0 git clone --quiet --depth 1 --filter=blob:none \
+    --sparse --branch "${ref}" -- "${REPO_URL}" "${dest_dir}" \
+    >/dev/null 2>&1 || return 1
+  git -C "${dest_dir}" sparse-checkout set "extensions/${ext_name}" \
+    >/dev/null 2>&1 || return 1
+  [ -f "${dest_dir}/extensions/${ext_name}/install.sh" ] || return 1
+  return 0
+}
+
+# ---- fetch path 2 (fallback): codeload tarball at the SAME pinned ref ------
+# Contract B6/B7. Used only when the sparse clone above is unavailable or
+# fails, for any reason. codeload has no subtree-only endpoint, so this
+# downloads the whole-repo tarball at "$ref" and then extracts and keeps
+# ONLY extensions/"$ext_name"/ — so both fetch paths land the identical
+# subtree at dest_dir, and the delegate step below cannot tell them apart.
+# curl + tar only (Contract B7) — no other third-party dependency.
+tarball_fetch() {  # $1=ref $2=ext_name $3=dest_dir → 0 fetched, 1 failure
+  ref="$1"
+  ext_name="$2"
+  dest_dir="$3"
+
+  command -v curl >/dev/null 2>&1 || return 1
+  command -v tar  >/dev/null 2>&1 || return 1
+
+  archive="${dest_dir}.tar.gz"
+  extract_dir="${dest_dir}.extract"
+  # Clears any partial state a failed sparse_clone_fetch() attempt may have
+  # left at dest_dir (e.g. a half-cloned .git/) — this is the ONLY place
+  # dest_dir is reset for this path, so the caller need not clean up first.
+  rm -rf "${dest_dir}" "${extract_dir}" "${archive}"
+  mkdir -p "${extract_dir}" || return 1
+
+  # Same endpoint form Contract B6/B7 names: codeload accepts a tag, branch,
+  # or commit SHA as <ref> — slashes included, which this repo's own tags
+  # need (complete/<spec-id>, e.g. complete/008-pre-public-maintenance).
+  curl -fsSL -o "${archive}" "${CODELOAD_URL_BASE}/${ref}" || return 1
+
+  # codeload wraps the whole repo in one top-level "<repo>-<ref>/" directory
+  # whose exact sanitized name we don't predict, so extract to a scratch dir
+  # first, locate that one top-level dir, then keep ONLY the subtree we
+  # need. A plain POSIX directory glob (dir/*/ matches directories only) —
+  # not `find -mindepth/-maxdepth`, which is a GNU/BSD extension, not POSIX.
+  tar -xzf "${archive}" -C "${extract_dir}" || return 1
+  rm -f "${archive}"
+
+  top_dir=""
+  for d in "${extract_dir}"/*/; do
+    [ -d "${d}" ] || continue
+    top_dir="${d}"
+    break
+  done
+  [ -n "${top_dir}" ] || return 1
+  [ -d "${top_dir}extensions/${ext_name}" ] || return 1
+
+  mkdir -p "${dest_dir}/extensions" || return 1
+  mv "${top_dir}extensions/${ext_name}" "${dest_dir}/extensions/${ext_name}" || return 1
+  rm -rf "${extract_dir}"
+
+  [ -f "${dest_dir}/extensions/${ext_name}/install.sh" ] || return 1
+  return 0
+}
+
 fetch_and_delegate() {  # $1=ext_name $2=ref $3=target_dir $4=tmp_dir
   ext_name="$1"
   ref="$2"
   target_dir="$3"
   tmp_dir="$4"
 
-  # T004: replace this stub with the fetch + delegate steps described above.
-  die "fetch_and_delegate() is not implemented yet (T004 — see the SEAM FOR T004 comment above this function). Cannot install '${ext_name}' @ '${ref}' into '${target_dir}' (tmp workspace: '${tmp_dir}')."
+  # A dedicated subdir of tmp_dir, not tmp_dir itself: keeps a failed
+  # primary attempt's partial state from ever being mistaken for a
+  # successful fetch by the fallback path or the delegate step below — both
+  # fetch paths always land the final tree at exactly this one path, so the
+  # delegate step cannot tell which path produced it.
+  fetched_dir="${tmp_dir}/src"
+
+  if sparse_clone_fetch "${ref}" "${ext_name}" "${fetched_dir}"; then
+    ok "fetched extensions/${ext_name}/ @ '${ref}' (sparse clone)"
+  else
+    warn "sparse clone unavailable or failed for '${ref}' — falling back to the codeload tarball"
+    if tarball_fetch "${ref}" "${ext_name}" "${fetched_dir}"; then
+      ok "fetched extensions/${ext_name}/ @ '${ref}' (codeload tarball fallback)"
+    else
+      die "could not fetch extensions/${ext_name}/ @ '${ref}' via sparse git clone OR the codeload tarball fallback — check that '${ref}' exists as a tag/commit and that ${REPO_URL} is reachable (and, until the D73 visibility flip, public)"
+    fi
+  fi
+
+  installer="${fetched_dir}/extensions/${ext_name}/install.sh"
+  [ -f "${installer}" ] || die "fetched tree has no extensions/${ext_name}/install.sh @ '${ref}' — unexpected repo layout at that ref"
+  chmod +x "${installer}" 2>/dev/null || true
+
+  # Delegate — never re-implement install logic (Contract B2/FR-003/D45).
+  # Exec the fetched extension's OWN install.sh, via ITS OWN shebang (most
+  # sibling installers are #!/usr/bin/env bash; deck-render's is POSIX sh —
+  # either way that is its call, not ours to second-guess or replicate).
+  #
+  # Deliberately the LAST statement in this function, unwrapped by any
+  # if/&&/||/$(): under this script's `set -eu`, if it fails, the shell
+  # exits immediately with THIS exact exit status, which the EXIT trap's
+  # cleanup() (already installed above — see the SEAM comment) captures as
+  # `rc=$?` before it removes tmp_dir, then re-asserts with `exit "$rc"`.
+  # That is how the delegated command's exit status survives verbatim
+  # (Contract §Exit codes) without this function installing any trap of its
+  # own.
+  "${installer}" "${target_dir}"
 }
 
 fetch_and_delegate "${EXT_NAME}" "${REF}" "${TARGET_DIR}" "${TMP_DIR}"
