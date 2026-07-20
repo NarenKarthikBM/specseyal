@@ -43,77 +43,38 @@ per feature as `human` or `auto` via a `profile.yaml`.
 **Install**
 
 ```bash
-# 1. Get the SpecSeyal source onto disk. The installers are a local file copy
-#    (no network fetch), so the extensions/ tree must be present. Any of:
-git clone https://github.com/NarenKarthikBM/specseyal.git         # full history, or
-git clone --depth 1 https://github.com/NarenKarthikBM/specseyal.git   # shallow, or
-#    no git at all — download and extract the tree:
-#    curl -L https://github.com/NarenKarthikBM/specseyal/archive/refs/heads/main.tar.gz | tar xz
-cd specseyal        # (or specseyal-main from the tarball)
-
-# 2. Initialize GitHub Spec Kit in the repo you want the pipeline in — installs
-#    .specify/ and the stock /speckit-* commands as .claude/skills/.
+# 1. Initialize Spec Kit in your repo — installs .specify/, which every
+#    SpecSeyal extension requires.
 specify init --here --integration claude
 
-# 3. Layer each SpecSeyal extension on top, one install.sh per extension. Each
-#    installer's last argument is the TARGET repo (the one initialized in step 2):
-#    "." installs into the current directory; pass a path to install elsewhere.
-bash extensions/graphify/install.sh .
-bash extensions/council/install.sh .
-bash extensions/git/install.sh .
-bash extensions/workforce/install.sh .
-bash extensions/testing/install.sh .
-bash extensions/deck-render/install.sh .
+# 2. Layer on the extensions you want. No clone needed — bootstrap.sh fetches
+#    a single extension subtree and runs that extension's own install.sh.
+curl -fsSLO https://raw.githubusercontent.com/NarenKarthikBM/specseyal/complete/008-pre-public-maintenance/bootstrap.sh
+sh bootstrap.sh graphify .
+sh bootstrap.sh council .
+sh bootstrap.sh git .
+sh bootstrap.sh workforce .
+sh bootstrap.sh testing .
+sh bootstrap.sh deck-render .
 ```
 
-To layer SpecSeyal onto a *different* repo, point the target argument at it —
-e.g. `bash /path/to/specseyal/extensions/graphify/install.sh /path/to/your-repo`.
+The second argument is the target repo (defaults to `.`) — pass a path to
+install elsewhere. Add `--ref <tag>` to pull the extension subtree from a
+different release; it always takes a concrete tag or commit, never a moving
+branch. Every installer is idempotent, and every extension ships an
+`uninstall.sh`.
 
-Every installer is idempotent — re-running it updates the extension in place
-rather than duplicating it — and every extension ships an `uninstall.sh`
-alongside its `install.sh`.
+`sh bootstrap.sh --self-test` checks the script itself and installs nothing.
 
-**Clone-free install (single extension)**
+**Install from a clone**
 
-Don't want to clone the whole repo just to install one extension?
-`bootstrap.sh`, at the SpecSeyal repo root, fetches a single
-`extensions/<name>/` subtree from a pinned ref and delegates straight to that
-extension's own `install.sh` — no manual `git clone` of SpecSeyal required.
-This is additive to the route above, not a replacement: both work, and
-re-running either is idempotent.
-
-The documented default is the reviewable two-step form — fetch the script,
-then run it, so you can read it before anything executes:
+Prefer the source on disk (or building SpecSeyal itself)? Clone, then run each
+installer directly — the last argument is the target repo:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/NarenKarthikBM/specseyal/<pinned-ref>/bootstrap.sh
-sh bootstrap.sh <extension-name> [<target-repo-dir>] [--ref <pinned-ref>]
+git clone --depth 1 https://github.com/NarenKarthikBM/specseyal.git && cd specseyal
+bash extensions/graphify/install.sh /path/to/your-repo   # repeat per extension
 ```
-
-`<pinned-ref>` is a concrete tag — the earliest one carrying `bootstrap.sh` is
-`complete/008-pre-public-maintenance`, so it is the floor for this route. Note
-that the two refs are independent: the `curl` URL selects which ref
-`bootstrap.sh` *itself* is fetched from, while `--ref` selects which ref the
-*extension subtree* is fetched from. Pin both to the same tag unless you
-deliberately want otherwise.
-
-`<extension-name>` is one of: `git | graphify | council | workforce | testing
-| deck-render`. `<target-repo-dir>` is optional and defaults to `.` (must
-already exist). `--ref` always takes a concrete tag or commit, never a moving
-branch.
-
-A convenience one-liner exists but is intentionally secondary — it skips the
-inspection step above, so treat it as a shortcut for a ref you already
-trust, not the primary path:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/NarenKarthikBM/specseyal/<pinned-ref>/bootstrap.sh | sh -s -- <extension-name> [<target-repo-dir>] [--ref <pinned-ref>]
-```
-
-`sh bootstrap.sh --self-test` exercises both of its fetch paths (sparse clone
-and tarball fallback) against local, hermetic stand-ins and installs nothing
-— a way to sanity-check the script itself before pointing it at a real
-target.
 
 **First commands**
 
