@@ -332,3 +332,56 @@ confirming it refuses to pass on exit code alone.
 "Both-branch fixtures" section, line 40) names `specs/000-sample` as the standing CI golden. That
 literal text was **not** implemented, by human decision. Recorded here and in the harness comment
 as a deliberate, disclosed deviation — carried to T017.
+
+---
+
+2026-07-20T10:53:00Z | wave 10 | tasks: T016 | agents: 1 | outcome: success
+
+## T016 — quickstart integration gate: SC-001…SC-010 binding (R1-S09)
+
+Read-only. `git status --porcelain | wc -l` → `0` before and after; scratch confined to `/tmp`
+and removed. Independently re-confirmed by the orchestrator.
+
+### Harness results vs. T001 baseline
+
+| harness | baseline | this run | verdict |
+|---|---|---|---|
+| git | 61/0 | **61/0** | match |
+| graphify | 28/0 → 40/0 expected post-T014 | **40/0** | match |
+| workforce | 13/0 → 25/0 expected post-T002+T011 | **25/0** | match |
+| testing | 43/0 | **43/0** | match |
+| deck-render | 92/8 | **92/8**, same 8 | unchanged, out of scope |
+
+### SC verdicts
+
+| SC | Verdict | Basis |
+|---|---|---|
+| SC-001 | **PROVISIONAL** | `--self-test` 3 pass/0 fail/1 named skip; arg-injection + enum guards executed. Real default-ref install reproduced the two documented blockers exactly: `curl: (56) … 404` on `complete/008-pre-public-maintenance`. True outsider path not completable. |
+| SC-002 | **PROVISIONAL** | README's "Not available yet" notice verified **accurate against live 404 behaviour**; step-1/step-2 ref distinction correct; no undocumented step. The doc's own honest verdict is "not available yet". |
+| SC-003 | **PROVISIONAL** | Local-route idempotency **fully executed and PASS** — `install.sh <target>` run twice, sha256 of the whole `.claude/`+`.specify/` tree byte-identical. Clone-free half untestable until SC-001 clears. |
+| SC-004 | **PASS** | All 7 fixture dirs correct. Additionally exercised against a **real live feature** (`specs/001-council-extension`): D50 rule-5 carve-out honored with **zero false positives** — a check beyond the brief, on real data. |
+| SC-005 | **PASS** | §7 no-import guard `ok`; §8 double-run byte-identical (stdout, stderr, exit code); manually reproduced. **Genuinely moved from manual to code-verified** (R1-S21). |
+| SC-006 | **PASS** | Both seam hooks present in the manual block; `61 passed, 0 failed`; guard's FAIL-on-divergence independently bite-tested at wave 7. |
+| SC-007 | **PASS** | All three whitespace variants (`#x`, `  #  x`, tab) pass, plus `dequote`/`parse_shell`/`resolve_target` regressions. `40 passed, 0 failed`. |
+| SC-008 | **NOT EXECUTED** | Rule text confirmed present in both council SKILL.md files, but **zero** council rounds anywhere carry the line — correct, since I-29 is forward-only (R1-S13) and 008's own round predates it. Nothing to observe yet. |
+| SC-009 | **NOT EXECUTED** | No task in 008's own waves had a sole gitignored output, so the live rule was never exercised. The detector side is proven by T007's fixture, but that is an SC-004 concern, not a live run. |
+| SC-010 | **NOT EXECUTED** | By design — T017 (wave 11) is strictly after this gate. All six I-rows found, **none yet resolved**. |
+
+**Aggregate: 4 code-verified · 3 provisional · 3 not executed = 10/10 accounted for, none silently skipped.**
+
+### Named executor + timing for the six manual-only criteria
+
+- **SC-001 / SC-002 / SC-003** — repo maintainer, in one session immediately after **both** (a) this
+  feature's cleanup mints `complete/008-pre-public-maintenance` and (b) the D73 visibility flip;
+  from a machine with **zero prior git credential** for this repo. SC-003's local half is already
+  discharged; only the clone-free half remains.
+- **SC-008** — whoever runs `/speckit-council` on the next feature (≥ 009); verified by grepping
+  that round's `decision-record.md`/`suggestions.md` for `Council apparatus`.
+- **SC-009** — whoever runs `/speckit-implement-parallel` on the next feature containing a task
+  whose sole output is gitignored (paradigm: a deck-render feature emitting only a `.pptx`);
+  verified by grepping that feature's `traces.jsonl` for `"artifact": null` on that task.
+- **SC-010** — this feature's own **T017**, the very next wave.
+
+**SC-001/002/003 are PROVISIONAL for two independent reasons**, both requiring post-D73
+re-confirmation: the repo is private (R1-S06's original reason), **and** the pinned default ref
+does not exist until this feature's own cleanup tags it (discovered this run).
