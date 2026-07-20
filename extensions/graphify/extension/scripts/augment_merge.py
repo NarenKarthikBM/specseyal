@@ -128,7 +128,20 @@ def parse_hook_commands(text):
         if in_hooks:
             m = re.match(r"^\s+command:\s*(.+?)\s*$", line)
             if m:
-                cmds.append(dequote(m.group(1).strip()))
+                raw = m.group(1).strip()
+                # I-26/FR-012/H2.1-2: strip a trailing inline YAML comment before
+                # dequote() so it never leaks into the minted command id (e.g.
+                # "speckit.git.record-gate  # hook-internal action: ..." must mint
+                # "speckit.git.record-gate", not the comment tail too). Only a
+                # whitespace-preceded '#' counts as a comment start (mirrors YAML's
+                # own rule); a '#' glued directly onto the id with no preceding
+                # space/tab is left alone as part of the id. Scoped to THIS caller
+                # only, applied before dequote() — dequote() itself is untouched, so
+                # its other two callers (resolve_target, parse_shell) — which parse
+                # shell content where '#' is legitimate inside paths/strings/args —
+                # are unaffected.
+                raw = re.sub(r"[ \t]+#.*$", "", raw)
+                cmds.append(dequote(raw))
     return cmds
 
 

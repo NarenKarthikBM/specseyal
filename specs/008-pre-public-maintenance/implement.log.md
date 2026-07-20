@@ -249,3 +249,48 @@ This proves the guard derives from the manifest rather than matching a hardcoded
 `print_manual_block()` definitions — `deck-render`, `graphify`, `testing`, `workforce` — carry
 the same latent drift with no guard. The durable deliverable here is the guard pattern, not the
 two-line fix (R1-S07).
+
+---
+
+2026-07-20T10:33:20Z | wave 8 | tasks: T014 | agents: 1 | outcome: success
+
+## T014 both-branch evidence (H2 / SC-007 / R1-S03)
+
+- **Pre-fix (parser reverted, fixtures kept):** `Result: 36 passed, 4 failed`, exit 1 — the three
+  whitespace-variant checks plus the real-world `extensions/git/extension/extension.yml` pin went
+  red, while all 8 boundary/regression assertions stayed green. That split matters: it proves the
+  regression assertions are a genuine untouched baseline, not coincidentally passing.
+- **Post-fix:** `Result: 40 passed, 0 failed`, exit 0 — T001's 28 plus 12 new.
+- **The strip is scoped to `parse_hook_commands()`; `dequote()` is byte-for-byte unmodified**
+  (confirmed by the orchestrator: `dequote` does not appear in the diff at all). This was the
+  task's main hazard — stripping inside `dequote()` would have silently corrupted `parse_shell()`,
+  which parses shell content where `#` is legitimate in paths, strings, and arguments. Committed
+  regression fixtures cover `resolve_target()` and `parse_shell()`, including a quoted-path case
+  containing an internal `" #"` that would have caught exactly that mistake.
+- **Mirror resync: not triggered.** No `extension.yml` was touched, so a graphify reinstall would
+  be a no-op against `.specify/extensions.yml`.
+
+## Finding carried to T017 — graphify installed-mirror drift (wave 8)
+
+Surfaced by T014, independently confirmed and quantified by the orchestrator. **Pre-existing and
+unrelated to this feature's changes**; out of the FR-015 allowlist, so recorded rather than fixed.
+
+`.specify/extensions/graphify/` (the installed `cp -R` mirror of `extension/`) is missing two
+entries present in source:
+
+```
+MISSING from mirror:  graphify-version.pin
+MISSING from mirror:  scripts
+```
+
+and `grep -rl augment_merge .specify/` returns nothing — the installed tree carries no reference
+to that script at all.
+
+**Consequence, stated carefully:** T014's fix is correct in source, and that is where
+`extensions/graphify/test/run.sh` exercises it, so the 40/0 result is sound. But the installed
+graphify extension does not carry `augment_merge.py`, so the fix cannot take effect for anything
+running from `.specify/`. Whether the mirror *should* carry `scripts/` (drift) or deliberately
+omits it because the script is a dev-time tool run from source (by design) is **not adjudicated
+here** — T017 should decide which it is. This matches the repo's known install-mirror-drift
+pattern, so drift is the more likely reading, but the orchestrator did not verify that and does
+not assert it.
