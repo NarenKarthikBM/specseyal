@@ -91,7 +91,13 @@ Barrier: wait for the single return, then append its one trace fragment (§ Trac
 
 Dispatch **one `Opus` subagent**, mode `synthesis` — never `delta-check`; that mode belongs exclusively to `/speckit-council-triage`'s post-revision check, and this skill never invokes it, reopen included. Prompt = the rendered `chairman-prompt.md` §2 block with `{{feature}}`, `{{round}}`, `{{opinions_dir}} = council/round-N/opinions`, `{{peer_dir}} = council/round-N/opinions/peer`, `{{plan_path}} = plan.md` substituted. The chairman reads every stage-1 opinion (`opinions/<A..E>.md`) **and every stage-2 peer file present** under `opinions/peer/` — **ten files under tier `full`** (5 opinions + 5 per-member peer), **six under `standard`** (5 opinions + one `consolidated.md`) — it is the *only* session ever permitted to open them, and it discovers the peer files by listing `opinions/peer/` rather than assuming a fixed count. It writes `council/round-N/suggestions.md`: classified rows, stable `R<round>-S<nn>` IDs, the reduced-grounding banner iff any opinion flagged it, and a Chairman's note. Its return is status + verdict counts **only** — no suggestion text, no opinion excerpts.
 
-Barrier: wait for the return, then append its trace fragment (§ Traces).
+**Council-apparatus provenance (I-29).** `suggestions.md`'s metadata block records who prepared it but not which version of the council machinery produced it. Once the chairman's return confirms the file exists, resolve `APPARATUS_SHA=$(git rev-parse HEAD -- extensions/council/)` yourself — the same direct-git-command mechanism `/speckit-council-triage` uses for its own plan/deck provenance, never delegated to the chairman — and insert one new line immediately after the file's existing `**Reads**:` line:
+```
+**Council apparatus**: `extensions/council/` @ `<APPARATUS_SHA>`
+```
+Before resolving it, run `git status --porcelain -- extensions/council/`: any output means `extensions/council/` is dirty and the SHA alone doesn't fully describe what ran — append the literal suffix ` (dirty — uncommitted changes present)` to the line; omit it when the tree is clean. Write this line only into the `suggestions.md` you generate this run — never back-fill it into a `round-N/suggestions.md` written before this instruction existed; that would violate the immutability guardrail below (a completed round is never touched again) even though it isn't literally an overwrite.
+
+Barrier: wait for the return, insert the council-apparatus provenance line above, then append the chairman's trace fragment (§ Traces).
 
 ## Query-ceiling enforcement (arm 4 — D77, S09, `005-graphify-context`)
 

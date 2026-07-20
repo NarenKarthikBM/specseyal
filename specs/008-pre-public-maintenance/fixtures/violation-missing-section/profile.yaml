@@ -1,0 +1,17 @@
+# Autonomy profile — violation-missing-section
+# Fixture (T007, specs/008-pre-public-maintenance/fixtures). Both gates human (D9 default).
+# See docs/contracts/profile-schema.md.
+schema_version: "1.0"
+feature: "violation-missing-section"
+
+full_auto: false
+council_tier: full
+deck_render: none            # renders nothing; the default (D73(3), profile-schema.md S1.2).
+
+gates:
+  council:
+    mode: human
+    max_rounds: 1
+    reopen_tier: auto
+  workforce:
+    mode: human

@@ -78,3 +78,41 @@ directory is unexempted. Verified both branches: PASS 14/14 on the clean tree; F
 history only, so an *uncommitted* working-tree stray is not caught. This matches `tasks.md`'s
 literal specification of the diff command, and is harmless under this run's discipline — every
 wave commits before its tasks are marked `[X]`, so by T018 the full branch is committed.
+
+---
+
+2026-07-20T09:20:10Z | wave 3 | tasks: T003, T007, T013, T015 | agents: 4 | outcome: success
+
+## Findings carried to T017 (wave 3)
+
+Two items surfaced by wave-3 agents that belong in the `docs/90` close-out, recorded here so
+they are not lost between waves:
+
+1. **`hardening-invariants.md` H3's site description is inaccurate** (surfaced by T013). H3
+   names the edit sites as `suggestions.md` "alongside the existing plan/deck SHAs" and
+   `decision-record.md` "§5 Metadata". Neither matches the files: `suggestions.md` carries no
+   plan/deck SHA lines at all (only `Feature`/`Prepared by`/`Reads`), and `decision-record.md`'s
+   `## Metadata` is a cardinality-1 section of five fixed fields per `docs/contracts/
+   decision-record.md` §3 that holds no SHAs — the real plan/deck provenance lives in the
+   per-round `## Round N` block. T013 placed the apparatus line in `## Round N` beside the
+   actual `Deck reviewed:`/`Plan reviewed:` lines, and had the orchestrator post-insert into
+   `suggestions.md` rather than edit out-of-scope templates. Additive and contract-clean, but a
+   council-approved contract carries a wrong site description that survived the round.
+
+2. **`bootstrap.sh`'s default `--ref` is a forward reference** (surfaced at wave-3 dispatch).
+   There are no release tags in this repo — only `complete/<spec-id>` completion tags, latest
+   `complete/007-oss-docs`. `bootstrap.sh` is introduced by 008, so it exists in no earlier tag;
+   the only correct pinned default is `complete/008-pre-public-maintenance`, minted by this
+   feature's own cleanup. Until that tag lands the documented one-command install fails unless
+   the user passes `--ref` explicitly. This is a second, independent reason SC-001/002/003
+   sign-off is provisional, beyond R1-S06's private-repo reason — T006 must state it in the
+   README and T016 cannot validate the default path.
+
+## Orchestrator integration patch (wave 3)
+
+T015's rule said only "before writing a task's record, probe whether the path is tracked",
+without pinning the probe relative to the wave commit. Read at the wrong moment every
+brand-new file is untracked, so a trace written pre-commit would null out legitimate outputs.
+Patched inline (not re-dispatched) with a clause pinning the probe to **after** step 4's
+commit, matching this skill's own step 4 → step 5 ordering. Contract H4.1–H4.3 were already
+satisfied by the agent's text; this closes a misread, not a contract gap.
