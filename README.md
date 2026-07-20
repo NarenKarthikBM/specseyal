@@ -45,10 +45,10 @@ per feature as `human` or `auto` via a `profile.yaml`.
 ```bash
 # 1. Get the SpecSeyal source onto disk. The installers are a local file copy
 #    (no network fetch), so the extensions/ tree must be present. Any of:
-git clone https://github.com/<owner>/specseyal.git         # full history, or
-git clone --depth 1 https://github.com/<owner>/specseyal.git   # shallow, or
+git clone https://github.com/NarenKarthikBM/specseyal.git         # full history, or
+git clone --depth 1 https://github.com/NarenKarthikBM/specseyal.git   # shallow, or
 #    no git at all — download and extract the tree:
-#    curl -L https://github.com/<owner>/specseyal/archive/refs/heads/main.tar.gz | tar xz
+#    curl -L https://github.com/NarenKarthikBM/specseyal/archive/refs/heads/main.tar.gz | tar xz
 cd specseyal        # (or specseyal-main from the tarball)
 
 # 2. Initialize GitHub Spec Kit in the repo you want the pipeline in — installs
