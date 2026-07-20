@@ -174,6 +174,8 @@ print_manual_block() {
       after_analyze:   [ {extension: git, command: speckit.git.commit,      optional: false, phase: analyze, priority: 5} ]
       after_tasks:     [ {extension: git, command: speckit.git.commit,      optional: false, phase: tasks,   priority: 5} ]
       after_implement: [ {extension: git, command: speckit.git.commit,      optional: false, phase: impl,    priority: 5} ]
+      after_complete:  [ {extension: git, command: speckit.git.commit,      optional: false, phase: complete, priority: 5} ]
+      after_testing:   [ {extension: git, command: speckit.git.commit,      optional: false, phase: testing,  priority: 5} ]
       after_council_approve: [ {extension: git, command: speckit.git.record-gate, optional: false, gate: council, priority: 5} ]
       after_workforce_approve: [ {extension: git, command: speckit.git.record-gate, optional: false, gate: workforce, priority: 5} ]
       before_plan:      # 007 T015 — fail-closed profile validation at the plan boundary

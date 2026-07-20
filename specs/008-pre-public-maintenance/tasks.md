@@ -121,7 +121,7 @@ docs/90-DECISIONS-AND-IDEAS.md
 
 ### Implementation for User Story 3
 
-- [ ] T012 [US3] I-23 — git-ext manual-fallback completeness + divergence guard. **One lock-step task in this fixed sub-order (R1-S11)**, touching `extensions/git/install.sh` and `extensions/git/test/run.sh`:
+- [X] T012 [US3] I-23 — git-ext manual-fallback completeness + divergence guard. **One lock-step task in this fixed sub-order (R1-S11)**, touching `extensions/git/install.sh` and `extensions/git/test/run.sh`:
   1. **Mirror resync first (R1-S23)** — if the work triggers a git-ext reinstall, re-sync `extension/extension.yml` → `.specify/extensions.yml` **strictly before** the guard runs, so the guard never validates a stale installed mirror. Not an independently-ordered separate commit.
   2. **Generalize the guard** in `extensions/git/test/run.sh` — replace the current single-hook grep (L164, `after_workforce_approve` only) with an assertion that **every** hook registered in `extensions/git/extension/extension.yml` appears in the manual block, **scoped to `extensions/git/install.sh` specifically** — not a bare `print_manual_block` name match, which any of the five identical copies would satisfy (R1-S10/FR-011).
   3. **Witness it FAIL** against the current pre-fix state (`after_complete`/`after_testing` missing from the block) — a guard that passes on real divergence is not a guard (spec Edge).

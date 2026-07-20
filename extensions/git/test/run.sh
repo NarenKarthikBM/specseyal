@@ -158,13 +158,45 @@ gate_routed after_workforce_approve workforce && ok "after_workforce_approve SUR
 ( cd "$W" && sh "$w_gates_sh" write workforce >/dev/null 2>&1 ) && ok "gates.sh write workforce still succeeds after reinstall" || bad "gates.sh write workforce broken after reinstall — R1-S04/S07/S17 now covering workforce"
 
 # static check on the fix itself: install.sh's PyYAML-unavailable manual fallback block (the
-# text a human pastes by hand on a host with neither a PyYAML interpreter nor `uv`) must also
-# declare after_workforce_approve — the auto-merge exercised above can't reach that code path
-# on this host (uv is present), so this greps the source directly for the fixed entry.
-if awk '/^print_manual_block/,/^MANUAL$/' "$GIT_EXT/install.sh" | grep -q 'after_workforce_approve.*record-gate.*gate: workforce'; then
-  ok "install.sh manual fallback declares after_workforce_approve (record-gate, gate: workforce)"
+# text a human pastes by hand on a host with neither a PyYAML interpreter nor `uv`) must
+# declare 100% of the hooks extension.yml registers (H1/I-23) — the auto-merge exercised above
+# can't reach that code path on this host (uv is present), so this greps the source directly.
+# Generalized (was a single after_workforce_approve grep) to derive its expected hook set from
+# the manifest itself, not a hardcoded list, so it keeps tracking extension.yml as it evolves
+# (H1.2) instead of drifting again the next time a hook is added there.
+GIT_MANIFEST="$GIT_EXT/extension/extension.yml"          # READ-ONLY source of truth (nested under extension/)
+
+# manifest_hook_names — every top-level key under the manifest's `hooks:` map (e.g.
+# after_specify, before_tasks, …), one per line. Line-based, no PyYAML: a hook key is a line
+# indented exactly 2 spaces under `hooks:` (its own nested fields sit 2+ spaces deeper, and
+# `before_tasks`/`before_implement`'s list-of-mappings form is still keyed the same way).
+manifest_hook_names() {
+  awk '
+    /^hooks:/     { in_hooks = 1; next }
+    in_hooks && /^[A-Za-z]/ { in_hooks = 0 }
+    in_hooks && /^  [A-Za-z_][A-Za-z0-9_]*:/ { print }
+  ' "$GIT_MANIFEST" | sed -n 's/^  \([A-Za-z_][A-Za-z0-9_]*\):.*/\1/p'
+}
+
+# manual_block_declares <hook-name> — true iff that hook key starts a line inside git's own
+# print_manual_block() body. Scoped to extensions/git/install.sh SPECIFICALLY (not a bare
+# `print_manual_block` name match) — five structurally-identical print_manual_block()
+# definitions exist across the extensions/ tree (deck-render, git, graphify, testing,
+# workforce); reading any other one would make this guard vacuous (R1-S10/FR-011).
+manual_block="$(awk '/^print_manual_block/,/^MANUAL$/' "$GIT_EXT/install.sh")"
+manual_block_declares() {
+  printf '%s\n' "$manual_block" | grep -qE "^ *$1:"
+}
+
+missing_hooks=""
+for h in $(manifest_hook_names); do
+  manual_block_declares "$h" || missing_hooks="$missing_hooks $h"
+done
+
+if [ -z "$missing_hooks" ]; then
+  ok "install.sh manual fallback (extensions/git/install.sh) declares 100% of extension.yml-registered hooks"
 else
-  bad "install.sh manual fallback still missing after_workforce_approve"
+  bad "install.sh manual fallback missing hook(s) registered in extension.yml:$missing_hooks"
 fi
 
 # ---------------------------------------------------------------------------

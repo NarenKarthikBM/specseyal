@@ -210,3 +210,42 @@ testing.md           · 4 unexpected top-level headings (contract defines no opt
 traces.jsonl:20      · role 'tester' missing required 'context_in'             (D72)
 traces.jsonl:6,7,8   · role 'council-member' missing 'graph_queries'/'ceiling_hit' (D77)
 ```
+
+---
+
+2026-07-20T10:20:05Z | wave 7 | tasks: T012 | agents: 1 | outcome: success
+
+## T012 lock-step evidence (R1-S11 / H1 / SC-006)
+
+All five sub-steps executed in the mandated order; the FAIL-witness preceded the fix.
+
+- **Step 1 — mirror resync: NOT TRIGGERED.** The git harness runs entirely against throwaway
+  repos under `$TMPDIR` and never installs into this working tree, so no reinstall occurred.
+  `.specify/extensions.yml` confirmed zero-diff. R1-S23 is satisfied vacuously, and this is
+  recorded rather than silently skipped.
+- **Step 2 — guard generalized.** `manifest_hook_names()` extracts all **13** top-level keys
+  under `hooks:` from `extensions/git/extension/extension.yml` (line-based awk/sed, no PyYAML),
+  and the assertion is scoped to `"$GIT_EXT/install.sh"` specifically — never a bare
+  `print_manual_block` name match, which any of the five identical copies would satisfy
+  (R1-S10/FR-011).
+- **Step 3 — FAIL witnessed (pre-fix), verbatim:**
+  `FAIL install.sh manual fallback missing hook(s) registered in extension.yml: after_complete after_testing`
+  → `Result: 60 passed, 1 failed`
+- **Step 4 — fix applied.** `print_manual_block()` +2 entries (`after_complete`, `after_testing`),
+  matching the block's existing alignment and field order.
+- **Step 5 — PASS witnessed (post-fix), verbatim:**
+  `PASS install.sh manual fallback (extensions/git/install.sh) declares 100% of extension.yml-registered hooks`
+  → `Result: 61 passed, 0 failed` — matching T001's baseline count exactly.
+
+**Orchestrator independent re-verification.** Rather than accept the reported witness, the
+orchestrator ran its own bite test: removed the `after_testing` entry from the manual block and
+re-ran the suite, obtaining
+`FAIL install.sh manual fallback missing hook(s) registered in extension.yml: after_testing`
+→ `60 passed, 1 failed`; restored and re-confirmed `61 passed, 0 failed`. `git diff --stat`
+confirms `install.sh` carries exactly the intended `+2` lines and no residue from the test.
+This proves the guard derives from the manifest rather than matching a hardcoded list.
+
+**Scope note for T017.** I-23 closes **git's copy only**. The other four structurally-identical
+`print_manual_block()` definitions — `deck-render`, `graphify`, `testing`, `workforce` — carry
+the same latent drift with no guard. The durable deliverable here is the guard pattern, not the
+two-line fix (R1-S07).
